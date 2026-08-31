@@ -1,0 +1,5 @@
+* Synthetic structural CDL view for the OpenCollate UART example.
+.SUBCKT uart clk_i rst_ni tx_en_i data_i data_o irq_o tx_active_o VDD_CORE VSS
+*.PININFO clk_i:I rst_ni:I tx_en_i:I data_i:I data_o:O irq_o:O tx_active_o:O VDD_CORE:B:P VSS:B:G
+.ENDS uart
+.END

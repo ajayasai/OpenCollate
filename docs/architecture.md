@@ -9,108 +9,121 @@ truth**.
 source files
     │
     ▼
-isolated parser adapters
-    │  observations + provenance + fact state
+format-specific, non-writing parser adapters
+    │  observations + provenance + fact state + parser diagnostics
     ▼
-normalization
-    │  names, roles, directions, shapes
+normalization and identity resolution
+    │  names, roles, directions, shapes, aliases, participation
     ▼
-resolution and participation
-    │  canonical object identities + explicit aliases
-    ▼
-design contract
+canonical design and optional frozen contract
     │
-    ├── inventory checks
-    ├── semantic checks
-    ├── mapping checks
-    └── completeness checks
+    ├── interface and inventory checks
+    ├── object-reference and clock checks
+    ├── mapping and register checks
+    └── completeness and integrity checks
             │
             ▼
-diagnostics → text / JSON / Markdown / SARIF
+diagnostics → text / JSON / Markdown / SARIF / contract JSON
 ```
 
-Pairwise comparison grows quadratically and tends to hide which view supplied a conclusion.
-OpenCollate instead reconciles every observation into one evidence-bearing contract. A new parser
-does not need custom comparison logic for every existing parser.
+Pairwise comparison grows quadratically and hides which view supplied a conclusion. OpenCollate
+instead reconciles observations into shared identities while preserving every source spelling,
+view, and location. A new parser can contribute facts without custom comparisons against every
+existing parser.
 
-## Layers
+## Observation model
 
-### Parser adapters
+`ViewObservation` is the parser boundary. It can carry:
 
-Each adapter owns syntax recovery and source-specific semantics. It emits components, ports,
-shapes, roles, functions, mappings, and parser diagnostics in a parser-neutral model. An adapter
-must not:
+- Component and port definitions, shapes, roles, directions, and small Boolean functions.
+- Explicit die-pad/package-ball/signal mappings.
+- Named design-object definitions or references with kind, scope, and relation.
+- Static clock definitions and targets.
+- IP-XACT interfaces and logical-to-physical port maps.
+- Registers and fields with address, size, layout, access, and reset facts.
+- Experimental GDSII cell definitions, SREF/AREF hierarchy references, and text-label objects;
+  selected labels can supply unknown-shape ports only under explicit filters.
+- Parser diagnostics, whole-view completeness, tainted scopes, and source-specific attributes.
 
-- Rename an object to make a mismatch disappear.
-- Infer scalar width from a failed vector parse.
-- Treat skipped data as absent data.
-- Decide which source view is authoritative.
+This distinction matters. A DEF placed component is a design-object instance, not another top
+component interface. An SDC `get_ports` result is a reference to resolve, not a port definition.
+A standard DEF pin/net does not establish a package mapping.
 
-The SystemVerilog adapter uses pyslang; the Liberty, LEF, and CSV adapters are intentionally
-isolated so they can evolve or be replaced without changing rules.
+## Fact states
 
-### Fact states
+Every observation or field is `known`, `unknown`, `unsupported`, `tainted`, or
+`not_applicable`. Only known values can establish equality. Recovery data remains visible, but a
+tainted width or dynamic Tcl reference cannot silently create a pass or an absent-object error.
 
-Every observation has a state:
+## Parser trust boundary
 
-- `known`: the adapter established a value.
-- `unknown`: the source or context did not establish a value.
-- `unsupported`: OpenCollate recognized a construct it cannot model.
-- `tainted`: recovery produced data that may depend on an earlier parse problem.
-- `not_applicable`: the property has no meaning for that object or view.
+Parsers consume untrusted text and do not write source files. The important execution boundaries
+are:
 
-Only known facts may establish equality. Unknown, unsupported, and tainted facts remain visible
-and cannot silently produce a pass.
+- SystemVerilog is parsed and elaborated by pyslang; it is not simulated.
+- SDC and UPF use static Tcl-shaped tokenizers and never start Tcl or execute commands.
+- C-header and IP-XACT integer expressions use bounded, side-effect-free evaluators.
+- IP-XACT rejects DTD/entity declarations, fetches no schemas, and expands no external definitions.
+- CDL/SPICE is structurally tokenized, never simulated, and parameters remain text.
+- DEF and LEF geometry is structurally skipped rather than interpreted as names or connectivity.
+- GDSII is parsed as a bounded native record stream; geometry elements are counted and discarded
+  without polygon materialization or physical verification.
 
-### Normalization
+Parsers with explicit size, token, nesting, and object limits fail closed. See
+[supported syntax](supported-syntax.md) and the [security model](security-model.md).
 
-Normalization converts representational variants—direction spelling, power roles, and vector
-structure—without discarding the original spelling or source span. It is intentionally narrower
-than aliasing.
+## Normalization, aliases, and participation
 
-### Resolution
+Normalization converts representational variants—direction spelling, role spelling, and vector
+structure—without discarding the original token or source span. Aliases explicitly group
+different native names under one canonical identity. Participation states which views are
+expected to contain an object.
 
-Resolution groups observations into canonical component and port identities. Explicit aliases
-handle intentional differences such as `VDD_CORE` versus `VDDC`. Participation policy answers
-whether an object is expected in a view; it is separate from aliases so an omitted LEF pin cannot
-be hidden by renaming.
+These mechanisms are intentionally separate: an alias cannot hide absence, participation cannot
+rewrite a conflicting value, and neither mechanism turns unknown evidence into known evidence.
 
-### Contract and rules
+## Contract and runtime overlays
 
-The contract retains the observations used to derive each canonical property. Rules consume the
-contract, not parser internals. This allows direct unit tests for reconciliation and rules and
-makes `opencollate contract build` an audit surface.
+Schema version 1 of the frozen contract persists canonical components, ports, and registers. The
+runtime observation graph also contains clocks, interfaces, constraints, hierarchy references,
+UPF objects, DEF connectivity, and pin mappings. Rules evaluate those overlays during a check,
+but they are not all serialized as frozen-contract authorities in 0.2.0.
 
-### Diagnostics and reporters
+The contract retains the selected canonical values and per-view native names. Diagnostics retain
+the observation evidence used by a rule. Build and inspect a contract with:
 
-Rules emit structured diagnostics. Renderers are pure transformations with stable ordering. A
-renderer cannot change severity, evidence, waiver state, or exit status.
+```console
+opencollate contract build opencollate.toml --output contract.oc.json
+```
+
+## Rules and reporters
+
+Rules consume parser-neutral observations and canonical identities, not parser internals. The
+runtime catalog is the authority for code, default severity, summary, and remediation. Reporters
+are pure transformations: they cannot change severity, waiver state, fingerprint, evidence, or
+exit status.
 
 ## Determinism
 
-Inputs are keyed by declared view and normalized object identity rather than filesystem discovery
-order. Contracts and diagnostics are sorted before serialization. Fingerprints derive from
-semantic identity, not line number alone, so unrelated source movement does not churn waivers.
-
-## Trust boundaries
-
-Input files and configuration are untrusted. Parsers must avoid shell execution and never write
-files. Only commands with an explicit output option may write, and output paths remain under user
-control. See [SECURITY.md](../SECURITY.md).
+Views and files are ordered deterministically. Contracts and diagnostics are sorted before
+serialization. Fingerprints derive from semantic identity rather than a line number alone, so
+unrelated source movement does not intentionally churn waivers. Determinism supports reviewable
+diffs; it does not anonymize design data.
 
 ## Package layout
 
 ```text
 src/opencollate/
-  cli.py               command surface
+  cli.py               command surface and parser dispatch
   config.py            TOML loading and validation
-  model.py             parser-neutral facts and provenance
-  normalize.py         value normalization
-  resolve.py           aliases, identity, participation
-  checks/              contract rules
-  diagnostics.py       codes, fingerprints, waivers
-  reporters/           text, JSON, Markdown, SARIF
+  model.py             parser-neutral facts, contracts, and provenance
+  engine.py            reconciliation and built-in checks
+  catalog.py           authoritative rule registry
+  diagnostics.py       findings, fingerprints, and waivers
+  reporters/           text, JSON, Markdown, and SARIF
   parsers/             format-specific adapters
+  schemas/             report and contract JSON Schemas
 ```
 
-The precise tree may evolve before 1.0; the layer boundaries are the compatibility goal.
+The precise tree can evolve before 1.0; parser neutrality, explicit fact state, provenance, and
+non-executing treatment of executable-shaped collateral are the compatibility goals.

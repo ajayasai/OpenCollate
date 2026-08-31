@@ -34,6 +34,11 @@ Code families are intentionally separated:
 | OC3001–OC3104 | Component and port inventory |
 | OC4001–OC4303 | Direction, shape, role, and Boolean semantics |
 | OC5001–OC5006 | Package and cross-domain mappings |
+| OC6001–OC6003 | Static SDC object and clock consistency |
+| OC6101–OC6104 | Static UPF references and object integrity |
+| OC6201–OC6202 | IP-XACT interface port maps |
+| OC6301–OC6309 | Hardware/software register maps and fields |
+| OC6401 | DEF endpoint resolution against elaborated RTL |
 | OC9001 and above | Internal integrity failures |
 
 Use `capabilities` to inspect the installed format/output surface and `explain` for a rule's
@@ -53,6 +58,10 @@ Severity describes the finding. Policy may promote or demote a rule, but it cann
 unknown evidence into known evidence. Any unwaived error-level finding produces exit status 1.
 A fatal condition that prevents a trustworthy check produces status 2.
 Fatal findings cannot be downgraded or waived.
+
+A status-0 run is not a signoff result. It means only that enabled rules found no unwaived
+error-level contradiction in known facts. Review parser diagnostics, unknown/unsupported facts,
+tainted scopes, configured participation, and the [supported syntax boundary](supported-syntax.md).
 
 ## Evidence
 
@@ -74,3 +83,10 @@ waiver again.
 SARIF maps diagnostic code to `ruleId`, message to the result message, evidence spans to
 locations, and the OpenCollate fingerprint to a partial fingerprint. Downstream annotation is a
 presentation; the OpenCollate JSON report remains the complete audit record.
+
+## Completeness before mismatch
+
+`OC1102`–`OC1105` are not cosmetic warnings. They explain where a rule could not safely compare a
+fact or where analysis coverage is partial. Automation that suppresses all warnings can erase the
+distinction between “equal” and “not comparable.” In security- or tapeout-sensitive workflows,
+review these findings explicitly and use process-level limits for untrusted inputs.

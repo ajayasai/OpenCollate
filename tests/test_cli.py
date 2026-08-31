@@ -21,7 +21,7 @@ def test_version_uses_argparse_version_action(capsys: pytest.CaptureFixture[str]
     with pytest.raises(SystemExit) as captured:
         main(["--version"])
     assert captured.value.code == 0
-    assert capsys.readouterr().out.strip() == "OpenCollate 0.1.0"
+    assert capsys.readouterr().out.strip() == "OpenCollate 0.2.0"
 
 
 def test_capabilities_text_and_json(capsys: pytest.CaptureFixture[str]) -> None:
@@ -30,6 +30,7 @@ def test_capabilities_text_and_json(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["capabilities", "--json"]) == 0
     value = json.loads(capsys.readouterr().out)
     assert value["formats"]["liberty"]["status"] == "supported"
+    assert value["formats"]["gdsii"]["backend"] == "native-structural-streaming"
     assert value["rules"] >= 40
 
 
@@ -48,6 +49,7 @@ def test_init_is_non_destructive(tmp_path: Path, capsys: pytest.CaptureFixture[s
     manifest = target / "opencollate.toml"
     assert manifest.is_file()
     assert "[sources.rtl.default]" in manifest.read_text(encoding="utf-8")
+    assert "[sources.gds.stream]" in manifest.read_text(encoding="utf-8")
     assert main(["init", str(target)]) == 2
     assert "refusing to overwrite" in capsys.readouterr().err
 
@@ -154,10 +156,10 @@ def test_missing_and_unknown_inputs_return_usage_failure(
     assert main(["check", str(tmp_path / "missing.toml")]) == 2
     assert "OC1002" in capsys.readouterr().err
 
-    (tmp_path / "design.gds").write_bytes(b"GDS")
+    (tmp_path / "design.oas").write_bytes(b"OAS")
     manifest = tmp_path / "unknown.toml"
     manifest.write_text(
-        '[project]\nname="unknown"\n[sources.gds.default]\nfiles=["design.gds"]\n',
+        '[project]\nname="unknown"\n[sources.oasis.default]\nfiles=["design.oas"]\n',
         encoding="utf-8",
     )
     assert main(["check", str(manifest)]) == 2
@@ -186,6 +188,34 @@ def test_unknown_parser_option_is_an_actionable_config_error(
     captured = capsys.readouterr()
     assert "OC1001" in captured.err
     assert "unsupported source option(s): geometry_mode" in captured.err
+
+
+@pytest.mark.parametrize(
+    ("option", "value", "message"),
+    [
+        ("top_cells", "42", "string or string array"),
+        ("pin_text_layers", "true", "integer or integer array"),
+        ("pin_text_types", "[0, 40000]", "between 0 and 32767"),
+    ],
+)
+def test_gds_options_fail_as_actionable_config_errors(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    option: str,
+    value: str,
+    message: str,
+) -> None:
+    (tmp_path / "design.gds").write_bytes(b"")
+    manifest = tmp_path / "opencollate.toml"
+    manifest.write_text(
+        f"[sources.gds.default]\nfiles=['design.gds']\n{option}={value}\n",
+        encoding="utf-8",
+    )
+
+    assert main(["check", str(manifest)]) == 2
+    captured = capsys.readouterr()
+    assert message in captured.err
+    assert "Traceback" not in captured.err
 
 
 def test_invalid_csv_delimiter_is_an_actionable_config_error(

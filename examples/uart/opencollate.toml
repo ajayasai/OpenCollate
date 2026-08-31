@@ -26,6 +26,33 @@ package_ball = "Ball"
 signal = "Signal"
 component = "Component"
 
+[sources.ipxact.component]
+files = ["ipxact/uart.xml"]
+
+[sources.sdc.functional]
+files = ["constraints/uart.sdc"]
+
+[sources.upf.power]
+files = ["power/uart.upf"]
+
+[sources.header.software]
+files = ["software/uart_regs.h"]
+component_name = "uart"
+macro_prefix = "UART"
+default_register_width = 32
+
+[sources.cdl.netlist]
+files = ["netlist/uart.cdl"]
+
+[sources.def.placed]
+files = ["physical/uart.def"]
+
+[sources.gds.stream]
+files = ["physical/uart.gds"]
+top_cells = ["uart"]
+pin_text_layers = [10]
+pin_text_types = [5]
+
 [contract]
 baseline = "rtl.default"
 

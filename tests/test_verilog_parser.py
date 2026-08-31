@@ -63,3 +63,34 @@ def test_name_heuristics_are_tainted_not_canonical_truth() -> None:
     view = parse_verilog(FIXTURES / "simple.sv", top="alu")
     clk = next(port for port in view.components[0].ports if port.name == "clk")
     assert clk.state_for("role") == FactState.TAINTED
+
+
+def test_elaborated_hierarchy_is_indexed_for_constraint_checks(tmp_path: Path) -> None:
+    source = tmp_path / "hierarchy.sv"
+    source.write_text(
+        """
+module leaf(input logic d, output logic q);
+  assign q = d;
+endmodule
+module top(input logic clk, output logic done);
+  logic n;
+  leaf u_leaf(.d(clk), .q(n));
+  genvar i;
+  for (i = 0; i < 2; i++) begin : lanes
+    leaf u_lane(.d(n), .q());
+  end
+  assign done = n;
+endmodule
+""",
+        encoding="utf-8",
+    )
+
+    view = parse_verilog(source, top="top")
+    definitions = {(item.kind, item.native_name) for item in view.objects}
+
+    assert ("port", "clk") in definitions
+    assert ("net", "n") in definitions
+    assert ("instance", "u_leaf") in definitions
+    assert ("pin", "u_leaf/d") in definitions
+    assert ("instance", "lanes[0]/u_lane") in definitions
+    assert ("pin", "lanes[1]/u_lane/q") in definitions

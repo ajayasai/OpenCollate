@@ -1,0 +1,12 @@
+VERSION 5.8 ;
+DESIGN broken ;
+COMPONENTS 1 ;
+- u0 CELL + PLACED ( one 20 ) ZZ ;
+END COMPONENTS
+PINS 1 ;
+- mystery + NET n + DIRECTION SIDEWAYS + USE WHATEVER + FIXED ( 1 ) N ;
+END PINS
+NETS 2 ;
+- n ( PIN mystery ) ( u0 A ) ;
+END NETS
+END DESIGN

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<spirit:component xmlns:spirit="http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009">
+  <spirit:vendor>example.org</spirit:vendor>
+  <spirit:library>peripherals</spirit:library>
+  <spirit:name>legacy_uart</spirit:name>
+  <spirit:version>1.0</spirit:version>
+  <spirit:busInterfaces>
+    <spirit:busInterface>
+      <spirit:name>APB</spirit:name>
+      <spirit:busType spirit:vendor="amba.com" spirit:library="AMBA3"
+                      spirit:name="APB" spirit:version="1.0"/>
+      <spirit:abstractionTypes>
+        <spirit:abstractionType>
+          <spirit:abstractionRef spirit:vendor="amba.com" spirit:library="AMBA3"
+                                 spirit:name="APB_rtl" spirit:version="1.0"/>
+          <spirit:portMaps>
+            <spirit:portMap>
+              <spirit:logicalPort><spirit:name>PCLK</spirit:name></spirit:logicalPort>
+              <spirit:physicalPort><spirit:name>pclk</spirit:name></spirit:physicalPort>
+            </spirit:portMap>
+            <spirit:portMap>
+              <spirit:logicalPort>
+                <spirit:name>PWDATA</spirit:name>
+                <spirit:range><spirit:left>7</spirit:left><spirit:right>0</spirit:right></spirit:range>
+              </spirit:logicalPort>
+              <spirit:physicalPort>
+                <spirit:name>data</spirit:name>
+                <spirit:partSelect>
+                  <spirit:range><spirit:left>7</spirit:left><spirit:right>0</spirit:right></spirit:range>
+                </spirit:partSelect>
+              </spirit:physicalPort>
+            </spirit:portMap>
+          </spirit:portMaps>
+        </spirit:abstractionType>
+      </spirit:abstractionTypes>
+      <spirit:slave/>
+    </spirit:busInterface>
+  </spirit:busInterfaces>
+  <spirit:model>
+    <spirit:ports>
+      <spirit:port>
+        <spirit:name>pclk</spirit:name>
+        <spirit:wire><spirit:direction>in</spirit:direction></spirit:wire>
+      </spirit:port>
+      <spirit:port>
+        <spirit:name>data</spirit:name>
+        <spirit:wire>
+          <spirit:direction>out</spirit:direction>
+          <spirit:vectors>
+            <spirit:vector><spirit:left>7</spirit:left><spirit:right>0</spirit:right></spirit:vector>
+          </spirit:vectors>
+        </spirit:wire>
+      </spirit:port>
+    </spirit:ports>
+  </spirit:model>
+</spirit:component>

@@ -1,0 +1,21 @@
+* Structural CDL fixture
+.GLOBAL VDD! VSS!
+
+.sUbCkT INV A Y VDD! VSS! PARAMS: DRIVE=2
+*.PININFO A:I Y:O VDD!:P VSS!:G
+.PARAM LCH=16n
+M_N Y A VSS! VSS! / nch W={DRIVE * 1u}
++ L={LCH}
+M_P Y A VDD! VDD! pch W=2u L={LCH}
+R\ load Y \sense\/node 10k TC={0.1 0.01}
+C0 \sense\/node VSS! C=2f
+L0 Y OUT 1n
+.eNdS inv
+
+.SUBCKT TOP IN OUT VDD! VSS!
+*.PORT_DIRECTION IN INPUT OUT OUTPUT
+* PIN VDD! USE=POWER
+* PORT VSS! ROLE GROUND
+X/u0 IN OUT VDD! VSS! / INV DRIVE=4
+.ENDS TOP
+.END

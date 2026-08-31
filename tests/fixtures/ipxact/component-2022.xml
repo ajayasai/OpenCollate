@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ipxact:component xmlns:ipxact="https://www.accellera.org/XMLSchema/IPXACT/1685-2022/">
+  <ipxact:vendor>example.org</ipxact:vendor>
+  <ipxact:library>gpio</ipxact:library>
+  <ipxact:name>gpio2022</ipxact:name>
+  <ipxact:version>3.0</ipxact:version>
+  <ipxact:busInterfaces>
+    <ipxact:busInterface>
+      <ipxact:name>GPIO</ipxact:name>
+      <ipxact:busType vendor="example.org" library="bus" name="gpio" version="2.0"/>
+      <ipxact:abstractionTypes>
+        <ipxact:abstractionType>
+          <ipxact:abstractionRef vendor="example.org" library="bus"
+                                 name="gpio_wire" version="2.0"/>
+          <ipxact:portMaps>
+            <ipxact:portMap>
+              <ipxact:logicalPort><ipxact:name>GPIO_OUT</ipxact:name></ipxact:logicalPort>
+              <ipxact:physicalPort><ipxact:name>lane</ipxact:name></ipxact:physicalPort>
+            </ipxact:portMap>
+          </ipxact:portMaps>
+        </ipxact:abstractionType>
+      </ipxact:abstractionTypes>
+      <ipxact:target/>
+    </ipxact:busInterface>
+  </ipxact:busInterfaces>
+  <ipxact:model>
+    <ipxact:ports>
+      <ipxact:port>
+        <ipxact:name>clk</ipxact:name>
+        <ipxact:wire>
+          <ipxact:direction>in</ipxact:direction>
+          <ipxact:qualifier><ipxact:isClock>true</ipxact:isClock></ipxact:qualifier>
+        </ipxact:wire>
+      </ipxact:port>
+      <ipxact:port>
+        <ipxact:name>lane</ipxact:name>
+        <ipxact:wire>
+          <ipxact:direction>out</ipxact:direction>
+          <ipxact:qualifier><ipxact:isData>true</ipxact:isData></ipxact:qualifier>
+          <ipxact:vectors>
+            <ipxact:vector vectorId="laneWidth">
+              <ipxact:left>LANES - 1</ipxact:left><ipxact:right>0</ipxact:right>
+            </ipxact:vector>
+          </ipxact:vectors>
+        </ipxact:wire>
+        <ipxact:arrays>
+          <ipxact:array><ipxact:left>1</ipxact:left><ipxact:right>0</ipxact:right></ipxact:array>
+        </ipxact:arrays>
+      </ipxact:port>
+    </ipxact:ports>
+  </ipxact:model>
+  <ipxact:parameters>
+    <ipxact:parameter parameterId="LANES">
+      <ipxact:name>lanes</ipxact:name><ipxact:value>4</ipxact:value>
+    </ipxact:parameter>
+  </ipxact:parameters>
+</ipxact:component>

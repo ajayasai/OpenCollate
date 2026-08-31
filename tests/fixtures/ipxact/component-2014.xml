@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ipxact:component xmlns:ipxact="http://www.accellera.org/XMLSchema/IPXACT/1685-2014">
+  <ipxact:vendor>example.org</ipxact:vendor>
+  <ipxact:library>peripherals</ipxact:library>
+  <ipxact:name>uart</ipxact:name>
+  <ipxact:version>2.1</ipxact:version>
+  <ipxact:busInterfaces>
+    <ipxact:busInterface>
+      <ipxact:name>CSR</ipxact:name>
+      <ipxact:busType vendor="example.org" library="bus" name="csr" version="1.0"/>
+      <ipxact:abstractionTypes>
+        <ipxact:abstractionType>
+          <ipxact:abstractionRef vendor="example.org" library="bus"
+                                 name="csr_rtl" version="1.0"/>
+          <ipxact:portMaps>
+            <ipxact:portMap>
+              <ipxact:logicalPort><ipxact:name>IRQ</ipxact:name></ipxact:logicalPort>
+              <ipxact:physicalPort><ipxact:name>irq</ipxact:name></ipxact:physicalPort>
+            </ipxact:portMap>
+          </ipxact:portMaps>
+        </ipxact:abstractionType>
+      </ipxact:abstractionTypes>
+      <ipxact:slave>
+        <ipxact:memoryMapRef memoryMapRef="regs"/>
+      </ipxact:slave>
+    </ipxact:busInterface>
+  </ipxact:busInterfaces>
+  <ipxact:memoryMaps>
+    <ipxact:memoryMap>
+      <ipxact:name>regs</ipxact:name>
+      <ipxact:addressUnitBits>8</ipxact:addressUnitBits>
+      <ipxact:addressBlock>
+        <ipxact:name>uart_regs</ipxact:name>
+        <ipxact:baseAddress>BASE_ADDR</ipxact:baseAddress>
+        <ipxact:range>0x100</ipxact:range>
+        <ipxact:width>32</ipxact:width>
+        <ipxact:usage>register</ipxact:usage>
+        <ipxact:register>
+          <ipxact:name>CTRL</ipxact:name>
+          <ipxact:addressOffset>4</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-write</ipxact:access>
+          <ipxact:field>
+            <ipxact:name>ENABLE</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>1</ipxact:bitWidth>
+            <ipxact:access>read-write</ipxact:access>
+            <ipxact:resets>
+              <ipxact:reset><ipxact:value>0</ipxact:value><ipxact:mask>1</ipxact:mask></ipxact:reset>
+            </ipxact:resets>
+          </ipxact:field>
+          <ipxact:field>
+            <ipxact:name>MODE</ipxact:name>
+            <ipxact:bitOffset>4</ipxact:bitOffset>
+            <ipxact:bitWidth>2</ipxact:bitWidth>
+            <ipxact:access>read-write</ipxact:access>
+          </ipxact:field>
+        </ipxact:register>
+      </ipxact:addressBlock>
+    </ipxact:memoryMap>
+  </ipxact:memoryMaps>
+  <ipxact:model>
+    <ipxact:ports>
+      <ipxact:port>
+        <ipxact:name>data</ipxact:name>
+        <ipxact:wire>
+          <ipxact:direction>in</ipxact:direction>
+          <ipxact:vectors>
+            <ipxact:vector>
+              <ipxact:left>DATA_WIDTH - 1</ipxact:left>
+              <ipxact:right>0</ipxact:right>
+            </ipxact:vector>
+          </ipxact:vectors>
+        </ipxact:wire>
+      </ipxact:port>
+      <ipxact:port>
+        <ipxact:name>irq</ipxact:name>
+        <ipxact:wire><ipxact:direction>out</ipxact:direction></ipxact:wire>
+      </ipxact:port>
+    </ipxact:ports>
+  </ipxact:model>
+  <ipxact:parameters>
+    <ipxact:parameter parameterId="DATA_WIDTH">
+      <ipxact:name>dataWidth</ipxact:name><ipxact:value>8</ipxact:value>
+    </ipxact:parameter>
+    <ipxact:parameter parameterId="BASE_ADDR">
+      <ipxact:name>baseAddress</ipxact:name><ipxact:value>32'h1000</ipxact:value>
+    </ipxact:parameter>
+  </ipxact:parameters>
+</ipxact:component>

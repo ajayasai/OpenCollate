@@ -6,29 +6,28 @@
 
 **Catch SoC collateral drift before tapeout.**
 
-OpenCollate builds one canonical design contract from RTL and implementation collateral, then
-explains every disagreement in design language. It is local-first, scriptable, and open source.
+OpenCollate builds one provenance-preserving design contract from RTL, implementation,
+constraints, power intent, register descriptions, circuit netlists, and package collateral. It
+then reports contradictions in design language. It is local-first, scriptable, and open source.
 
 ```text
-ERROR OC4001  uart/irq_o has conflicting directions: RTL, LEF (abstract) = output; Liberty (tt) = input.
+ERROR OC4001  uart/irq_o has conflicting directions: RTL, CDL, DEF, IP-XACT, LEF = output; Liberty = input.
   --> rtl/uart.sv:8:24 [rtl.default] = output
-  --> lef/uart.lef:57:3 [lef.abstract] = output
   --> lib/uart.lib:39:9 [liberty.tt] = input
   help: Correct the direction in the outlying collateral or the canonical contract.
 ```
 
-A width diagnostic is equally direct: `uart/irq is 1 bit in RTL but 4 bits in Liberty.`
-
-> **Alpha software:** OpenCollate 0.1.0 is useful for evaluation and CI experiments. Its Python
-> API, contract schema, rule set, and diagnostic fingerprints may change before 1.0. It is not a
-> replacement for signoff verification.
+> **Beta software:** OpenCollate 0.2.0 is intended for evaluation, collateral review, and CI
+> experiments. Its Python API, schema, and diagnostic surface can still change before 1.0. It is
+> not a signoff tool and does not replace simulation, formal verification, STA, CDC/RDC, DRC,
+> LVS, extraction, or implementation-tool validation.
 
 ## Install
 
 OpenCollate requires Python 3.11 or newer.
 
 ```console
-python -m pip install "git+https://github.com/ajayasai/OpenCollate.git@v0.1.0"
+python -m pip install "git+https://github.com/ajayasai/OpenCollate.git@v0.2.0"
 opencollate --version
 ```
 
@@ -40,56 +39,71 @@ python -m pip install -e ".[dev]"
 
 ## Thirty-second tour
 
-Run a generated, synthetic demonstration without providing design files:
+Run the generated demonstration:
 
 ```console
 opencollate demo
 ```
 
-Or check the repository's deliberately inconsistent UART example:
+Or run the repository’s synthetic, deliberately inconsistent UART across all eleven supported view
+kinds:
 
 ```console
 opencollate check examples/uart/opencollate.toml
 ```
 
-The default configuration name is `opencollate.toml`, so this also works from the example
-directory:
+The full-stack example imports SystemVerilog, Liberty, LEF, CSV, IP-XACT, SDC, UPF, a C register
+header, CDL, DEF, and experimental structural GDSII. It is expected to return status 1 with
+exactly `OC4001`, `OC4301`, and `OC5003`. See the
+[UART walkthrough](examples/uart/README.md).
+
+## 0.2.0 support matrix
+
+“Structural” means OpenCollate imports facts needed for consistency checks; it does not implement
+the complete language or the analysis normally performed by its native tool.
+
+| View | 0.2.0 Beta support | Deliberate boundary |
+| --- | --- | --- |
+| Verilog/SystemVerilog | pyslang preprocessing, parsing, and elaboration; modules, ports, parameters, dimensions, includes, defines, hierarchy, and small continuous-assignment Boolean functions | No behavioral or sequential equivalence; unsupported ports and unresolved shapes remain explicit |
+| Liberty | Libraries, cells, pins, buses, bundles, types, `pg_pin`, roles, directions, ranges, and small Boolean functions | Timing, power, noise, and characterization table contents are skipped |
+| LEF | Macro/pin interface, direction, use, and declared bus naming | Geometry, vias, obstructions, and antenna/vendor properties are skipped |
+| CSV | Component-pin and package-map profiles, configurable columns, ranges/per-bit rows, roles, directions, pads, balls, and signals | It is not a general spreadsheet importer; ambiguous identity columns must be mapped |
+| IP-XACT | IEEE 1685 2009/2014/2022 components, ports, vectors/arrays, parameters, interfaces/port maps, memory maps, registers, and fields | No XSD validation, schema fetching, or external definition expansion |
+| SDC | Non-executing Tcl tokenizer; static queries, clocks, generated clocks, I/O delays, false paths, and multicycle paths | Tcl control flow, arbitrary commands, and environment-dependent substitution are not executed |
+| UPF | Non-executing structural subset for design/scope, domains, supplies, isolation, retention, level shifting, switches, and power states | It is not a UPF interpreter or power-intent signoff engine; dynamic Tcl is not executed |
+| C register headers | Conventional base/address/offset and field position/mask/width/reset integer macros | No C preprocessor, conditional-build selection, compiler, or arbitrary macro execution |
+| CDL/SPICE | Subcircuits, explicit pin metadata, connectivity, globals, models, M/R/C/L/X structure, and continuations | No simulation, parameter evaluation, device-model validation, or electrical equivalence |
+| DEF 5.8 | `DESIGN`, `COMPONENTS`, `PINS`, `NETS`, `SPECIALNETS`, placement, connectivity, hierarchy, and bus naming | Routes and geometry are skipped; DEF pins do not imply package-ball/die-pad mappings |
+| GDSII (experimental) | Bounded native big-endian stream parsing for cells, inferred/selected tops, SREF/AREF hierarchy, transforms, and text labels; selected labels can become unknown-shape ports only through explicit layer/type filters | Polygon/path/node/box geometry is never materialized or verified; no DRC, LVS, extraction, connectivity inference, or implicit label-to-pin guessing |
+
+Read the [exact supported syntax and limits](docs/supported-syntax.md). The installed build is
+authoritative:
 
 ```console
-cd examples/uart
-opencollate check
+opencollate capabilities
 ```
 
-OpenCollate's diagnostics carry a stable code, the affected object and property, evidence from
-each view, source locations where available, and a remediation hint. Terminal prose is for
-people; JSON and SARIF are available for automation and code-scanning integrations.
+Every fact is **known**, **unknown**, **unsupported**, **tainted**, or **not applicable**. Parser
+recovery never turns an unestablished fact into an apparent pass.
 
-## What the Alpha understands
+## What OpenCollate checks
 
-| View | 0.1 support | Deliberate boundary |
-| --- | --- | --- |
-| Verilog/SystemVerilog | Modules, ANSI and non-ANSI ports, directions, evaluated packed and unpacked dimensions, includes, defines, source spans, and top selection through pyslang | Interfaces, `ref` ports, and unevaluable shapes are reported as unsupported or unknown; they are never guessed as scalars |
-| Liberty | Libraries, cells, pins, buses, bundles, types, `pg_pin`, direction, use, bus ranges, and small Boolean functions | Timing and power table contents are skipped, not interpreted |
-| LEF | Version and naming directives plus macro/pin, direction, and use data | Geometry and vendor properties are tolerated but do not participate in checks |
-| CSV pin maps | UTF-8 BOM and RFC 4180 CSV, header aliases, scalar/range/per-bit rows, direction, and role normalization | Vendor-specific columns require explicit header mapping |
-| IP-XACT, SDC, UPF | Planned | Not accepted by 0.1 |
+The 65-rule 0.2.0 catalog covers:
 
-See [supported syntax](docs/supported-syntax.md) for exact constructs and unknown-state behavior.
-The machine-readable state is always **known**, **unknown**, **unsupported**, **tainted**, or
-**not applicable**; parser recovery never silently invents design facts.
+- Configuration, parser completeness, unsupported constructs, and tainted scopes.
+- Component and port identity, inventory, direction, role, shape, range, and ordering.
+- Small combinational RTL/Liberty Boolean equivalence.
+- Die-pad, package-ball, and logical-signal mappings from explicit mapping sources.
+- SDC objects and clocks against statically elaborated RTL.
+- UPF object references and duplicate or missing power-intent objects.
+- IP-XACT interface-to-physical-port maps.
+- IP-XACT versus C-header register addresses, widths, fields, access, resets, and layout.
+- DEF endpoints against the elaborated RTL hierarchy.
+- GDSII structure and explicitly selected text-label port inventory through the common component
+  contract; geometry is not checked.
 
-## Checks in the first release
-
-- Module, macro, cell, and pin inventory differences.
-- Port/pin name, direction, width, range, and ordering differences.
-- Missing or extra power and ground pins.
-- Clock and reset role inconsistencies when roles are present in the imported views.
-- Liberty Boolean function versus small RTL expression equivalence.
-- Die-pad and package-pin mapping consistency from CSV.
-
-Boolean equivalence is exact truth-table comparison for expressions within the configured input
-limit (12 variables by default). Larger or unsupported expressions produce an explicit
-inconclusive diagnostic instead of a false pass.
+See the [rule catalog](docs/rule-catalog.md). Inconclusive evidence produces a completeness or
+not-applicable diagnostic; absence of a mismatch is not proof of equivalence.
 
 ## Commands
 
@@ -98,75 +112,68 @@ opencollate check [CONFIG]                  # default: opencollate.toml
 opencollate check -c path/to/config.toml
 opencollate demo [--output-dir DIR]
 opencollate init [PATH]
-opencollate capabilities
+opencollate capabilities [--json]
 opencollate explain CODE
 opencollate schema [report|contract] [--output PATH]
 opencollate contract build [CONFIG] --output contract.oc.json
 ```
 
-Exit status is part of the CLI contract:
-
 | Status | Meaning |
 | ---: | --- |
 | 0 | The command completed and no unwaived error-level violations were found |
 | 1 | The check completed and found unwaived violations |
-| 2 | Configuration, input, parser, or internal failure prevented a trustworthy result |
+| 2 | Configuration, input, parser, output, or internal failure prevented a trustworthy result |
 
 `demo` returns 0 by default because its inconsistencies are intentional; use `demo --strict-exit`
-to propagate the demonstration check status.
-
-See [exit codes](docs/exit-codes.md) before integrating OpenCollate into CI.
+to propagate its check status. Read [exit codes](docs/exit-codes.md) before CI integration.
 
 ## Design contract, not pairwise spaghetti
 
-Each importer converts a source view into the same evidence-bearing model. Normalization and
-explicit aliases resolve representational differences. Checks compare reconciled facts and emit
-diagnostics that retain provenance back to every source.
+Each importer emits parser-neutral observations with source provenance and fact state. Resolution
+groups them into canonical identities; rules consume those identities and retain evidence from
+every view.
 
 ```text
-Verilog ─┐
-Liberty ─┼─> facts + provenance ─> canonical contract ─> rules ─> terminal / JSON / SARIF
-LEF ─────┤
-CSV ─────┘
+RTL / Liberty / LEF / CDL / DEF / GDSII / IP-XACT
+                    │
+CSV / SDC / UPF / C headers
+                    ▼
+        observations + provenance
+                    ▼
+     canonical components, ports, registers
+                    ▼
+ rules → terminal / JSON / Markdown / SARIF / contract JSON
 ```
 
-This structure keeps parsers replaceable, makes rule behavior testable without a parser, and
-allows teams to inspect the exact contract being checked:
+Inspect the exact contract being checked:
 
 ```console
-opencollate contract build --output contract.oc.json
+opencollate contract build examples/uart/opencollate.toml --output contract.oc.json
 ```
 
-Read [the architecture](docs/architecture.md), [canonical contract](docs/canonical-contract.md),
-[diagnostic model](docs/diagnostics.md), and [rule catalog](docs/rule-catalog.md).
+The frozen contract currently persists components, ports, and register maps. Clocks, interfaces,
+hierarchical objects, constraints, and mappings remain first-class run observations but are not
+all frozen-contract fields in schema version 1. Read the [architecture](docs/architecture.md),
+[canonical contract](docs/canonical-contract.md), and [diagnostic model](docs/diagnostics.md).
 
-## Configuration
+## Security and privacy
 
-Start with a documented configuration:
+OpenCollate treats configuration and collateral as untrusted input. SDC and UPF are tokenized as
+static text; Tcl is never started. C macro and IP-XACT integer expressions use small bounded
+evaluators, not compilers or `eval`. IP-XACT rejects DTD/entity declarations and never fetches a
+schema. CDL/SPICE is never simulated; DEF/LEF geometry is skipped structurally; and GDSII
+geometry records are bounded and discarded without polygon construction.
 
-```console
-opencollate init .
-```
+OpenCollate has no telemetry, account, upload, or network-reporting feature. Reports still contain
+design names, paths, connectivity, and expressions and must be protected like source collateral.
+Read the [security model](docs/security-model.md) and [privacy statement](docs/privacy.md).
 
-The generated `opencollate.toml` provides starter source views, a reference baseline, and core
-policy settings. Project-specific aliases, participation rules, and waivers are added separately.
-Paths are resolved relative to the configuration file. Read the
-[configuration guide](docs/configuration.md) and see the synthetic
-[UART configuration](examples/uart/opencollate.toml).
+## No-signoff positioning
 
-## Privacy and reproducibility
-
-OpenCollate runs locally. It contains no telemetry, account, upload, or network-reporting feature.
-The files you check stay on the machine unless you deliberately send reports elsewhere. Output is
-deterministically ordered to make code review and CI diffs useful. Read the
-[privacy statement](docs/privacy.md).
-
-## Non-goals
-
-OpenCollate does not synthesize RTL, perform timing analysis, prove arbitrary sequential logic,
-run DRC/LVS, or certify a design for tapeout. A clean report only means that the enabled rules
-found no contradictions in the facts they could establish. Unknown and unsupported facts must be
-reviewed.
+A clean OpenCollate report means only that enabled rules found no contradiction in facts they
+could establish. It does not certify correctness, completeness, manufacturability, timing,
+electrical behavior, power intent, or tapeout readiness. Review `OC1102`–`OC1105`, unknowns,
+tainted scopes, configuration participation, and parser coverage before relying on any result.
 
 ## Project
 

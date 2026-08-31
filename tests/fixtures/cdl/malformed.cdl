@@ -1,0 +1,10 @@
++ ORPHAN
+.SUBCKT BAD A A
+*.PININFO A:I A:O MISSING:I
+Mbroken A B nch
+Qunsupported A B C qmod
+Xdup A child
+Xdup A child
+.ENDS OTHER EXTRA
+.SUBCKT OPEN P N PARAMS: W=
+Rbad P

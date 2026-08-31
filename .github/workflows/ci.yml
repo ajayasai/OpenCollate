@@ -35,6 +35,8 @@ jobs:
         run: ruff check .
       - name: Type-check
         run: mypy src/opencollate
+      - name: Security lint
+        run: python -m bandit -q -r src/opencollate
 
   test:
     name: Test (${{ matrix.os }}, Python ${{ matrix.python }})

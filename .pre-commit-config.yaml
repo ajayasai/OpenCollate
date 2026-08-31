@@ -20,6 +20,12 @@ repos:
         language: system
         pass_filenames: false
         types: [python]
+      - id: bandit
+        name: bandit security lint
+        entry: bandit -q -r src/opencollate
+        language: system
+        pass_filenames: false
+        types: [python]
       - id: pytest-fast
         name: pytest fast suite
         entry: pytest -q

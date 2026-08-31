@@ -491,6 +491,151 @@ class PinMappingObservation:
 
 
 @dataclass(frozen=True, slots=True)
+class DesignObjectObservation:
+    """A named design object defined or referenced by collateral.
+
+    This deliberately small record is shared by RTL hierarchy, SDC queries,
+    and UPF scope references.  ``relation`` distinguishes authoritative
+    definitions from references that must resolve in another view.  Parsers
+    retain command-specific detail in ``attributes`` instead of flattening
+    every language into an unreliable pseudo-netlist.
+    """
+
+    kind: str
+    native_name: str
+    relation: str = "definition"
+    scope: str | None = None
+    provenance: Provenance | None = None
+    status: FactState = FactState.KNOWN
+    attributes: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        kind = self.kind.strip().lower().replace("-", "_")
+        relation = self.relation.strip().lower().replace("-", "_")
+        if not kind:
+            raise ValueError("design object kind must not be empty")
+        if not self.native_name:
+            raise ValueError("design object native_name must not be empty")
+        if relation not in {"definition", "reference"}:
+            raise ValueError("design object relation must be definition or reference")
+        object.__setattr__(self, "kind", kind)
+        object.__setattr__(self, "relation", relation)
+        object.__setattr__(self, "status", FactState(self.status))
+        object.__setattr__(self, "attributes", dict(self.attributes))
+
+    @property
+    def qualified_name(self) -> str:
+        if not self.scope or self.native_name.startswith(f"{self.scope}/"):
+            return self.native_name
+        return f"{self.scope}/{self.native_name}"
+
+
+@dataclass(frozen=True, slots=True)
+class ClockObservation:
+    """A primary or generated clock declaration with statically known facts."""
+
+    native_name: str
+    targets: tuple[str, ...] = ()
+    period: float | None = None
+    waveform: tuple[float, float] | None = None
+    source: str | None = None
+    generated: bool = False
+    provenance: Provenance | None = None
+    status: FactState = FactState.KNOWN
+    attributes: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.native_name:
+            raise ValueError("clock native_name must not be empty")
+        if self.period is not None and self.period <= 0:
+            raise ValueError("clock period must be positive")
+        waveform = None if self.waveform is None else tuple(self.waveform)
+        if waveform is not None and len(waveform) != 2:
+            raise ValueError("clock waveform must contain exactly two edges")
+        object.__setattr__(self, "targets", tuple(self.targets))
+        object.__setattr__(self, "waveform", waveform)
+        object.__setattr__(self, "status", FactState(self.status))
+        object.__setattr__(self, "attributes", dict(self.attributes))
+
+
+@dataclass(frozen=True, slots=True)
+class InterfaceObservation:
+    """An IP-XACT-style bus interface and its logical-to-physical port map."""
+
+    native_name: str
+    component: str | None = None
+    bus_type: str | None = None
+    abstraction_type: str | None = None
+    mode: str | None = None
+    port_maps: Mapping[str, str] = field(default_factory=dict)
+    provenance: Provenance | None = None
+    status: FactState = FactState.KNOWN
+    attributes: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.native_name:
+            raise ValueError("interface native_name must not be empty")
+        object.__setattr__(self, "port_maps", dict(self.port_maps))
+        object.__setattr__(self, "status", FactState(self.status))
+        object.__setattr__(self, "attributes", dict(self.attributes))
+
+
+@dataclass(frozen=True, slots=True)
+class RegisterFieldObservation:
+    """A field inside a hardware or software register declaration."""
+
+    native_name: str
+    bit_offset: int | None = None
+    bit_width: int | None = None
+    access: str | None = None
+    reset_value: int | None = None
+    provenance: Provenance | None = None
+    status: FactState = FactState.KNOWN
+    attributes: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.native_name:
+            raise ValueError("register field native_name must not be empty")
+        if self.bit_offset is not None and self.bit_offset < 0:
+            raise ValueError("register field bit_offset must not be negative")
+        if self.bit_width is not None and self.bit_width < 1:
+            raise ValueError("register field bit_width must be positive")
+        object.__setattr__(self, "status", FactState(self.status))
+        object.__setattr__(self, "attributes", dict(self.attributes))
+
+
+@dataclass(frozen=True, slots=True)
+class RegisterObservation:
+    """A register address-map observation from hardware or software collateral."""
+
+    native_name: str
+    component: str | None = None
+    memory_map: str | None = None
+    address_block: str | None = None
+    address_offset: int | None = None
+    absolute_address: int | None = None
+    size_bits: int | None = None
+    access: str | None = None
+    fields: tuple[RegisterFieldObservation, ...] = ()
+    provenance: Provenance | None = None
+    status: FactState = FactState.KNOWN
+    attributes: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.native_name:
+            raise ValueError("register native_name must not be empty")
+        if self.address_offset is not None and self.address_offset < 0:
+            raise ValueError("register address_offset must not be negative")
+        if self.absolute_address is not None and self.absolute_address < 0:
+            raise ValueError("register absolute_address must not be negative")
+        if self.size_bits is not None and self.size_bits < 1:
+            raise ValueError("register size_bits must be positive")
+        object.__setattr__(self, "fields", tuple(self.fields))
+        object.__setattr__(self, "status", FactState(self.status))
+        object.__setattr__(self, "attributes", dict(self.attributes))
+
+
+@dataclass(frozen=True, slots=True)
 class ViewObservation:
     view: ViewId
     components: tuple[ComponentObservation, ...] = ()
@@ -498,6 +643,10 @@ class ViewObservation:
     complete: bool = True
     tainted_scopes: frozenset[str] = frozenset()
     pin_mappings: tuple[PinMappingObservation, ...] = ()
+    objects: tuple[DesignObjectObservation, ...] = ()
+    clocks: tuple[ClockObservation, ...] = ()
+    interfaces: tuple[InterfaceObservation, ...] = ()
+    registers: tuple[RegisterObservation, ...] = ()
     attributes: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -506,6 +655,10 @@ class ViewObservation:
         object.__setattr__(self, "diagnostics", tuple(self.diagnostics))
         object.__setattr__(self, "tainted_scopes", frozenset(self.tainted_scopes))
         object.__setattr__(self, "pin_mappings", tuple(self.pin_mappings))
+        object.__setattr__(self, "objects", tuple(self.objects))
+        object.__setattr__(self, "clocks", tuple(self.clocks))
+        object.__setattr__(self, "interfaces", tuple(self.interfaces))
+        object.__setattr__(self, "registers", tuple(self.registers))
         object.__setattr__(self, "attributes", dict(self.attributes))
 
     def scope_is_tainted(self, native_name: str | None = None) -> bool:
@@ -610,10 +763,90 @@ class ContractComponent:
 
 
 @dataclass(frozen=True, slots=True)
+class ContractRegisterField:
+    canonical_name: str
+    names: Mapping[str, str] = field(default_factory=dict)
+    bit_offset: int | None = None
+    bit_width: int | None = None
+    access: str | None = None
+    reset_value: int | None = None
+
+    def __post_init__(self) -> None:
+        if not self.canonical_name:
+            raise ValueError("contract register-field name must not be empty")
+        if self.bit_offset is not None and self.bit_offset < 0:
+            raise ValueError("contract register-field offset must not be negative")
+        if self.bit_width is not None and self.bit_width < 1:
+            raise ValueError("contract register-field width must be positive")
+        object.__setattr__(self, "names", dict(self.names))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "canonical_name": self.canonical_name,
+            "names": dict(sorted(self.names.items())),
+            "bit_offset": self.bit_offset,
+            "bit_width": self.bit_width,
+            "access": self.access,
+            "reset_value": self.reset_value,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ContractRegister:
+    canonical_name: str
+    component: str
+    names: Mapping[str, str] = field(default_factory=dict)
+    memory_map: str | None = None
+    address_block: str | None = None
+    address_offset: int | None = None
+    absolute_address: int | None = None
+    size_bits: int | None = None
+    access: str | None = None
+    fields: tuple[ContractRegisterField, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.canonical_name or not self.component:
+            raise ValueError("contract register component and name must not be empty")
+        if self.address_offset is not None and self.address_offset < 0:
+            raise ValueError("contract register offset must not be negative")
+        if self.absolute_address is not None and self.absolute_address < 0:
+            raise ValueError("contract register address must not be negative")
+        if self.size_bits is not None and self.size_bits < 1:
+            raise ValueError("contract register width must be positive")
+        for field_name in ("memory_map", "address_block"):
+            value = getattr(self, field_name)
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                raise ValueError(f"contract register {field_name} must be a nonempty string")
+        object.__setattr__(self, "names", dict(self.names))
+        object.__setattr__(self, "fields", tuple(self.fields))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "canonical_name": self.canonical_name,
+            "component": self.component,
+            "names": dict(sorted(self.names.items())),
+            "memory_map": self.memory_map,
+            "address_block": self.address_block,
+            "address_offset": self.address_offset,
+            "absolute_address": self.absolute_address,
+            "size_bits": self.size_bits,
+            "access": self.access,
+            "fields": [
+                item.to_dict() for item in sorted(self.fields, key=lambda item: item.canonical_name)
+            ],
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class DesignContract:
     components: tuple[ContractComponent, ...]
     schema_version: int = 1
     generated_by: str = "OpenCollate"
+    registers: tuple[ContractRegister, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "components", tuple(self.components))
+        object.__setattr__(self, "registers", tuple(self.registers))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -622,6 +855,18 @@ class DesignContract:
             "components": [
                 item.to_dict()
                 for item in sorted(self.components, key=lambda item: item.canonical_name)
+            ],
+            "registers": [
+                item.to_dict()
+                for item in sorted(
+                    self.registers,
+                    key=lambda item: (
+                        item.component,
+                        item.memory_map or "",
+                        item.address_block or "",
+                        item.canonical_name,
+                    ),
+                )
             ],
         }
 
@@ -746,10 +991,93 @@ class DesignContract:
                     ports=tuple(ports),
                 )
             )
+
+        raw_registers = data.get("registers", ())
+        if not isinstance(raw_registers, (list, tuple)):
+            raise TypeError("registers must be an array")
+        registers: list[ContractRegister] = []
+        for register_index, raw_register in enumerate(raw_registers):
+            register_path = f"registers[{register_index}]"
+            if not isinstance(raw_register, Mapping):
+                raise TypeError(f"{register_path} must be an object")
+            canonical_register = raw_register.get("canonical_name")
+            component = raw_register.get("component")
+            if not isinstance(canonical_register, str) or not canonical_register:
+                raise TypeError(f"{register_path}.canonical_name must be a nonempty string")
+            if not isinstance(component, str) or not component:
+                raise TypeError(f"{register_path}.component must be a nonempty string")
+            raw_names = raw_register.get("names", {})
+            if not isinstance(raw_names, Mapping) or not all(
+                isinstance(key, str) and isinstance(value, str) for key, value in raw_names.items()
+            ):
+                raise TypeError(f"{register_path}.names must map strings to strings")
+
+            def optional_integer(source: Mapping[str, Any], key: str, where: str) -> int | None:
+                value = source.get(key)
+                if value is not None and type(value) is not int:
+                    raise TypeError(f"{where}.{key} must be an integer or null")
+                return value
+
+            raw_fields = raw_register.get("fields", ())
+            if not isinstance(raw_fields, (list, tuple)):
+                raise TypeError(f"{register_path}.fields must be an array")
+            register_fields: list[ContractRegisterField] = []
+            for field_index, raw_field in enumerate(raw_fields):
+                field_path = f"{register_path}.fields[{field_index}]"
+                if not isinstance(raw_field, Mapping):
+                    raise TypeError(f"{field_path} must be an object")
+                canonical_field = raw_field.get("canonical_name")
+                if not isinstance(canonical_field, str) or not canonical_field:
+                    raise TypeError(f"{field_path}.canonical_name must be a nonempty string")
+                raw_field_names = raw_field.get("names", {})
+                if not isinstance(raw_field_names, Mapping) or not all(
+                    isinstance(key, str) and isinstance(value, str)
+                    for key, value in raw_field_names.items()
+                ):
+                    raise TypeError(f"{field_path}.names must map strings to strings")
+                field_access = raw_field.get("access")
+                if field_access is not None and not isinstance(field_access, str):
+                    raise TypeError(f"{field_path}.access must be a string or null")
+                register_fields.append(
+                    ContractRegisterField(
+                        canonical_name=canonical_field,
+                        names=dict(raw_field_names),
+                        bit_offset=optional_integer(raw_field, "bit_offset", field_path),
+                        bit_width=optional_integer(raw_field, "bit_width", field_path),
+                        access=field_access,
+                        reset_value=optional_integer(raw_field, "reset_value", field_path),
+                    )
+                )
+            register_access = raw_register.get("access")
+            if register_access is not None and not isinstance(register_access, str):
+                raise TypeError(f"{register_path}.access must be a string or null")
+            memory_map = raw_register.get("memory_map")
+            address_block = raw_register.get("address_block")
+            if memory_map is not None and not isinstance(memory_map, str):
+                raise TypeError(f"{register_path}.memory_map must be a string or null")
+            if address_block is not None and not isinstance(address_block, str):
+                raise TypeError(f"{register_path}.address_block must be a string or null")
+            registers.append(
+                ContractRegister(
+                    canonical_name=canonical_register,
+                    component=component,
+                    names=dict(raw_names),
+                    memory_map=memory_map,
+                    address_block=address_block,
+                    address_offset=optional_integer(raw_register, "address_offset", register_path),
+                    absolute_address=optional_integer(
+                        raw_register, "absolute_address", register_path
+                    ),
+                    size_bits=optional_integer(raw_register, "size_bits", register_path),
+                    access=register_access,
+                    fields=tuple(register_fields),
+                )
+            )
         return cls(
             tuple(components),
             schema_version=schema_version,
             generated_by=generated_by,
+            registers=tuple(registers),
         )
 
 
@@ -784,21 +1112,28 @@ __all__ = [
     "CanonicalComponent",
     "CanonicalDesign",
     "CanonicalPort",
+    "ClockObservation",
     "ComponentKind",
     "ComponentMember",
     "ComponentObservation",
     "ContractComponent",
     "ContractPort",
+    "ContractRegister",
+    "ContractRegisterField",
     "DesignContract",
+    "DesignObjectObservation",
     "Direction",
     "Fact",
     "FactState",
     "IndexRange",
+    "InterfaceObservation",
     "PinMappingObservation",
     "PortMember",
     "PortObservation",
     "PortRole",
     "Provenance",
+    "RegisterFieldObservation",
+    "RegisterObservation",
     "SourceSpan",
     "ViewId",
     "ViewObservation",

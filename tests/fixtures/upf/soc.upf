@@ -1,0 +1,56 @@
+# Synthetic static UPF exercising the importer without vendor collateral.
+upf_version 3.1
+set_design_top "soc_top"
+
+create_power_domain PD_TOP -include_scope
+create_power_domain "PD_CPU" \
+  -elements {u_cpu \
+             u_mem}
+
+create_supply_port VDD -domain PD_TOP -direction in
+create_supply_port VSS -domain PD_TOP -direction in
+create_supply_port VDD_CPU -domain PD_CPU -direction in
+create_supply_net VDD -domain PD_TOP ; create_supply_net VSS -domain PD_TOP
+create_supply_net VDD_CPU -domain PD_CPU -resolve parallel
+create_supply_set SS_CPU \
+  -function {power VDD_CPU} \
+  -function {ground VSS}
+create_supply_set SS_TOP -function {power VDD} -function {ground VSS}
+
+connect_supply_net VDD -ports {VDD u_cpu/VDD}
+connect_supply_net VSS -ports {VSS u_cpu/VSS}
+set_domain_supply_net PD_TOP \
+  -primary_power_net VDD -primary_ground_net VSS \
+  -primary_power_port VDD -primary_ground_port VSS
+set_domain_supply_net PD_CPU \
+  -primary_power_net VDD_CPU -primary_ground_net VSS
+
+set_isolation ISO_CPU -domain PD_CPU -elements {u_cpu} \
+  -applies_to outputs -clamp_value 0 -isolation_signal {iso_enable high} \
+  -isolation_power_net VDD -isolation_ground_net VSS -location parent
+set_isolation_control ISO_CPU_CTRL -domain PD_CPU \
+  -isolation_signal {pmu/iso_enable high} -isolation_sense high
+set_retention RET_CPU -domain PD_CPU -elements {u_cpu/state_regs} \
+  -retention_power_net VDD -retention_ground_net VSS \
+  -save_signal {pmu/save high} -restore_signal {pmu/restore high}
+set_retention_control RET_CPU_CTRL -domain PD_CPU \
+  -save_signal {pmu/save high} -restore_signal {pmu/restore high}
+set_level_shifter LS_CPU -domain PD_CPU -elements {u_cpu} \
+  -applies_to outputs -rule low_to_high -location parent \
+  -input_supply_set SS_CPU -output_supply_set SS_TOP
+
+create_power_switch SW_CPU -domain PD_CPU \
+  -input_supply_port {VIN VDD} \
+  -output_supply_port {VOUT VDD_CPU} \
+  -control_port {CTRL pmu/sleep_cpu} \
+  -on_state {ON VIN {!pmu/sleep_cpu}} \
+  -off_state {OFF {pmu/sleep_cpu}}
+
+add_port_state VDD -state {FULL_ON 1.0} -state {OFF off}
+add_power_state SS_CPU \
+  -state {ACTIVE -supply_expr {power == FULL_ON}} \
+  -state {SLEEP -logic_expr {pmu/sleep_cpu}}
+
+set_scope u_cluster
+create_power_domain PD_CLUSTER -elements {u0 u1}
+set_scope /

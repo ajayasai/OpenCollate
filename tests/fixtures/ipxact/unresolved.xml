@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ipxact:component xmlns:ipxact="http://www.accellera.org/XMLSchema/IPXACT/1685-2014">
+  <ipxact:vendor>example.org</ipxact:vendor>
+  <ipxact:library>broken</ipxact:library>
+  <ipxact:name>unresolved_ip</ipxact:name>
+  <ipxact:version>1.0</ipxact:version>
+  <ipxact:busInterfaces>
+    <ipxact:busInterface>
+      <ipxact:name>BROKEN_BUS</ipxact:name>
+      <ipxact:busType vendor="example.org" library="bus" name="broken" version="1.0"/>
+      <ipxact:abstractionTypes>
+        <ipxact:abstractionType>
+          <ipxact:abstractionRef vendor="example.org" library="bus"
+                                 name="broken_rtl" version="1.0"/>
+          <ipxact:portMaps>
+            <ipxact:portMap>
+              <ipxact:logicalPort><ipxact:name>DATA</ipxact:name></ipxact:logicalPort>
+              <ipxact:physicalPort><ipxact:name>missing_pin</ipxact:name></ipxact:physicalPort>
+            </ipxact:portMap>
+          </ipxact:portMaps>
+        </ipxact:abstractionType>
+      </ipxact:abstractionTypes>
+      <ipxact:slave/>
+    </ipxact:busInterface>
+  </ipxact:busInterfaces>
+  <ipxact:memoryMaps>
+    <ipxact:memoryMap>
+      <ipxact:name>regs</ipxact:name>
+      <ipxact:addressBlock>
+        <ipxact:name>block</ipxact:name>
+        <ipxact:baseAddress>BASE_UNKNOWN</ipxact:baseAddress>
+        <ipxact:range>0x100</ipxact:range>
+        <ipxact:width>32</ipxact:width>
+        <ipxact:register>
+          <ipxact:name>STATUS</ipxact:name>
+          <ipxact:addressOffset>OFF_UNKNOWN</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:field>
+            <ipxact:name>VALUE</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>FIELD_WIDTH</ipxact:bitWidth>
+          </ipxact:field>
+        </ipxact:register>
+      </ipxact:addressBlock>
+    </ipxact:memoryMap>
+  </ipxact:memoryMaps>
+  <ipxact:model>
+    <ipxact:ports>
+      <ipxact:port>
+        <ipxact:name>data</ipxact:name>
+        <ipxact:wire>
+          <ipxact:direction>in</ipxact:direction>
+          <ipxact:vectors>
+            <ipxact:vector>
+              <ipxact:left>MISSING_WIDTH - 1</ipxact:left><ipxact:right>0</ipxact:right>
+            </ipxact:vector>
+          </ipxact:vectors>
+        </ipxact:wire>
+      </ipxact:port>
+    </ipxact:ports>
+  </ipxact:model>
+</ipxact:component>

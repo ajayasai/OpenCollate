@@ -6,3 +6,5 @@
 *.jpeg binary
 *.gif binary
 *.pdf binary
+*.gds binary
+*.gdsii binary

@@ -4,7 +4,7 @@ title: "OpenCollate: SoC design-collateral consistency checker"
 type: software
 authors:
   - name: "ajayasai"
-version: 0.1.0
+version: 0.2.0
 date-released: 2026-08-31
 license: Apache-2.0
 repository-code: "https://github.com/ajayasai/OpenCollate"

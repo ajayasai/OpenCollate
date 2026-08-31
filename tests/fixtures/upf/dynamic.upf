@@ -1,0 +1,6 @@
+# These constructs must be surfaced, never evaluated.
+set domain_elements {u_cpu u_gpu}
+create_power_domain PD_DYNAMIC -elements $domain_elements
+create_supply_net [format "VDD_%s" $corner] -domain PD_DYNAMIC
+foreach inst $domain_elements {create_power_domain PD_$inst -elements $inst}
+exec touch should-not-exist

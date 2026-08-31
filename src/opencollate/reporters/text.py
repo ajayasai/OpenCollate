@@ -90,10 +90,17 @@ def render_text(result: object, *, verbose: bool = False) -> str:
         views = checked.get("views")
         components = checked.get("components")
         ports = checked.get("ports")
-        if views is not None or components is not None or ports is not None:
+        registers = checked.get("registers")
+        if (
+            views is not None
+            or components is not None
+            or ports is not None
+            or registers is not None
+        ):
+            register_text = f", {int(registers or 0)} register(s)" if registers is not None else ""
             lines.append(
                 "Checked: "
                 f"{int(views or 0)} view(s), {int(components or 0)} component(s), "
-                f"{int(ports or 0)} port(s)"
+                f"{int(ports or 0)} port(s){register_text}"
             )
     return "\n".join(lines) + "\n"

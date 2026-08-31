@@ -7,6 +7,7 @@ objects, and every diagnostic retains the observations that support it.
 from __future__ import annotations
 
 import json
+import re
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -44,11 +45,15 @@ from opencollate.model import (
     CanonicalComponent,
     CanonicalDesign,
     CanonicalPort,
+    ClockObservation,
     ComponentMember,
     ComponentObservation,
     ContractComponent,
     ContractPort,
+    ContractRegister,
+    ContractRegisterField,
     DesignContract,
+    DesignObjectObservation,
     Direction,
     FactState,
     PinMappingObservation,
@@ -56,10 +61,41 @@ from opencollate.model import (
     PortObservation,
     PortRole,
     Provenance,
+    RegisterFieldObservation,
+    RegisterObservation,
     ViewId,
     ViewObservation,
     decoded_identifier,
 )
+
+_VIEW_KIND_ALIASES = {
+    "sv": "rtl",
+    "systemverilog": "rtl",
+    "verilog": "rtl",
+    "lib": "liberty",
+    "pinmap": "csv",
+    "pin_map": "csv",
+    "pin-map": "csv",
+    "ip_xact": "ipxact",
+    "ip-xact": "ipxact",
+    "spirit": "ipxact",
+    "c_header": "header",
+    "c-header": "header",
+    "cheader": "header",
+    "software": "header",
+    "spice": "cdl",
+    "sp": "cdl",
+    "circuit": "cdl",
+    "gdsii": "gds",
+    "gds2": "gds",
+    "stream": "gds",
+}
+
+
+def _semantic_view_kind(view: ViewId | str) -> str:
+    kind = view.kind if isinstance(view, ViewId) else str(view)
+    normalized = kind.strip().casefold()
+    return _VIEW_KIND_ALIASES.get(normalized, normalized)
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +153,7 @@ class EngineResult:
                 "views": len(self.design.views),
                 "components": len(self.design.components),
                 "ports": ports,
+                "registers": len(self.generated_contract.registers),
             },
             "diagnostics": [item.to_dict() for item in self.diagnostics],
         }
@@ -128,6 +165,7 @@ class _ValueEvidence:
     value: Any
     provenance: Provenance | None
     native_name: str | None = None
+    order_known: bool = True
 
     def diagnostic_evidence(self) -> DiagnosticEvidence:
         return DiagnosticEvidence(
@@ -179,7 +217,7 @@ class _AliasResolver:
         normalized = selector.strip().lower()
         if normalized == view.key.lower():
             return 0
-        if normalized == view.kind:
+        if normalized == view.kind or _semantic_view_kind(normalized) == _semantic_view_kind(view):
             return 1
         if normalized == "*":
             return 3
@@ -221,15 +259,18 @@ class _AliasResolver:
 
 
 def _view_label(view: ViewId) -> str:
+    kind = _semantic_view_kind(view)
     label = {
         "rtl": "RTL",
-        "systemverilog": "RTL",
-        "verilog": "RTL",
         "liberty": "Liberty",
         "lef": "LEF",
         "csv": "CSV",
+        "ipxact": "IP-XACT",
+        "header": "C header",
+        "cdl": "CDL/SPICE",
+        "gds": "GDSII",
         "contract": "the contract",
-    }.get(view.kind, view.kind.upper())
+    }.get(kind, kind.upper())
     if view.name in {"default", "frozen"}:
         return label
     return f"{label} ({view.name})"
@@ -372,10 +413,14 @@ class ComparisonEngine:
                 resolver,
             )
         )
+        diagnostics.extend(self._check_object_references(reconciliation.design, observed))
+        diagnostics.extend(self._check_clocks(reconciliation.design, observed))
+        diagnostics.extend(self._check_interfaces(reconciliation.design, observed, resolver))
+        diagnostics.extend(self._check_registers(observed, contract))
         diagnostics = self._apply_severity_overrides(diagnostics)
         diagnostics = self._apply_waivers(diagnostics, today=today or date.today())
         ordered = sort_diagnostics(diagnostics)
-        generated = self.build_contract(reconciliation.design)
+        generated = self.build_contract(reconciliation.design, observed)
         return EngineResult(
             project=self.config.name,
             design=reconciliation.design,
@@ -631,7 +676,7 @@ class ComparisonEngine:
         contract: DesignContract | None,
     ) -> tuple[ViewId, ...]:
         active = set(active_views)
-        active = {view for view in active if not self._is_package_map_view(view)}
+        active = {view for view in active if self._is_component_contract_view(view)}
         required: set[ViewId] = set(active if self.config.policy.strict_inventory else ())
         optional: set[ViewId] = set()
         for rule in self.config.participation:
@@ -656,6 +701,7 @@ class ComparisonEngine:
                 view
                 for view in active
                 if selector in {"*", view.kind, view.key.lower()}
+                or _semantic_view_kind(selector) == _semantic_view_kind(view)
                 or fnmatchcase(view.key.lower(), selector)
             }
             if matches:
@@ -805,6 +851,9 @@ class ComparisonEngine:
         component_views = {
             view for view in component.views() if not self._is_package_map_view(view)
         }
+        default_inventory_views = {
+            view for view in component_views if self._is_component_contract_view(view)
+        }
         native_components_by_view: dict[ViewId, set[str]] = defaultdict(set)
         for member in component.members:
             native_components_by_view[member.view].add(member.observation.native_name)
@@ -858,7 +907,7 @@ class ComparisonEngine:
         for port in component.ports:
             expected = contract_ports.get(port.canonical_name)
             role = self._dominant_role(port, expected)
-            required_views = set(component_views)
+            required_views = set(default_inventory_views)
             for rule in self.config.participation:
                 if not fnmatchcase(component.canonical_name, rule.component):
                     continue
@@ -908,19 +957,26 @@ class ComparisonEngine:
         if role not in {PortRole.POWER, PortRole.GROUND}:
             return result
         if self.config.policy.rtl_power_pins in {"optional", "ignore"}:
-            result = {
-                view for view in result if view.kind not in {"rtl", "verilog", "systemverilog"}
-            }
+            result = {view for view in result if _semantic_view_kind(view) != "rtl"}
         return result
 
     def _is_package_map_view(self, view: ViewId) -> bool:
-        if view.kind not in {"csv", "pinmap", "pin_map"}:
+        if _semantic_view_kind(view) != "csv":
             return False
         try:
             source = self.config.source(view)
         except KeyError:
             return False
         return (source.profile or "").strip().lower().replace("-", "_") == "package_map"
+
+    def _is_component_contract_view(self, view: ViewId) -> bool:
+        if self._is_package_map_view(view):
+            return False
+        return _semantic_view_kind(view) not in {
+            "sdc",
+            "upf",
+            "header",
+        }
 
     @staticmethod
     def _port_evidence(port: CanonicalPort, value: Any) -> tuple[DiagnosticEvidence, ...]:
@@ -1044,6 +1100,10 @@ class ComparisonEngine:
                 and len({frozenset(indices or ()) for indices in ordered_indices}) == 1
                 and len(unpacked_shapes) == 1
             )
+            # Individually listed physical pins establish membership and width,
+            # but their statement order does not declare logical bus ordering.
+            if range_order_only and not all(item.order_known for item, _ in structured):
+                return diagnostics
             code = "OC4102" if range_order_only else "OC4103"
             message = (
                 f"{display} has the same bit indices but reversed or inconsistent ordering."
@@ -1105,6 +1165,7 @@ class ComparisonEngine:
                 member.observation.shape,
                 member.observation.provenance,
                 member.observation.native_name,
+                member.observation.attributes.get("bit_order_known") is not False,
             )
             for member in port.members
             if member.observation.state_for("shape") == FactState.KNOWN
@@ -1265,7 +1326,7 @@ class ComparisonEngine:
 
         diagnostics: list[Diagnostic] = []
         for output, values in sorted(functions.items()):
-            if len({item.view.kind for item in values}) < 2:
+            if len({_semantic_view_kind(item.view) for item in values}) < 2:
                 continue
             ordered = self._ordered_values(values)
             parsed: list[tuple[_ValueEvidence, BoolExpr]] = []
@@ -1301,7 +1362,7 @@ class ComparisonEngine:
                     and decoded_identifier(name)
                     not in {decoded_identifier(value) for value in native_names}
                 }
-                if unknown and item.view.kind == "liberty":
+                if unknown and _semantic_view_kind(item.view) == "liberty":
                     diagnostics.append(
                         Diagnostic.from_rule(
                             "OC4303",
@@ -1379,11 +1440,22 @@ class ComparisonEngine:
         resolver: _AliasResolver,
     ) -> list[Diagnostic]:
         rows: list[tuple[ViewId, PinMappingObservation]] = []
+        physical_rows: list[tuple[ViewId, PinMappingObservation]] = []
         for observation in observations:
-            if not self._is_package_map_view(observation.view):
-                continue
-            rows.extend((observation.view, item) for item in observation.pin_mappings)
+            if self._is_package_map_view(observation.view):
+                rows.extend((observation.view, item) for item in observation.pin_mappings)
+            else:
+                physical_rows.extend(
+                    (observation.view, item)
+                    for item in observation.pin_mappings
+                    if self._is_physical_pad_mapping(item)
+                )
         diagnostics: list[Diagnostic] = []
+        physical_by_pad: dict[str, list[tuple[ViewId, PinMappingObservation]]] = defaultdict(list)
+        for item in physical_rows:
+            _, row = item
+            if row.status == FactState.KNOWN and row.die_pad:
+                physical_by_pad[row.die_pad].append(item)
         valid_rows: list[tuple[ViewId, PinMappingObservation]] = []
         for view, row in rows:
             if row.status != FactState.KNOWN:
@@ -1399,6 +1471,65 @@ class ComparisonEngine:
                 )
                 continue
             valid_rows.append((view, row))
+            if row.die_pad and physical_by_pad and row.die_pad not in physical_by_pad:
+                diagnostics.append(
+                    Diagnostic.from_rule(
+                        "OC5001",
+                        f"Package ball {row.package_ball} references die pad "
+                        f"{row.die_pad!r}, but that pad is absent from the physical design.",
+                        provenance=row.provenance,
+                        object=_object("die_pad", f"die-pad:{row.die_pad}", row.die_pad),
+                        property_name="presence",
+                        evidence=(DiagnosticEvidence(view, row.die_pad, row.provenance),),
+                        metadata={
+                            "physical_views": [
+                                str(item.view)
+                                for item in observations
+                                if any(
+                                    self._is_physical_pad_mapping(mapping)
+                                    for mapping in item.pin_mappings
+                                )
+                            ]
+                        },
+                    )
+                )
+            physical_assignments = physical_by_pad.get(row.die_pad or "", ())
+            physical_signals = {
+                physical.signal
+                for _, physical in physical_assignments
+                if physical.signal and physical.signal.upper() not in {"NC", "DNP", "N/C"}
+            }
+            if (
+                row.signal
+                and row.signal.upper() not in {"NC", "DNP", "N/C"}
+                and physical_signals
+                and row.signal not in physical_signals
+            ):
+                diagnostics.append(
+                    Diagnostic.from_rule(
+                        "OC5005",
+                        f"Package ball {row.package_ball} assigns signal {row.signal!r} to die "
+                        f"pad {row.die_pad!r}, but the physical design assigns "
+                        + ", ".join(repr(item) for item in sorted(physical_signals))
+                        + ".",
+                        provenance=row.provenance,
+                        object=_object(
+                            "die_pad",
+                            f"die-pad:{row.die_pad}",
+                            row.die_pad or "<unspecified>",
+                        ),
+                        property_name="signal",
+                        evidence=(DiagnosticEvidence(view, row.signal, row.provenance),)
+                        + tuple(
+                            DiagnosticEvidence(
+                                physical_view,
+                                physical.signal,
+                                physical.provenance,
+                            )
+                            for physical_view, physical in physical_assignments
+                        ),
+                    )
+                )
 
         by_ball: dict[str, list[tuple[ViewId, PinMappingObservation]]] = defaultdict(list)
         by_pad: dict[str, list[tuple[ViewId, PinMappingObservation]]] = defaultdict(list)
@@ -1467,6 +1598,13 @@ class ComparisonEngine:
         return diagnostics
 
     @staticmethod
+    def _is_physical_pad_mapping(mapping: PinMappingObservation) -> bool:
+        source = str(mapping.attributes.get("source") or "").casefold()
+        return bool(mapping.die_pad) and (
+            mapping.attributes.get("physical") is True or source in {"gds_pin_text", "physical_pad"}
+        )
+
+    @staticmethod
     def _component_has_port(
         component: CanonicalComponent,
         view: ViewId,
@@ -1509,6 +1647,1269 @@ class ComparisonEngine:
                 for (view, row), value in zip(assignments, values, strict=True)
             ),
         )
+
+    @staticmethod
+    def _name_variants(name: str, scope: str | None = None) -> set[str]:
+        raw = decoded_identifier(str(name)).strip().strip("/")
+        if not raw:
+            return set()
+        variants = {raw, raw.replace(".", "/")}
+        if scope:
+            normalized_scope = decoded_identifier(scope).strip().strip("/")
+            scoped = {f"{normalized_scope}/{item}" for item in tuple(variants) if normalized_scope}
+            variants.update(scoped)
+            for item in tuple(variants):
+                prefix = f"{normalized_scope}/"
+                if normalized_scope and item.startswith(prefix):
+                    variants.add(item[len(prefix) :])
+        variants.update(item.replace("/", ".") for item in tuple(variants))
+        return {item for item in variants if item}
+
+    @classmethod
+    def _reference_matches(
+        cls,
+        reference: DesignObjectObservation,
+        candidates: set[str],
+        *,
+        source_kind: str,
+        source_divider: str = "/",
+    ) -> bool | None:
+        reference_name = reference.native_name
+        reference_scope = reference.scope
+        if source_kind == "def":
+            # DEF uses a backslash to quote its divider character.  Decode it
+            # only for matching; diagnostics retain the exact source spelling.
+            reference_name = reference_name.replace(f"\\{source_divider}", source_divider)
+            if reference_scope is not None:
+                reference_scope = reference_scope.replace(f"\\{source_divider}", source_divider)
+        match_mode = str(reference.attributes.get("match_mode") or "").casefold()
+        options = reference.attributes.get("options")
+        nocase = isinstance(options, Mapping) and "-nocase" in options
+        if match_mode == "regexp":
+            regexp_candidates = candidates
+            if reference_scope:
+                scope_variants = cls._name_variants(reference_scope)
+                regexp_candidates = set()
+                for candidate in candidates:
+                    for scope in scope_variants:
+                        for separator in ("/", "."):
+                            prefix = f"{scope}{separator}"
+                            if candidate.startswith(prefix):
+                                regexp_candidates.add(candidate)
+                                regexp_candidates.add(candidate[len(prefix) :])
+            outcomes = {
+                cls._safe_regexp_search(
+                    reference_name,
+                    candidate,
+                    nocase=nocase,
+                )
+                for candidate in regexp_candidates
+            }
+            if True in outcomes:
+                return True
+            if None in outcomes or not regexp_candidates:
+                return (
+                    None
+                    if cls._safe_regexp_search(
+                        reference_name,
+                        "",
+                        nocase=nocase,
+                    )
+                    is None
+                    else False
+                )
+            return False
+
+        patterns = cls._name_variants(reference_name)
+        if reference_scope:
+            scopes = cls._name_variants(reference_scope)
+            qualified_patterns: set[str] = set()
+            for pattern in patterns:
+                if any(
+                    pattern == scope
+                    or pattern.startswith(f"{scope}/")
+                    or pattern.startswith(f"{scope}.")
+                    for scope in scopes
+                ):
+                    qualified_patterns.add(pattern)
+                    continue
+                for scope in scopes:
+                    qualified_patterns.add(f"{scope}/{pattern}")
+                    qualified_patterns.add(f"{scope}.{pattern}")
+            patterns = qualified_patterns
+        is_pattern = (
+            match_mode == "glob"
+            or bool(reference.attributes.get("pattern"))
+            or any(marker in reference_name for marker in ("*", "?"))
+        )
+        if nocase:
+            patterns = {item.casefold() for item in patterns}
+            candidates = {item.casefold() for item in candidates}
+        if not is_pattern:
+            return bool(patterns & candidates)
+        return any(
+            fnmatchcase(candidate, pattern) for pattern in patterns for candidate in candidates
+        )
+
+    @staticmethod
+    def _safe_regexp_search(
+        pattern: str,
+        candidate: str,
+        *,
+        nocase: bool,
+    ) -> bool | None:
+        """Evaluate a deliberately small, non-catastrophic Tcl-regexp subset.
+
+        Grouping, alternation, counted repetition, and more than two ``*``
+        quantifiers are left inconclusive.  This covers ordinary anchored SDC
+        selectors without exposing checks to adversarial backtracking.
+        """
+
+        if len(pattern) > 512 or len(candidate) > 65_536:
+            return None
+        in_class = False
+        escaped = False
+        previous_atom = False
+        previous_quantifier = False
+        star_count = 0
+        question_count = 0
+        for index, character in enumerate(pattern):
+            if escaped:
+                if character.isdigit():
+                    return None
+                escaped = False
+                previous_atom = True
+                previous_quantifier = False
+                continue
+            if character == "\\":
+                escaped = True
+                continue
+            if in_class:
+                if character == "[":
+                    # Tcl supports POSIX bracket classes such as [:digit:],
+                    # which Python's re engine does not interpret equivalently.
+                    return None
+                if character == "]":
+                    in_class = False
+                    previous_atom = True
+                    previous_quantifier = False
+                continue
+            if character == "[":
+                in_class = True
+                previous_atom = False
+                previous_quantifier = False
+                continue
+            if character in "(){}|+":
+                return None
+            if character in "*?":
+                if not previous_atom or previous_quantifier:
+                    return None
+                if character == "*":
+                    star_count += 1
+                    if star_count > 2:
+                        return None
+                else:
+                    question_count += 1
+                    if question_count > 8:
+                        return None
+                previous_quantifier = True
+                continue
+            if character == "^" and index != 0:
+                return None
+            if character == "$" and index != len(pattern) - 1:
+                return None
+            previous_atom = character not in "^$"
+            previous_quantifier = False
+        if escaped or in_class:
+            return None
+        try:
+            compiled = re.compile(pattern, re.IGNORECASE if nocase else 0)
+        except re.error:
+            return None
+        # Tcl's regexp command searches unless the caller supplied anchors.
+        return compiled.search(candidate) is not None
+
+    def _check_object_references(
+        self,
+        design: CanonicalDesign,
+        observations: Sequence[ViewObservation],
+    ) -> list[Diagnostic]:
+        rtl_views = [item for item in observations if _semantic_view_kind(item.view) == "rtl"]
+        has_rtl = bool(rtl_views)
+
+        rtl_index: dict[str, set[str]] = defaultdict(set)
+        for observation in rtl_views:
+            for observed_component in observation.components:
+                component_names = self._name_variants(observed_component.native_name)
+                rtl_index["instance"].update(component_names)
+                rtl_index["cell"].update(component_names)
+                for observed_port in observed_component.ports:
+                    names = self._name_variants(
+                        observed_port.native_name, observed_component.native_name
+                    )
+                    for bit in observed_port.shape.bit_indices:
+                        names.update(
+                            self._name_variants(
+                                f"{observed_port.native_name}[{bit}]",
+                                observed_component.native_name,
+                            )
+                        )
+                    rtl_index["port"].update(names)
+            for item in observation.objects:
+                if item.relation != "definition" or item.status != FactState.KNOWN:
+                    continue
+                rtl_index[item.kind].update(self._name_variants(item.native_name, item.scope))
+        for canonical_component in design.components:
+            rtl_members = [
+                member
+                for member in canonical_component.members
+                if _semantic_view_kind(member.view) == "rtl"
+            ]
+            if not rtl_members:
+                continue
+            rtl_index["instance"].update(self._name_variants(canonical_component.canonical_name))
+            rtl_index["cell"].update(self._name_variants(canonical_component.canonical_name))
+            for canonical_port in canonical_component.ports:
+                if not any(
+                    _semantic_view_kind(member.view) == "rtl" for member in canonical_port.members
+                ):
+                    continue
+                rtl_index["port"].update(
+                    self._name_variants(
+                        canonical_port.canonical_name, canonical_component.canonical_name
+                    )
+                )
+
+        generic_index_by_view: dict[ViewId, dict[str, set[str]]] = defaultdict(
+            lambda: defaultdict(set)
+        )
+        for observation in observations:
+            for clock in observation.clocks:
+                if clock.status == FactState.KNOWN:
+                    names = self._name_variants(clock.native_name)
+                    generic_index_by_view[observation.view]["clock"].update(names)
+            for item in observation.objects:
+                if item.relation == "definition" and item.status == FactState.KNOWN:
+                    generic_index_by_view[observation.view][item.kind].update(
+                        self._name_variants(item.native_name, item.scope)
+                    )
+
+        aliases = {
+            "cells": "instance",
+            "cell": "instance",
+            "instances": "instance",
+            "ports": "port",
+            "pins": "pin",
+            "nets": "net",
+            "clocks": "clock",
+        }
+        diagnostics: list[Diagnostic] = []
+        for observation in observations:
+            if _semantic_view_kind(observation.view) != "upf":
+                continue
+            definitions_by_key: dict[tuple[str, str], list[DesignObjectObservation]] = defaultdict(
+                list
+            )
+            for item in observation.objects:
+                if item.relation == "definition" and item.status == FactState.KNOWN:
+                    definitions_by_key[(item.kind, item.qualified_name)].append(item)
+            for (kind, name), definitions in sorted(definitions_by_key.items()):
+                updates = [
+                    index
+                    for index, item in enumerate(definitions)
+                    if item.attributes.get("update") is True
+                ]
+                initial = [
+                    index
+                    for index, item in enumerate(definitions)
+                    if item.attributes.get("update") is not True
+                ]
+                legal_update_sequence = (
+                    bool(updates) and len(initial) == 1 and initial[0] < min(updates)
+                )
+                if legal_update_sequence or (not updates and len(definitions) < 2):
+                    continue
+                if updates and not initial:
+                    detail = "is updated before any initial definition"
+                elif updates and len(initial) == 1:
+                    detail = "is updated before its initial definition"
+                else:
+                    detail = f"has {len(initial)} initial definitions"
+                diagnostics.append(
+                    Diagnostic.from_rule(
+                        "OC6104",
+                        f"{_view_label(observation.view)} UPF {kind} {name!r} {detail}.",
+                        object=_object(
+                            kind,
+                            f"upf:{observation.view.key}:{kind}:{name}",
+                            name,
+                        ),
+                        property_name="definition",
+                        evidence=tuple(
+                            DiagnosticEvidence(
+                                observation.view,
+                                {
+                                    "name": item.native_name,
+                                    "update": item.attributes.get("update") is True,
+                                },
+                                item.provenance,
+                            )
+                            for item in definitions
+                        ),
+                    )
+                )
+        for observation in observations:
+            observation_kind = _semantic_view_kind(observation.view)
+            if observation_kind not in {"sdc", "upf", "def"}:
+                continue
+            for reference in observation.objects:
+                if reference.relation != "reference" or reference.status != FactState.KNOWN:
+                    continue
+                kind = aliases.get(reference.kind, reference.kind)
+                if (
+                    observation_kind == "def"
+                    and kind == "pin"
+                    and reference.attributes.get("endpoint_type") == "top_pin"
+                ):
+                    kind = "port"
+                rtl_object = kind in {"port", "pin", "net", "instance"}
+                # An SDC/UPF-only project has no authoritative elaborated design
+                # against which an RTL reference can be judged.  Internal UPF
+                # references are still checked against definitions below.
+                if rtl_object and not has_rtl:
+                    continue
+                candidates = (
+                    rtl_index[kind] if rtl_object else generic_index_by_view[observation.view][kind]
+                )
+                match = self._reference_matches(
+                    reference,
+                    candidates,
+                    source_kind=observation_kind,
+                    source_divider=(
+                        str(observation.attributes.get("dividerchar"))
+                        if observation_kind == "def"
+                        and isinstance(observation.attributes.get("dividerchar"), str)
+                        and len(str(observation.attributes.get("dividerchar"))) == 1
+                        else "/"
+                    ),
+                )
+                if match is None:
+                    diagnostics.append(
+                        Diagnostic.from_rule(
+                            "OC1105",
+                            f"{_view_label(observation.view)} regular expression "
+                            f"{reference.native_name!r} is outside the bounded static subset; "
+                            "object existence was not judged.",
+                            provenance=reference.provenance,
+                            object=_object(
+                                kind,
+                                f"reference:{observation.view.key}:{kind}:{reference.native_name}",
+                                reference.native_name,
+                            ),
+                            property_name="reference",
+                            evidence=(
+                                DiagnosticEvidence(
+                                    observation.view,
+                                    reference.native_name,
+                                    reference.provenance,
+                                ),
+                            ),
+                            metadata={"match_mode": "regexp"},
+                        )
+                    )
+                    continue
+                if match:
+                    continue
+                tainted_reference_scopes = {
+                    item
+                    for item in (reference.scope, reference.native_name, reference.qualified_name)
+                    if item
+                }
+                if self._whole_view_tainted(observation) or bool(
+                    tainted_reference_scopes & set(observation.tainted_scopes)
+                ):
+                    # A static fact can remain useful in an incomplete UPF/SDC/DEF
+                    # view, but the omitted dynamic or included content may define
+                    # the object.  Do not turn that uncertainty into an absence.
+                    continue
+                if observation_kind == "sdc":
+                    code = "OC6001"
+                    subject = "SDC"
+                elif observation_kind == "upf":
+                    if kind == "instance":
+                        code = "OC6101"
+                    elif kind in {"port", "pin"}:
+                        code = "OC6102"
+                    else:
+                        code = "OC6103"
+                    subject = "UPF"
+                else:
+                    code = "OC6401"
+                    subject = "DEF"
+                command = str(reference.attributes.get("command") or "reference")
+                display = f"{kind} {reference.native_name}"
+                diagnostics.append(
+                    Diagnostic.from_rule(
+                        code,
+                        f"{subject} command {command} references {kind} "
+                        f"{reference.native_name!r}, but it "
+                        "matches no statically elaborated design object.",
+                        provenance=reference.provenance,
+                        object=_object(
+                            kind,
+                            f"reference:{observation.view.key}:{kind}:{reference.native_name}",
+                            display,
+                        ),
+                        property_name="reference",
+                        evidence=(
+                            DiagnosticEvidence(
+                                observation.view,
+                                reference.native_name,
+                                reference.provenance,
+                                native_name=reference.native_name,
+                                label=command,
+                            ),
+                        ),
+                        metadata={"command": command, "reference_kind": kind},
+                    )
+                )
+        return diagnostics
+
+    @classmethod
+    def _resolved_clock_targets(
+        cls,
+        design: CanonicalDesign,
+        targets: Sequence[str],
+    ) -> tuple[str, ...]:
+        resolved: set[str] = set()
+        for target in targets:
+            target_variants = cls._name_variants(target)
+            target_matches: set[str] = set()
+            is_pattern = any(marker in target for marker in ("*", "?", "["))
+            for component in design.components:
+                for port in component.ports:
+                    port_variants = cls._name_variants(
+                        port.canonical_name, component.canonical_name
+                    )
+                    port_variants.update(
+                        variant
+                        for member in port.members
+                        for variant in cls._name_variants(
+                            member.observation.native_name,
+                            member.component_native_name,
+                        )
+                    )
+                    matched = bool(target_variants & port_variants)
+                    if is_pattern:
+                        matched = any(
+                            fnmatchcase(candidate, pattern)
+                            for pattern in target_variants
+                            for candidate in port_variants
+                        )
+                    if matched:
+                        target_matches.add(f"{component.canonical_name}/{port.canonical_name}")
+            if target_matches:
+                resolved.update(target_matches)
+            else:
+                resolved.add(decoded_identifier(target).strip().replace(".", "/"))
+        return tuple(sorted(resolved))
+
+    def _check_clocks(
+        self,
+        design: CanonicalDesign,
+        observations: Sequence[ViewObservation],
+    ) -> list[Diagnostic]:
+        grouped: dict[str, list[tuple[ViewId, ClockObservation]]] = defaultdict(list)
+        for observation in observations:
+            for clock in observation.clocks:
+                if clock.status == FactState.KNOWN:
+                    grouped[clock.native_name].append((observation.view, clock))
+
+        diagnostics: list[Diagnostic] = []
+        for name, declarations in sorted(grouped.items()):
+            conflicts: dict[str, list[Any]] = {}
+            for property_name in (
+                "period",
+                "waveform",
+                "source",
+                "generated",
+                "targets",
+            ):
+                values = [
+                    self._resolved_clock_targets(design, clock.targets)
+                    if property_name == "targets"
+                    else getattr(clock, property_name)
+                    for _, clock in declarations
+                ]
+                present = [value for value in values if value is not None]
+                stable = {_stable_value_key(value) for value in present}
+                if len(stable) > 1:
+                    conflicts[property_name] = present
+            if conflicts:
+                diagnostics.append(
+                    Diagnostic.from_rule(
+                        "OC6002",
+                        f"Clock {name} has conflicting definitions across "
+                        + ", ".join(_view_label(view) for view, _ in declarations)
+                        + ".",
+                        object=_object("clock", f"clock:{name}", name),
+                        property_name="clock_definition",
+                        evidence=tuple(
+                            DiagnosticEvidence(
+                                view,
+                                {
+                                    "period": clock.period,
+                                    "waveform": clock.waveform,
+                                    "source": clock.source,
+                                    "generated": clock.generated,
+                                    "targets": list(clock.targets),
+                                },
+                                clock.provenance,
+                                native_name=clock.native_name,
+                            )
+                            for view, clock in declarations
+                        ),
+                        metadata={"conflicts": conflicts},
+                    )
+                )
+
+            for view, clock in declarations:
+                for target in clock.targets:
+                    target_variants = self._name_variants(target)
+                    for component in design.components:
+                        for port in component.ports:
+                            port_variants = self._name_variants(
+                                port.canonical_name, component.canonical_name
+                            )
+                            port_variants.update(
+                                variant
+                                for member in port.members
+                                for variant in self._name_variants(
+                                    member.observation.native_name,
+                                    member.component_native_name,
+                                )
+                            )
+                            if not target_variants & port_variants:
+                                continue
+                            known_roles = {
+                                member.observation.role
+                                for member in port.members
+                                if member.observation.state_for("role") == FactState.KNOWN
+                                and member.observation.role != PortRole.UNKNOWN
+                            }
+                            if not known_roles or PortRole.CLOCK in known_roles:
+                                continue
+                            display = f"{component.canonical_name}/{port.canonical_name}"
+                            diagnostics.append(
+                                Diagnostic.from_rule(
+                                    "OC6003",
+                                    f"Clock {name} targets {display}, but authoritative "
+                                    "collateral classifies that pin as "
+                                    + "/".join(sorted(role.value for role in known_roles))
+                                    + ".",
+                                    object=_object(
+                                        "port",
+                                        component.port_id(port.canonical_name),
+                                        display,
+                                    ),
+                                    property_name="role",
+                                    evidence=(
+                                        DiagnosticEvidence(
+                                            view,
+                                            target,
+                                            clock.provenance,
+                                            label="clock target",
+                                        ),
+                                        *tuple(
+                                            DiagnosticEvidence(
+                                                member.view,
+                                                member.observation.role,
+                                                member.observation.provenance,
+                                                native_name=member.observation.native_name,
+                                            )
+                                            for member in port.members
+                                            if member.observation.state_for("role")
+                                            == FactState.KNOWN
+                                        ),
+                                    ),
+                                )
+                            )
+        return diagnostics
+
+    def _check_interfaces(
+        self,
+        design: CanonicalDesign,
+        observations: Sequence[ViewObservation],
+        resolver: _AliasResolver,
+    ) -> list[Diagnostic]:
+        diagnostics: list[Diagnostic] = []
+        for observation in observations:
+            for interface in observation.interfaces:
+                if interface.status != FactState.KNOWN:
+                    continue
+                native_component = interface.component
+                if native_component is None and len(observation.components) == 1:
+                    native_component = observation.components[0].native_name
+                component = None
+                if native_component:
+                    try:
+                        canonical = resolver.component(observation.view, native_component)
+                    except _AliasCollision:
+                        canonical = decoded_identifier(native_component)
+                    component = design.component(canonical)
+                    if component is None:
+                        component = next(
+                            (
+                                item
+                                for item in design.components
+                                if item.canonical_name.casefold() == canonical.casefold()
+                            ),
+                            None,
+                        )
+                if component is None:
+                    continue
+                valid_ports = {port.canonical_name for port in component.ports}
+                valid_ports.update(
+                    member.observation.native_name
+                    for port in component.ports
+                    for member in port.members
+                )
+                physical_to_logical: dict[str, list[str]] = defaultdict(list)
+                for logical, physical_expression in sorted(interface.port_maps.items()):
+                    physical = re.sub(r"(?:\[[^\]]+\])+$", "", physical_expression)
+                    physical_to_logical[physical].append(logical)
+                    if physical in valid_ports:
+                        continue
+                    display = f"{component.canonical_name}/{physical}"
+                    diagnostics.append(
+                        Diagnostic.from_rule(
+                            "OC6201",
+                            f"IP-XACT interface {interface.native_name} maps logical port "
+                            f"{logical} to {display}, which is absent from the component.",
+                            provenance=interface.provenance,
+                            object=_object("port", component.port_id(physical), display),
+                            property_name="interface.port_map",
+                            evidence=(
+                                DiagnosticEvidence(
+                                    observation.view,
+                                    {"logical": logical, "physical": physical_expression},
+                                    interface.provenance,
+                                    native_name=interface.native_name,
+                                ),
+                            ),
+                        )
+                    )
+                if interface.attributes.get("allow_many_to_one"):
+                    continue
+                for physical, logical_names in sorted(physical_to_logical.items()):
+                    if len(logical_names) < 2:
+                        continue
+                    diagnostics.append(
+                        Diagnostic.from_rule(
+                            "OC6202",
+                            f"IP-XACT interface {interface.native_name} maps logical ports "
+                            f"{', '.join(logical_names)} to the same physical port {physical}.",
+                            provenance=interface.provenance,
+                            object=_object(
+                                "interface",
+                                f"interface:{component.canonical_name}/{interface.native_name}",
+                                interface.native_name,
+                            ),
+                            property_name="interface.port_map",
+                            evidence=(
+                                DiagnosticEvidence(
+                                    observation.view,
+                                    {"physical": physical, "logical": logical_names},
+                                    interface.provenance,
+                                ),
+                            ),
+                        )
+                    )
+        return diagnostics
+
+    @staticmethod
+    def _register_component(register: RegisterObservation) -> str:
+        return decoded_identifier(
+            register.component or register.memory_map or "<unspecified>"
+        ).casefold()
+
+    @staticmethod
+    def _register_name(name: str) -> str:
+        normalized = decoded_identifier(name).strip().casefold()
+        return normalized[:-4] if normalized.endswith("_reg") else normalized
+
+    @staticmethod
+    def _register_field_name(name: str) -> str:
+        # A field may legitimately be named MODE_REG alongside MODE.  The
+        # register-level macro convenience suffix is not a field alias rule.
+        return decoded_identifier(name).strip().casefold()
+
+    @staticmethod
+    def _register_scope(register: RegisterObservation) -> tuple[str, ...]:
+        return tuple(
+            decoded_identifier(item).strip().casefold()
+            for item in (register.memory_map, register.address_block)
+            if item and decoded_identifier(item).strip()
+        )
+
+    @classmethod
+    def _group_register_entries(
+        cls,
+        entries: Sequence[tuple[ViewId, RegisterObservation]],
+    ) -> tuple[
+        dict[tuple[str, str], list[tuple[ViewId, RegisterObservation]]],
+        dict[tuple[str, str], set[ViewId]],
+        list[
+            tuple[
+                str,
+                str,
+                tuple[tuple[str, ...], ...],
+                tuple[tuple[ViewId, RegisterObservation], ...],
+            ]
+        ],
+    ]:
+        """Resolve register identity without flattening repeated address-block names.
+
+        A register name is sufficient while every view has at most one scoped
+        occurrence.  If any view contains that name in multiple maps/blocks,
+        scoped occurrences remain distinct and unscoped software declarations
+        are reported as ambiguous instead of being paired arbitrarily.
+        """
+
+        by_base: dict[tuple[str, str], list[tuple[ViewId, RegisterObservation]]] = defaultdict(list)
+        for view, register in entries:
+            by_base[
+                (
+                    cls._register_component(register),
+                    cls._register_name(register.native_name),
+                )
+            ].append((view, register))
+
+        groups: dict[tuple[str, str], list[tuple[ViewId, RegisterObservation]]] = defaultdict(list)
+        suppressed_missing: dict[tuple[str, str], set[ViewId]] = defaultdict(set)
+        ambiguities: list[
+            tuple[
+                str,
+                str,
+                tuple[tuple[str, ...], ...],
+                tuple[tuple[ViewId, RegisterObservation], ...],
+            ]
+        ] = []
+        for (component, name), members in sorted(by_base.items()):
+            scopes_by_view: dict[ViewId, set[tuple[str, ...]]] = defaultdict(set)
+            for view, register in members:
+                scope = cls._register_scope(register)
+                if scope:
+                    scopes_by_view[view].add(scope)
+            requires_scope = any(len(scopes) > 1 for scopes in scopes_by_view.values())
+            if not requires_scope:
+                groups[(component, name)].extend(members)
+                continue
+
+            scoped_views = {view for view, register in members if cls._register_scope(register)}
+            unscoped_members = tuple(
+                (view, register) for view, register in members if not cls._register_scope(register)
+            )
+            unscoped_views = {view for view, _ in unscoped_members}
+            distinct_scopes = tuple(
+                sorted(
+                    {
+                        cls._register_scope(register)
+                        for _, register in members
+                        if cls._register_scope(register)
+                    }
+                )
+            )
+            for view, register in members:
+                scope = cls._register_scope(register)
+                identity = "/".join((*scope, name)) if scope else name
+                groups[(component, identity)].append((view, register))
+                if scope:
+                    suppressed_missing[(component, identity)].update(unscoped_views)
+                else:
+                    suppressed_missing[(component, identity)].update(scoped_views)
+            if unscoped_members:
+                ambiguities.append((component, name, distinct_scopes, tuple(members)))
+        return groups, suppressed_missing, ambiguities
+
+    @staticmethod
+    def _normalized_access(value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().casefold().replace("-", "").replace("_", "")
+        aliases = {
+            "ro": "readonly",
+            "read": "readonly",
+            "wo": "writeonly",
+            "write": "writeonly",
+            "rw": "readwrite",
+        }
+        return aliases.get(normalized, normalized)
+
+    def _check_registers(
+        self,
+        observations: Sequence[ViewObservation],
+        contract: DesignContract | None,
+    ) -> list[Diagnostic]:
+        entries: list[tuple[ViewId, RegisterObservation]] = [
+            (observation.view, register)
+            for observation in observations
+            for register in observation.registers
+        ]
+        contract_view = ViewId("contract", "frozen")
+        if contract is not None:
+            for expected in contract.registers:
+                entries.append(
+                    (
+                        contract_view,
+                        RegisterObservation(
+                            native_name=expected.canonical_name,
+                            component=expected.component,
+                            memory_map=expected.memory_map,
+                            address_block=expected.address_block,
+                            address_offset=expected.address_offset,
+                            absolute_address=expected.absolute_address,
+                            size_bits=expected.size_bits,
+                            access=expected.access,
+                            fields=tuple(
+                                RegisterFieldObservation(
+                                    native_name=field.canonical_name,
+                                    bit_offset=field.bit_offset,
+                                    bit_width=field.bit_width,
+                                    access=field.access,
+                                    reset_value=field.reset_value,
+                                )
+                                for field in expected.fields
+                            ),
+                            attributes={"contract": True},
+                        ),
+                    )
+                )
+
+        groups, suppressed_missing, ambiguities = self._group_register_entries(entries)
+        by_component: dict[str, dict[ViewId, dict[str, list[RegisterObservation]]]] = defaultdict(
+            lambda: defaultdict(lambda: defaultdict(list))
+        )
+        observation_map = {item.view: item for item in observations}
+        for (component, identity), members in groups.items():
+            for view, register in members:
+                by_component[component][view][identity].append(register)
+
+        register_view_kinds = {
+            "ipxact",
+            "ip_xact",
+            "header",
+            "c_header",
+            "cheader",
+            "software",
+            "systemrdl",
+        }
+        declared_components: dict[ViewId, set[str]] = defaultdict(set)
+        for observation in observations:
+            if _semantic_view_kind(observation.view) not in register_view_kinds:
+                continue
+            declared_components[observation.view].update(
+                decoded_identifier(item.native_name).casefold() for item in observation.components
+            )
+            declared_components[observation.view].update(
+                self._register_component(register) for register in observation.registers
+            )
+            configured_component = observation.attributes.get("component_name")
+            if isinstance(configured_component, str) and configured_component.strip():
+                declared_components[observation.view].add(
+                    decoded_identifier(configured_component).casefold()
+                )
+        for component, by_view in by_component.items():
+            for view, components in declared_components.items():
+                if component in components:
+                    by_view.setdefault(view, {})
+
+        diagnostics: list[Diagnostic] = [
+            Diagnostic.from_rule(
+                "OC6310",
+                f"Register {component}/{name} appears in multiple address-map scopes "
+                + ", ".join("/".join(scope) for scope in scopes)
+                + "; the unscoped declaration cannot be associated unambiguously.",
+                object=_object(
+                    "register",
+                    f"register:{component}/{name}",
+                    f"{component}/{name}",
+                ),
+                property_name="identity",
+                evidence=tuple(
+                    DiagnosticEvidence(view, register.native_name, register.provenance)
+                    for view, register in evidence_members
+                ),
+                metadata={"scopes": [list(scope) for scope in scopes]},
+            )
+            for component, name, scopes, evidence_members in ambiguities
+        ]
+        for component, by_view in sorted(by_component.items()):
+            views = set(by_view)
+            register_names = {
+                name for view_registers in by_view.values() for name in view_registers
+            }
+            for view, view_registers in sorted(by_view.items()):
+                for name, duplicate_definitions in sorted(view_registers.items()):
+                    if len(duplicate_definitions) < 2:
+                        continue
+                    diagnostics.append(
+                        Diagnostic.from_rule(
+                            "OC6307",
+                            f"{_view_label(view)} defines register {component}/{name} "
+                            f"{len(duplicate_definitions)} times.",
+                            object=_object(
+                                "register",
+                                f"register:{component}/{name}",
+                                f"{component}/{name}",
+                            ),
+                            property_name="definition",
+                            evidence=tuple(
+                                DiagnosticEvidence(
+                                    view,
+                                    definition.native_name,
+                                    definition.provenance,
+                                )
+                                for definition in duplicate_definitions
+                            ),
+                        )
+                    )
+            for name in sorted(register_names):
+                register_members: list[tuple[ViewId, RegisterObservation]] = [
+                    (view, items[0])
+                    for view, view_registers in sorted(by_view.items())
+                    if (items := view_registers.get(name))
+                ]
+                present_views = {view for view, _ in register_members}
+                missing_views = {
+                    view
+                    for view in views - present_views
+                    if not self._whole_view_tainted(observation_map.get(view))
+                    and view not in suppressed_missing.get((component, name), set())
+                }
+                display = f"{component}/{name}"
+                entity = _object("register", f"register:{component}/{name}", display)
+                if missing_views:
+                    diagnostics.append(
+                        Diagnostic.from_rule(
+                            "OC6301",
+                            f"Register {display} is present in "
+                            + ", ".join(_view_label(view) for view in sorted(present_views))
+                            + " but missing from "
+                            + ", ".join(_view_label(view) for view in sorted(missing_views))
+                            + ".",
+                            object=entity,
+                            property_name="presence",
+                            evidence=tuple(
+                                DiagnosticEvidence(
+                                    view,
+                                    register.native_name,
+                                    register.provenance,
+                                )
+                                for view, register in register_members
+                            ),
+                            metadata={
+                                "missing_views": [str(view) for view in sorted(missing_views)]
+                            },
+                        )
+                    )
+                known = [
+                    (view, register)
+                    for view, register in register_members
+                    if register.status == FactState.KNOWN
+                ]
+                diagnostics.extend(self._check_register_integrity(component, name, known, entity))
+                offset_members = [
+                    (view, register)
+                    for view, register in known
+                    if register.address_offset is not None
+                ]
+                offsets = {register.address_offset for _, register in offset_members}
+                addresses = {
+                    register.absolute_address
+                    for _, register in known
+                    if register.absolute_address is not None
+                }
+                offset_conflict = len(offsets) > 1
+                address_conflict = len(addresses) > 1
+                if offset_conflict or address_conflict:
+                    diagnostics.append(
+                        Diagnostic.from_rule(
+                            "OC6302",
+                            f"Register {display} has conflicting addresses: "
+                            + "; ".join(
+                                f"{_view_label(view)} offset="
+                                f"{register.address_offset!r}, address="
+                                f"{register.absolute_address!r}"
+                                for view, register in known
+                            )
+                            + ".",
+                            object=entity,
+                            property_name="address",
+                            evidence=tuple(
+                                DiagnosticEvidence(
+                                    view,
+                                    {
+                                        "offset": register.address_offset,
+                                        "absolute": register.absolute_address,
+                                    },
+                                    register.provenance,
+                                )
+                                for view, register in known
+                            ),
+                        )
+                    )
+                widths = {
+                    register.size_bits for _, register in known if register.size_bits is not None
+                }
+                if len(widths) > 1:
+                    diagnostics.append(
+                        Diagnostic.from_rule(
+                            "OC6303",
+                            f"Register {display} has conflicting widths: "
+                            + "; ".join(
+                                f"{_view_label(view)}={register.size_bits} bits"
+                                for view, register in known
+                                if register.size_bits is not None
+                            )
+                            + ".",
+                            object=entity,
+                            property_name="size_bits",
+                            evidence=tuple(
+                                DiagnosticEvidence(
+                                    view,
+                                    register.size_bits,
+                                    register.provenance,
+                                )
+                                for view, register in known
+                                if register.size_bits is not None
+                            ),
+                        )
+                    )
+                accesses = {
+                    self._normalized_access(register.access)
+                    for _, register in known
+                    if register.access is not None
+                }
+                if len(accesses) > 1:
+                    diagnostics.append(
+                        Diagnostic.from_rule(
+                            "OC6306",
+                            f"Register {display} has conflicting access permissions.",
+                            object=entity,
+                            property_name="access",
+                            evidence=tuple(
+                                DiagnosticEvidence(view, register.access, register.provenance)
+                                for view, register in known
+                                if register.access is not None
+                            ),
+                        )
+                    )
+                diagnostics.extend(
+                    self._check_register_fields(
+                        component,
+                        name,
+                        register_members,
+                        observation_map,
+                    )
+                )
+        return diagnostics
+
+    def _check_register_integrity(
+        self,
+        component: str,
+        register_name: str,
+        definitions: Sequence[tuple[ViewId, RegisterObservation]],
+        entity: DiagnosticObject,
+    ) -> list[Diagnostic]:
+        diagnostics: list[Diagnostic] = []
+        for view, register in definitions:
+            problems: list[str] = []
+            evidence_fields: list[RegisterFieldObservation] = []
+            intervals: list[tuple[int, int, RegisterFieldObservation]] = []
+            for register_field in register.fields:
+                if (
+                    register_field.status != FactState.KNOWN
+                    or register_field.bit_offset is None
+                    or register_field.bit_width is None
+                ):
+                    continue
+                first = register_field.bit_offset
+                last = first + register_field.bit_width - 1
+                if register.size_bits is not None and last >= register.size_bits:
+                    problems.append(
+                        f"{register_field.native_name}[{last}:{first}] exceeds "
+                        f"{register.size_bits} bits"
+                    )
+                    evidence_fields.append(register_field)
+                intervals.append((first, last, register_field))
+            active: tuple[int, int, RegisterFieldObservation] | None = None
+            for interval in sorted(
+                intervals, key=lambda item: (item[0], item[1], item[2].native_name)
+            ):
+                if active is not None and interval[0] <= active[1]:
+                    problems.append(f"{interval[2].native_name} overlaps {active[2].native_name}")
+                    evidence_fields.extend((active[2], interval[2]))
+                if active is None or interval[1] > active[1]:
+                    active = interval
+            if not problems:
+                continue
+            display = f"{component}/{register_name}"
+            diagnostics.append(
+                Diagnostic.from_rule(
+                    "OC6309",
+                    f"Register {display} has an invalid field layout in "
+                    f"{_view_label(view)}: " + "; ".join(problems) + ".",
+                    object=entity,
+                    property_name="fields.layout",
+                    evidence=tuple(
+                        DiagnosticEvidence(
+                            view,
+                            {
+                                "field": field.native_name,
+                                "bit_offset": field.bit_offset,
+                                "bit_width": field.bit_width,
+                            },
+                            field.provenance,
+                        )
+                        for field in evidence_fields
+                    ),
+                )
+            )
+        return diagnostics
+
+    def _check_register_fields(
+        self,
+        component: str,
+        register_name: str,
+        definitions: Sequence[tuple[ViewId, RegisterObservation]],
+        observations: Mapping[ViewId, ViewObservation],
+    ) -> list[Diagnostic]:
+        by_view: dict[ViewId, dict[str, list[RegisterFieldObservation]]] = defaultdict(
+            lambda: defaultdict(list)
+        )
+        diagnostics: list[Diagnostic] = []
+        for view, register in definitions:
+            for field in register.fields:
+                by_view[view][self._register_field_name(field.native_name)].append(field)
+        field_names = {name for fields in by_view.values() for name in fields}
+        if not field_names:
+            return diagnostics
+        views = {view for view, _ in definitions}
+        for view, fields in sorted(by_view.items()):
+            for name, items in sorted(fields.items()):
+                if len(items) < 2:
+                    continue
+                diagnostics.append(
+                    Diagnostic.from_rule(
+                        "OC6307",
+                        f"{_view_label(view)} defines field "
+                        f"{component}/{register_name}/{name} {len(items)} times.",
+                        object=_object(
+                            "register_field",
+                            f"register:{component}/{register_name}/field:{name}",
+                            f"{component}/{register_name}/{name}",
+                        ),
+                        property_name="definition",
+                        evidence=tuple(
+                            DiagnosticEvidence(view, item.native_name, item.provenance)
+                            for item in items
+                        ),
+                    )
+                )
+        for name in sorted(field_names):
+            field_members: list[tuple[ViewId, RegisterFieldObservation]] = []
+            for view, view_fields in sorted(by_view.items()):
+                matching_fields = view_fields.get(name)
+                if matching_fields:
+                    field_members.append((view, matching_fields[0]))
+            present = {view for view, _ in field_members}
+            missing = {
+                view
+                for view in views - present
+                if not self._whole_view_tainted(observations.get(view))
+            }
+            display = f"{component}/{register_name}/{name}"
+            entity = _object(
+                "register_field",
+                f"register:{component}/{register_name}/field:{name}",
+                display,
+            )
+            if missing:
+                diagnostics.append(
+                    Diagnostic.from_rule(
+                        "OC6304",
+                        f"Register field {display} is missing from "
+                        + ", ".join(_view_label(view) for view in sorted(missing))
+                        + ".",
+                        object=entity,
+                        property_name="presence",
+                        evidence=tuple(
+                            DiagnosticEvidence(view, field.native_name, field.provenance)
+                            for view, field in field_members
+                        ),
+                        metadata={"missing_views": [str(view) for view in sorted(missing)]},
+                    )
+                )
+            known = [
+                (view, field) for view, field in field_members if field.status == FactState.KNOWN
+            ]
+            offsets = {field.bit_offset for _, field in known if field.bit_offset is not None}
+            widths = {field.bit_width for _, field in known if field.bit_width is not None}
+            if len(offsets) > 1 or len(widths) > 1:
+                diagnostics.append(
+                    Diagnostic.from_rule(
+                        "OC6305",
+                        f"Register field {display} has conflicting layouts.",
+                        object=entity,
+                        property_name="layout",
+                        evidence=tuple(
+                            DiagnosticEvidence(
+                                view,
+                                {"bit_offset": field.bit_offset, "bit_width": field.bit_width},
+                                field.provenance,
+                            )
+                            for view, field in known
+                        ),
+                    )
+                )
+            accesses = {
+                self._normalized_access(field.access)
+                for _, field in known
+                if field.access is not None
+            }
+            if len(accesses) > 1:
+                diagnostics.append(
+                    Diagnostic.from_rule(
+                        "OC6306",
+                        f"Register field {display} has conflicting access permissions.",
+                        object=entity,
+                        property_name="access",
+                        evidence=tuple(
+                            DiagnosticEvidence(view, field.access, field.provenance)
+                            for view, field in known
+                            if field.access is not None
+                        ),
+                    )
+                )
+            reset_values = {
+                field.reset_value for _, field in known if field.reset_value is not None
+            }
+            if len(reset_values) > 1:
+                diagnostics.append(
+                    Diagnostic.from_rule(
+                        "OC6308",
+                        f"Register field {display} has conflicting reset values.",
+                        object=entity,
+                        property_name="reset_value",
+                        evidence=tuple(
+                            DiagnosticEvidence(view, field.reset_value, field.provenance)
+                            for view, field in known
+                            if field.reset_value is not None
+                        ),
+                    )
+                )
+        return diagnostics
 
     @staticmethod
     def _contract_component(
@@ -1599,6 +3000,7 @@ class ComparisonEngine:
         for selector in waiver.views:
             if not any(
                 selector.lower() in {view.kind, view.key.lower()}
+                or _semantic_view_kind(selector) == _semantic_view_kind(view)
                 or fnmatchcase(view.key.lower(), selector.lower())
                 for view in diagnostic_views
             ):
@@ -1625,7 +3027,11 @@ class ComparisonEngine:
             metadata={"view": str(view)},
         )
 
-    def build_contract(self, design: CanonicalDesign) -> DesignContract:
+    def build_contract(
+        self,
+        design: CanonicalDesign,
+        observations: Sequence[ViewObservation] = (),
+    ) -> DesignContract:
         components: list[ContractComponent] = []
         for component in design.components:
             component_member = self._preferred_component_member(component.members)
@@ -1659,13 +3065,118 @@ class ComparisonEngine:
                     ports=tuple(ports),
                 )
             )
-        return DesignContract(tuple(components))
+        return DesignContract(
+            tuple(components),
+            registers=self._build_contract_registers(observations),
+        )
+
+    def _build_contract_registers(
+        self,
+        observations: Sequence[ViewObservation],
+    ) -> tuple[ContractRegister, ...]:
+        groups, _, _ = self._group_register_entries(
+            tuple(
+                (observation.view, register)
+                for observation in observations
+                for register in observation.registers
+            )
+        )
+
+        result: list[ContractRegister] = []
+        baseline = self.config.contract.baseline
+        register_authority = self.config.contract.authority.get("registers")
+
+        def member_rank(view: ViewId, native_name: str) -> tuple[Any, ...]:
+            authority_rank = (
+                0 if register_authority is not None and view.matches(register_authority) else 1
+            )
+            baseline_rank = 0 if baseline is not None and view == baseline else 1
+            format_rank = {
+                "ipxact": 0,
+                "systemrdl": 1,
+                "header": 10,
+                "c_header": 10,
+                "software": 10,
+            }.get(_semantic_view_kind(view), 5)
+            return authority_rank, baseline_rank, format_rank, view, native_name
+
+        for _, members in sorted(groups.items()):
+            usable = [item for item in members if item[1].status == FactState.KNOWN] or members
+            preferred_view, preferred = min(
+                usable,
+                key=lambda item: member_rank(item[0], item[1].native_name),
+            )
+            del preferred_view
+            names: dict[str, str] = {}
+            field_groups: dict[str, list[tuple[ViewId, RegisterFieldObservation]]] = defaultdict(
+                list
+            )
+            for view, register in sorted(members, key=lambda item: (item[0], item[1].native_name)):
+                names.setdefault(str(view), register.native_name)
+                for register_field in register.fields:
+                    field_groups[self._register_field_name(register_field.native_name)].append(
+                        (view, register_field)
+                    )
+            contract_fields: list[ContractRegisterField] = []
+            for field_members in field_groups.values():
+                known_fields = [
+                    item for item in field_members if item[1].status == FactState.KNOWN
+                ] or field_members
+                _, preferred_field = min(
+                    known_fields,
+                    key=lambda item: member_rank(item[0], item[1].native_name),
+                )
+                field_names: dict[str, str] = {}
+                for view, register_field in sorted(
+                    field_members, key=lambda item: (item[0], item[1].native_name)
+                ):
+                    field_names.setdefault(str(view), register_field.native_name)
+                contract_fields.append(
+                    ContractRegisterField(
+                        canonical_name=decoded_identifier(preferred_field.native_name),
+                        names=field_names,
+                        bit_offset=preferred_field.bit_offset,
+                        bit_width=preferred_field.bit_width,
+                        access=preferred_field.access,
+                        reset_value=preferred_field.reset_value,
+                    )
+                )
+            component = decoded_identifier(
+                preferred.component or preferred.memory_map or "<unspecified>"
+            )
+            result.append(
+                ContractRegister(
+                    canonical_name=decoded_identifier(preferred.native_name),
+                    component=component,
+                    names=names,
+                    memory_map=preferred.memory_map,
+                    address_block=preferred.address_block,
+                    address_offset=preferred.address_offset,
+                    absolute_address=preferred.absolute_address,
+                    size_bits=preferred.size_bits,
+                    access=preferred.access,
+                    fields=tuple(contract_fields),
+                )
+            )
+        return tuple(
+            sorted(
+                result,
+                key=lambda item: (
+                    item.component,
+                    item.memory_map or "",
+                    item.address_block or "",
+                    item.canonical_name,
+                ),
+            )
+        )
 
     def _preferred_component_member(self, members: Sequence[ComponentMember]) -> ComponentMember:
         baseline = self.config.contract.baseline
+        authority = self.config.contract.authority.get("components")
         return min(
             members,
             key=lambda item: (
+                0 if authority is not None and item.view.matches(authority) else 1,
                 0 if baseline is not None and item.view == baseline else 1,
                 item.view,
                 item.observation.native_name,
@@ -1674,12 +3185,14 @@ class ComparisonEngine:
 
     def _preferred_port_member(self, members: Sequence[PortMember]) -> PortMember:
         baseline = self.config.contract.baseline
+        authority = self.config.contract.authority.get("ports")
         known = [item for item in members if item.observation.status == FactState.KNOWN] or list(
             members
         )
         return min(
             known,
             key=lambda item: (
+                0 if authority is not None and item.view.matches(authority) else 1,
                 0 if baseline is not None and item.view == baseline else 1,
                 item.view,
                 item.observation.native_name,
@@ -1690,8 +3203,9 @@ class ComparisonEngine:
         self,
         design: CanonicalDesign,
         path: str | Path,
+        observations: Sequence[ViewObservation] = (),
     ) -> Path:
-        contract = self.build_contract(design)
+        contract = self.build_contract(design, observations)
         return write_contract(contract, path)
 
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "opencollate"
-version = "0.1.0"
+version = "0.2.0"
 description = "Open-source SoC design-collateral consistency checker"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -16,14 +16,17 @@ keywords = [
   "design-collateral",
   "eda",
   "hardware-verification",
+  "ip-xact",
   "lef",
   "liberty",
+  "sdc",
   "soc",
   "systemverilog",
+  "upf",
   "verilog",
 ]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Environment :: Console",
   "Intended Audience :: Developers",
   "Intended Audience :: Manufacturing",
@@ -41,6 +44,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "bandit>=1.8",
   "build>=1.2",
   "coverage[toml]>=7.6",
   "hypothesis>=6.120",

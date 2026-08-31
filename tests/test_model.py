@@ -7,6 +7,8 @@ from opencollate.model import (
     ComponentKind,
     ContractComponent,
     ContractPort,
+    ContractRegister,
+    ContractRegisterField,
     DesignContract,
     Direction,
     IndexRange,
@@ -115,7 +117,28 @@ def test_contract_round_trip_is_lossless() -> None:
                     ),
                 ),
             ),
-        )
+        ),
+        registers=(
+            ContractRegister(
+                canonical_name="CTRL",
+                component="uart",
+                names={"ipxact.default": "ctrl", "header.default": "UART_CTRL"},
+                memory_map="regs",
+                address_block="uart_regs",
+                address_offset=0,
+                size_bits=32,
+                access="read-write",
+                fields=(
+                    ContractRegisterField(
+                        canonical_name="ENABLE",
+                        names={"ipxact.default": "enable"},
+                        bit_offset=0,
+                        bit_width=1,
+                        reset_value=0,
+                    ),
+                ),
+            ),
+        ),
     )
     restored = DesignContract.from_dict(contract.to_dict())
     assert restored.to_dict() == contract.to_dict()

@@ -35,7 +35,8 @@
         "suppressed",
         "views",
         "components",
-        "ports"
+        "ports",
+        "registers"
       ],
       "properties": {
         "errors": { "$ref": "#/$defs/nonNegativeInteger" },
@@ -44,7 +45,8 @@
         "suppressed": { "$ref": "#/$defs/nonNegativeInteger" },
         "views": { "$ref": "#/$defs/nonNegativeInteger" },
         "components": { "$ref": "#/$defs/nonNegativeInteger" },
-        "ports": { "$ref": "#/$defs/nonNegativeInteger" }
+        "ports": { "$ref": "#/$defs/nonNegativeInteger" },
+        "registers": { "$ref": "#/$defs/nonNegativeInteger" }
       },
       "additionalProperties": false
     },

@@ -7,6 +7,7 @@ import csv
 import json
 import sys
 import tempfile
+from collections.abc import Mapping
 from dataclasses import replace
 from importlib import import_module, resources
 from pathlib import Path
@@ -154,6 +155,51 @@ def _parse_source(source: SourceConfig) -> ViewObservation:
             },
             **options,
         )
+    if kind in {"ipxact", "ip_xact", "ip-xact", "spirit"}:
+        _reject_unknown_source_options(source, options, {"parameter_values"})
+        _validate_integer_mapping_option(source, options, "parameter_values")
+        from opencollate.parsers.ipxact import parse_ipxact
+
+        return parse_ipxact(paths, view_id=source.view, **options)
+    if kind == "sdc":
+        _reject_unknown_source_options(source, options, set())
+        from opencollate.parsers.sdc import parse_sdc
+
+        return parse_sdc(paths, view_id=source.view)
+    if kind == "upf":
+        _reject_unknown_source_options(source, options, {"component_name"})
+        _validate_string_option(source, options, "component_name", nonempty=True)
+        from opencollate.parsers.upf import parse_upf
+
+        return parse_upf(paths, view_id=source.view, **options)
+    if kind in {"header", "c_header", "c-header", "cheader", "software"}:
+        supported = {"component_name", "macro_prefix", "default_register_width"}
+        _reject_unknown_source_options(source, options, supported)
+        _validate_string_option(source, options, "component_name", nonempty=True)
+        _validate_string_option(source, options, "macro_prefix", nonempty=True)
+        _validate_positive_integer_option(source, options, "default_register_width")
+        from opencollate.parsers.cheader import parse_c_header
+
+        return parse_c_header(paths, view_id=source.view, **options)
+    if kind in {"cdl", "spice", "sp", "circuit"}:
+        _reject_unknown_source_options(source, options, set())
+        from opencollate.parsers.cdl import parse_cdl
+
+        return parse_cdl(paths, view_id=source.view)
+    if kind == "def":
+        _reject_unknown_source_options(source, options, set())
+        from opencollate.parsers.defparser import parse_def
+
+        return parse_def(paths, view_id=source.view)
+    if kind in {"gds", "gdsii", "gds2", "stream"}:
+        supported = {"top_cells", "pin_text_layers", "pin_text_types"}
+        _reject_unknown_source_options(source, options, supported)
+        _validate_name_or_name_array_option(source, options, "top_cells")
+        _validate_integer_or_integer_array_option(source, options, "pin_text_layers")
+        _validate_integer_or_integer_array_option(source, options, "pin_text_types")
+        from opencollate.parsers.gds import parse_gds
+
+        return parse_gds(paths, view_id=source.view, **options)
     raise CliError(
         f"no parser is registered for source view {source.view}",
         code="OC1001",
@@ -183,21 +229,80 @@ def _validate_top_option(source: SourceConfig, options: dict[str, Any]) -> None:
         raise CliError(f"{source.view}: source option 'top' must not contain empty names")
 
 
+def _validate_name_or_name_array_option(
+    source: SourceConfig,
+    options: dict[str, Any],
+    name: str,
+) -> None:
+    if name not in options:
+        return
+    value = options[name]
+    names = [value] if isinstance(value, str) else value
+    if not isinstance(names, list) or not names or not all(isinstance(item, str) for item in names):
+        raise CliError(f"{source.view}: source option {name!r} must be a string or string array")
+    if any(not item.strip() for item in names):
+        raise CliError(f"{source.view}: source option {name!r} must not contain empty names")
+
+
+def _validate_integer_or_integer_array_option(
+    source: SourceConfig,
+    options: dict[str, Any],
+    name: str,
+) -> None:
+    if name not in options:
+        return
+    value = options[name]
+    values = [value] if type(value) is int else value
+    if not isinstance(values, list) or not all(type(item) is int for item in values):
+        raise CliError(f"{source.view}: source option {name!r} must be an integer or integer array")
+    if any(not 0 <= item <= 32_767 for item in values):
+        raise CliError(f"{source.view}: source option {name!r} values must be between 0 and 32767")
+
+
 def _validate_string_option(
     source: SourceConfig,
     options: dict[str, Any],
     name: str,
     *,
     length: int | None = None,
+    nonempty: bool = False,
 ) -> None:
     if name not in options:
         return
     value = options[name]
     if not isinstance(value, str):
         raise CliError(f"{source.view}: source option {name!r} must be a string")
+    if nonempty and not value.strip():
+        raise CliError(f"{source.view}: source option {name!r} must not be empty")
     if length is not None and len(value) != length:
         qualifier = "exactly one character" if length == 1 else f"exactly {length} characters"
         raise CliError(f"{source.view}: source option {name!r} must be {qualifier}")
+
+
+def _validate_positive_integer_option(
+    source: SourceConfig,
+    options: dict[str, Any],
+    name: str,
+) -> None:
+    if name not in options:
+        return
+    value = options[name]
+    if type(value) is not int or value < 1:
+        raise CliError(f"{source.view}: source option {name!r} must be a positive integer")
+
+
+def _validate_integer_mapping_option(
+    source: SourceConfig,
+    options: dict[str, Any],
+    name: str,
+) -> None:
+    if name not in options:
+        return
+    value = options[name]
+    if not isinstance(value, Mapping) or not all(
+        isinstance(key, str) and type(item) is int for key, item in value.items()
+    ):
+        raise CliError(f"{source.view}: source option {name!r} must map strings to integers")
 
 
 def _validate_csv_delimiter(source: SourceConfig, options: dict[str, Any]) -> None:
@@ -298,6 +403,36 @@ files = ["lef/**/*.lef"]
 files = ["package/pins.csv"]
 profile = "package_map"
 
+# Enable the views your project owns:
+# [sources.ipxact.component]
+# files = ["ipxact/component.xml"]
+#
+# [sources.sdc.functional]
+# files = ["constraints/**/*.sdc"]
+#
+# [sources.upf.low_power]
+# files = ["power/**/*.upf"]
+# component_name = "soc_top"
+#
+# [sources.header.firmware]
+# files = ["software/include/registers.h"]
+# component_name = "uart0"
+# macro_prefix = "UART0"
+# default_register_width = 32
+#
+# [sources.cdl.extracted]
+# files = ["netlist/**/*.cdl"]
+#
+# [sources.def.placed]
+# files = ["physical/**/*.def"]
+#
+# [sources.gds.stream]
+# files = ["physical/**/*.gds"]
+# top_cells = ["soc_top"]
+# # Text labels become candidate pins only with explicit selectors:
+# pin_text_layers = [10]
+# pin_text_types = [0]
+
 [contract]
 baseline = "rtl.default"
 
@@ -334,9 +469,16 @@ def _capability_data() -> dict[str, Any]:
             "liberty": {"status": "supported", "backend": "native"},
             "lef": {"status": "supported", "backend": "native"},
             "csv_pin_maps": {"status": "supported", "backend": "stdlib"},
-            "ip_xact": {"status": "planned"},
-            "sdc": {"status": "planned"},
-            "upf": {"status": "planned"},
+            "ip_xact": {"status": "supported", "backend": "stdlib-expat"},
+            "sdc": {"status": "supported", "backend": "native-static"},
+            "upf": {"status": "supported", "backend": "native-static"},
+            "c_register_headers": {"status": "supported", "backend": "stdlib"},
+            "cdl_spice": {"status": "supported", "backend": "native-static"},
+            "def": {"status": "supported", "backend": "native-structural"},
+            "gdsii": {
+                "status": "supported",
+                "backend": "native-structural-streaming",
+            },
         },
         "outputs": ["text", "json", "sarif", "markdown", "contract-json"],
         "rules": len(list(iter_rules())),

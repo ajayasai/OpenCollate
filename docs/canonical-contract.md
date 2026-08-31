@@ -1,7 +1,8 @@
 # Canonical design contract
 
-The design contract is OpenCollate's reconciled, provenance-preserving view of the design. It is
-an audit artifact, not a new source of design intent.
+The design contract is OpenCollate’s reviewed, reconciliation-ready view of design identity and
+selected interface/register facts. It is an audit artifact, not a new source of design intent and
+not a signoff database.
 
 Build one with:
 
@@ -9,88 +10,124 @@ Build one with:
 opencollate contract build [CONFIG] --output contract.oc.json
 ```
 
-## Identity
+Generate the exact schema for the installed build with:
 
-A canonical object has a kind and stable identifier. Components can represent RTL modules,
-Liberty cells, LEF macros, or package-facing entities. Ports belong to a component. Package
-mappings form edges between die pads, signals, and package balls.
+```console
+opencollate schema contract --output contract.schema.json
+```
 
-Original names remain in each observation. Aliases change grouping, not source evidence.
+## Schema version 1 contents
 
-## Evidence
+The 0.2.0 contract persists:
 
-A canonical property contains observations from one or more views. Each observation records:
+- Components: canonical name, kind, per-view native names, required views, and ports.
+- Ports: canonical name, per-view native names, direction, role, and full bus shape.
+- Registers: component, canonical and per-view names, memory map/address block, offset, absolute
+  address, width, access, and fields.
+- Register fields: canonical and per-view names, bit offset, bit width, access, and reset value.
 
-- Source view, such as `rtl.default` or `liberty.tt`.
-- Value in normalized machine-readable form.
-- Fact state.
-- Path and one-based source span where available.
-- Original spelling where normalization changed it.
-- Parser notes relevant to confidence.
+The live observation model is broader. It also carries hierarchical design objects, SDC queries
+and clocks, UPF objects, IP-XACT interfaces, DEF nets/endpoints, constraints, and package mappings.
+Those facts participate in 0.2.0 rules but are not all serialized in frozen-contract schema
+version 1. Do not assume a contract JSON file is a complete dump of every parsed fact.
+
+## Identity and evidence
+
+A canonical component can group an RTL module, Liberty cell, LEF macro, IP-XACT component,
+CDL/SPICE subcircuit, DEF design interface, and GDSII cell structure. A canonical port groups the
+corresponding native names. GDSII contributes ports only from explicitly filtered text labels,
+with unknown direction, role, and logical shape. A canonical register groups hardware and
+software register definitions by normalized component/register identity.
+
+Original names remain in per-view `names`. Aliases change grouping; they do not rewrite source
+evidence. Diagnostics—not the compact frozen contract—carry the complete rule evidence with view,
+value, fact state, and source location.
 
 Conceptually:
 
 ```json
 {
   "schema_version": 1,
+  "generated_by": "OpenCollate",
   "components": [
     {
-      "id": "uart",
+      "canonical_name": "uart",
+      "names": {
+        "rtl.default": "uart",
+        "ipxact.component": "uart"
+      },
       "ports": [
         {
-          "id": "uart/irq_o",
-          "direction": {
-            "observations": [
-              {
-                "view": "rtl.default",
-                "state": "known",
-                "value": "output",
-                "location": {"path": "rtl/uart.sv", "line": 8, "column": 5}
-              },
-              {
-                "view": "liberty.tt",
-                "state": "known",
-                "value": "input",
-                "location": {"path": "lib/uart.lib", "line": 33, "column": 5}
-              }
-            ]
+          "canonical_name": "data_i",
+          "direction": "input",
+          "role": "signal",
+          "shape": {
+            "width": 8,
+            "left": 7,
+            "right": 0,
+            "packed": [{"left": 7, "right": 0, "step": -1, "width": 8}],
+            "unpacked": []
           }
         }
       ]
+    }
+  ],
+  "registers": [
+    {
+      "component": "uart",
+      "canonical_name": "CTRL",
+      "address_offset": 0,
+      "absolute_address": 1073745920,
+      "size_bits": 32,
+      "fields": [{"canonical_name": "ENABLE", "bit_offset": 0, "bit_width": 1}]
     }
   ]
 }
 ```
 
-This is illustrative; use `opencollate schema contract` for the exact schema shipped with the
-installed version.
+This example is abbreviated. Validate consumers against the generated schema rather than copying
+the illustration.
 
-## Shapes
+## Shapes are structural
 
-Bus shape is not just width. The contract retains packed and unpacked dimensions, declared
-left/right bounds, ordering, and explicit per-bit indices where supplied. This distinguishes:
+Bus shape retains more than width:
 
-- `[7:0]` from `[0:7]`.
-- An explicit scalar from an unknown or failed vector parse.
-- A contiguous bus from a CSV list with gaps or duplicate bits.
-- Packed from unpacked dimensions.
+- Packed and unpacked dimensions.
+- Declared left/right bounds and ordering.
+- Explicit per-bit indices supplied by exploded CSV or DEF rows.
+- Whether a one-bit value was an explicit scalar or vector where known.
 
-## Baseline
+This distinguishes `[7:0]` from `[0:7]`, a scalar from an unknown shape, a contiguous bus from a
+gapped list, and packed from unpacked dimensions. A CDL/SPICE terminal normally contributes an
+unknown logical shape; it does not force other views to scalar.
 
-`[contract].baseline` identifies the source of intended inventory or values where policy requires
-an authority. A baseline does not erase conflicting evidence; diagnostics still show every view.
+## Authority and baseline
 
-A frozen contract can be used as a reviewed baseline when the configuration points to it. Treat
-that file like any other design source: review changes and version it with the design.
+`contract.baseline` selects a preferred view where intent is required. Optional
+`contract.authority` selectors can prefer sources for contract categories such as components,
+ports, or registers. Preference does not erase disagreement: checks still retain and report
+conflicting observations.
+
+A committed frozen contract can act as a reviewed baseline:
+
+```toml
+[contract]
+file = "contract.oc.json"
+```
+
+Treat it like design source. Review changes, keep it under version control, and rebuild it only
+after deciding whether source drift is intentional.
+
+## Unknown and tainted facts
+
+Contract selection does not manufacture missing data. When no known candidate establishes a
+property, it stays unknown in the selected model. Unsupported or tainted observations remain in
+the run and can make a comparison inconclusive. A generated contract should not be used as proof
+that every input was fully understood; review parser diagnostics alongside it.
 
 ## Compatibility
 
-Contract documents carry `schema_version`. OpenCollate 0.x may make breaking schema changes in a
-minor release, documented in the changelog. Consumers should validate against the schema returned
-by the same installed version:
-
-```console
-opencollate schema contract --output contract.schema.json
-```
-
-Do not infer compatibility from the OpenCollate package version alone.
+Contract documents carry `schema_version`. OpenCollate 0.x can make breaking schema changes in a
+minor release, documented in the changelog. A reader rejects unsupported schema versions. Use the
+schema generated by the same installed build and do not infer compatibility from the package
+version alone.

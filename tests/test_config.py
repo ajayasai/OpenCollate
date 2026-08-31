@@ -139,4 +139,4 @@ def test_contract_loader_round_trip(tmp_path: Path) -> None:
         ],
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
-    assert load_contract(path).to_dict() == payload
+    assert load_contract(path).to_dict() == {**payload, "registers": []}

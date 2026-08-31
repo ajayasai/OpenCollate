@@ -1,0 +1,51 @@
+# Synthetic DEF fixture. It is not derived from a proprietary design.
+VERSION 5.8 ;
+DIVIDERCHAR "/" ;
+BUSBITCHARS "[]" ;
+DESIGN soc_top ;
+UNITS DISTANCE MICRONS 1000 ;
+DIEAREA ( 0 0 ) ( 2000 1000 ) ;
+
+PROPERTYDEFINITIONS
+  DESIGN FLOW STRING ;
+END PROPERTYDEFINITIONS
+
+COMPONENTS 4 ;
+- u_cpu CPU_MACRO
+  + SOURCE NETLIST
+  + PLACED ( 100 200 ) N ; # a naturally continued logical entry
+- u_cluster/core0 CORE_MACRO + PLACED ( 200 200 ) S ;
+- u_mem\/bank0 SRAM_MACRO + FIXED ( -20 400 ) FN ;
+- u_pad PAD_IO + UNPLACED ;
+END COMPONENTS
+
+PINS 6 ;
+- clk + NET clk + DIRECTION INPUT + USE CLOCK
+  + LAYER M4 ( -20 -20 ) ( 20 20 ) + FIXED ( 0 500 ) E ;
+- data[1] + NET data[1] + DIRECTION INPUT + USE SIGNAL
+  + LAYER M3 ( -10 -10 ) ( 10 10 ) + PLACED ( 0 600 ) E ;
+- data[0] + NET data[0] + DIRECTION INPUT + USE SIGNAL
+  + LAYER M3 ( -10 -10 ) ( 10 10 ) + PLACED ( 0 700 ) E ;
+- irq + NET irq + DIRECTION OUTPUT + USE SIGNAL + UNPLACED ;
+- VDD + NET VDD + DIRECTION INOUT + USE POWER
+  + LAYER M5 ( -25 -25 ) ( 25 25 ) + PLACED ( 500 1000 ) N ;
+- VSS + NET VSS + DIRECTION INOUT + USE GROUND
+  + LAYER M5 ( -25 -25 ) ( 25 25 ) + COVER ( 600 1000 ) N ;
+END PINS
+
+NETS 4 ;
+- clk ( PIN clk ) ( u_cpu CLK )
+  + USE CLOCK + ROUTED M2 ( 0 500 ) ( 100 500 ) ;
+- data[1] ( PIN data[1] ) ( u_cpu D1 ) ;
+- data[0] ( PIN data[0] ) ( u_cpu D0 ) ;
+- irq ( PIN irq ) ( u_cpu IRQ ) ;
+END NETS
+
+SPECIALNETS 2 ;
+- VDD ( PIN VDD ) ( u_cpu VDD ) ( u_mem\/bank0 VDD )
+  + USE POWER + ROUTED M5 ( 500 1000 ) ( 500 400 ) ;
+- VSS ( PIN VSS ) ( u_cpu VSS ) ( u_mem\/bank0 VSS )
+  + USE GROUND + FIXED M5 ( 600 1000 ) ( 600 400 ) ;
+END SPECIALNETS
+
+END DESIGN

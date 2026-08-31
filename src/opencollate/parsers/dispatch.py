@@ -13,9 +13,16 @@ from opencollate.parsers.base import (
     ViewParser,
     coerce_paths,
 )
+from opencollate.parsers.cdl import CdlParser
+from opencollate.parsers.cheader import CHeaderParser
 from opencollate.parsers.csvpins import CsvPinMapParser
+from opencollate.parsers.defparser import DefParser
+from opencollate.parsers.gds import GdsParser
+from opencollate.parsers.ipxact import IpxactParser
 from opencollate.parsers.lef import LefParser
 from opencollate.parsers.liberty import LibertyParser
+from opencollate.parsers.sdc import SdcParser
+from opencollate.parsers.upf import UpfParser
 from opencollate.parsers.verilog import VerilogParser
 
 _PARSERS: dict[str, ViewParser] = {
@@ -23,6 +30,13 @@ _PARSERS: dict[str, ViewParser] = {
     "liberty": LibertyParser(),
     "lef": LefParser(),
     "csv": CsvPinMapParser(),
+    "ipxact": IpxactParser(),
+    "sdc": SdcParser(),
+    "upf": UpfParser(),
+    "header": CHeaderParser(),
+    "cdl": CdlParser(),
+    "def": DefParser(),
+    "gds": GdsParser(),
 }
 
 _ALIASES = {
@@ -36,6 +50,20 @@ _ALIASES = {
     "pin-map": "csv",
     "package": "csv",
     "tsv": "csv",
+    "ip-xact": "ipxact",
+    "ip_xact": "ipxact",
+    "spirit": "ipxact",
+    "c-header": "header",
+    "c_header": "header",
+    "cheader": "header",
+    "software-header": "header",
+    "spice": "cdl",
+    "sp": "cdl",
+    "circuit": "cdl",
+    "design-exchange-format": "def",
+    "gdsii": "gds",
+    "gds2": "gds",
+    "stream": "gds",
 }
 
 _EXTENSIONS = {
@@ -47,6 +75,22 @@ _EXTENSIONS = {
     ".lef": "lef",
     ".csv": "csv",
     ".tsv": "csv",
+    ".xml": "ipxact",
+    ".ipxact": "ipxact",
+    ".sdc": "sdc",
+    ".upf": "upf",
+    ".h": "header",
+    ".hh": "header",
+    ".hpp": "header",
+    ".cdl": "cdl",
+    ".cir": "cdl",
+    ".ckt": "cdl",
+    ".sp": "cdl",
+    ".spi": "cdl",
+    ".spice": "cdl",
+    ".def": "def",
+    ".gds": "gds",
+    ".gdsii": "gds",
 }
 
 

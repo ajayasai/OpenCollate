@@ -10,6 +10,10 @@
     "components": {
       "type": "array",
       "items": { "$ref": "#/$defs/component" }
+    },
+    "registers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/register" }
     }
   },
   "$defs": {
@@ -64,6 +68,54 @@
         "names": { "type": "object", "additionalProperties": { "type": "string" } },
         "required_views": { "type": "array", "items": { "type": "string" } },
         "ports": { "type": "array", "items": { "$ref": "#/$defs/port" } }
+      },
+      "additionalProperties": false
+    },
+    "register_field": {
+      "type": "object",
+      "required": [
+        "canonical_name",
+        "names",
+        "bit_offset",
+        "bit_width",
+        "access",
+        "reset_value"
+      ],
+      "properties": {
+        "canonical_name": { "type": "string", "minLength": 1 },
+        "names": { "type": "object", "additionalProperties": { "type": "string" } },
+        "bit_offset": { "type": ["integer", "null"], "minimum": 0 },
+        "bit_width": { "type": ["integer", "null"], "minimum": 1 },
+        "access": { "type": ["string", "null"] },
+        "reset_value": { "type": ["integer", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "register": {
+      "type": "object",
+      "required": [
+        "canonical_name",
+        "component",
+        "names",
+        "memory_map",
+        "address_block",
+        "address_offset",
+        "absolute_address",
+        "size_bits",
+        "access",
+        "fields"
+      ],
+      "properties": {
+        "canonical_name": { "type": "string", "minLength": 1 },
+        "component": { "type": "string", "minLength": 1 },
+        "names": { "type": "object", "additionalProperties": { "type": "string" } },
+        "memory_map": { "type": ["string", "null"] },
+        "address_block": { "type": ["string", "null"] },
+        "address_offset": { "type": ["integer", "null"], "minimum": 0 },
+        "absolute_address": { "type": ["integer", "null"], "minimum": 0 },
+        "size_bits": { "type": ["integer", "null"], "minimum": 1 },
+        "access": { "type": ["string", "null"] },
+        "fields": { "type": "array", "items": { "$ref": "#/$defs/register_field" } }
       },
       "additionalProperties": false
     }

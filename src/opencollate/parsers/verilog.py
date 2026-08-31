@@ -15,6 +15,7 @@ from opencollate.model import (
     BusShape,
     ComponentKind,
     ComponentObservation,
+    DesignObjectObservation,
     Direction,
     FactState,
     IndexRange,
@@ -34,6 +35,7 @@ from opencollate.parsers.base import (
 )
 
 _DIAG_NAME = re.compile(r"DiagCode\(([^)]+)\)")
+_MAX_DESIGN_OBJECTS = 100_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -244,6 +246,157 @@ def _extract_functions(
     return functions, diagnostics
 
 
+def _relative_hierarchical_path(symbol: Any, component_name: str) -> str:
+    try:
+        path = str(symbol.hierarchicalPath)
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+        path = str(getattr(symbol, "name", ""))
+    prefix = f"{component_name}."
+    if path.startswith(prefix):
+        path = path[len(prefix) :]
+    elif path == component_name:
+        path = ""
+    return path.replace(".", "/")
+
+
+def _extract_design_objects(
+    instance: Any,
+    source_manager: Any,
+    view: ViewId,
+    component_name: str,
+) -> tuple[list[DesignObjectObservation], list[Diagnostic]]:
+    """Index elaborated hierarchy for SDC and UPF reference checking."""
+
+    objects: list[DesignObjectObservation] = []
+    diagnostics: list[Diagnostic] = []
+    visited_scopes: set[int] = set()
+    limit_reached = False
+
+    def append(item: DesignObjectObservation) -> bool:
+        nonlocal limit_reached
+        if len(objects) >= _MAX_DESIGN_OBJECTS:
+            if not limit_reached:
+                diagnostics.append(
+                    parser_diagnostic(
+                        "OC1102",
+                        Severity.WARNING,
+                        f"Hierarchy index for {component_name} exceeds "
+                        f"{_MAX_DESIGN_OBJECTS:,} objects and was truncated",
+                        location=_source_location(source_manager, instance.location, view),
+                    )
+                )
+                limit_reached = True
+            return False
+        objects.append(item)
+        return True
+
+    def walk(scope: Any, port_names: set[str]) -> None:
+        if limit_reached or id(scope) in visited_scopes:
+            return
+        visited_scopes.add(id(scope))
+        try:
+            members = list(scope)
+        except (RuntimeError, TypeError):
+            return
+        for member in members:
+            symbol_type = type(member).__name__
+            name = decoded_identifier(str(getattr(member, "name", "")))
+            location = _source_location(
+                source_manager,
+                getattr(member, "location", instance.location),
+                view,
+            )
+            if symbol_type == "InstanceSymbol":
+                path = _relative_hierarchical_path(member, component_name) or name
+                definition = decoded_identifier(str(getattr(member.definition, "name", "")))
+                if not append(
+                    DesignObjectObservation(
+                        kind="instance",
+                        native_name=path,
+                        scope=component_name,
+                        provenance=location,
+                        attributes={
+                            "component_type": definition,
+                            "hierarchical_path": str(getattr(member, "hierarchicalPath", path)),
+                        },
+                    )
+                ):
+                    return
+                child_ports: set[str] = set()
+                try:
+                    raw_ports = list(member.body.portList)
+                except (AttributeError, RuntimeError, TypeError):
+                    raw_ports = []
+                for raw_port in raw_ports:
+                    port_name = decoded_identifier(str(raw_port.name))
+                    child_ports.add(port_name)
+                    append(
+                        DesignObjectObservation(
+                            kind="pin",
+                            native_name=f"{path}/{port_name}",
+                            scope=component_name,
+                            provenance=_source_location(
+                                source_manager,
+                                raw_port.location,
+                                view,
+                            ),
+                            attributes={
+                                "instance": path,
+                                "component_type": definition,
+                                "port": port_name,
+                                "direction": _direction(raw_port.direction).value,
+                            },
+                        )
+                    )
+                walk(member.body, child_ports)
+                continue
+            if symbol_type in {"GenerateBlockArraySymbol", "InstanceArraySymbol"}:
+                try:
+                    children = list(getattr(member, "entries", member))
+                except (RuntimeError, TypeError):
+                    children = []
+                for child in children:
+                    walk(child, set())
+                continue
+            if symbol_type in {"GenerateBlockSymbol", "CheckerInstanceSymbol"}:
+                walk(member, set())
+                continue
+            if symbol_type not in {"NetSymbol", "VariableSymbol"} or not name:
+                continue
+            if name in port_names:
+                continue
+            path = _relative_hierarchical_path(member, component_name) or name
+            append(
+                DesignObjectObservation(
+                    kind="net",
+                    native_name=path,
+                    scope=component_name,
+                    provenance=location,
+                    attributes={"slang_symbol": symbol_type},
+                )
+            )
+
+    root_ports: set[str] = set()
+    try:
+        raw_root_ports = list(instance.body.portList)
+    except (AttributeError, RuntimeError, TypeError):
+        raw_root_ports = []
+    for raw_port in raw_root_ports:
+        port_name = decoded_identifier(str(raw_port.name))
+        root_ports.add(port_name)
+        append(
+            DesignObjectObservation(
+                kind="port",
+                native_name=port_name,
+                scope=component_name,
+                provenance=_source_location(source_manager, raw_port.location, view),
+                attributes={"direction": _direction(raw_port.direction).value},
+            )
+        )
+    walk(instance.body, root_ports)
+    return objects, diagnostics
+
+
 def parse_verilog(
     paths: Pathish | Sequence[Pathish],
     *,
@@ -354,6 +507,7 @@ def parse_verilog(
         complete = False
 
     components: list[ComponentObservation] = []
+    design_objects: list[DesignObjectObservation] = []
     for instance in sorted(root.topInstances, key=lambda item: str(item.name)):
         definition = instance.definition
         if getattr(getattr(definition, "definitionKind", None), "name", "") != "Module":
@@ -430,6 +584,14 @@ def parse_verilog(
         )
         diagnostics.extend(function_diags)
         component_name = decoded_identifier(str(definition.name))
+        indexed_objects, object_diags = _extract_design_objects(
+            instance,
+            compilation.sourceManager,
+            view,
+            component_name,
+        )
+        design_objects.extend(indexed_objects)
+        diagnostics.extend(object_diags)
         components.append(
             ComponentObservation(
                 native_name=component_name,
@@ -452,6 +614,7 @@ def parse_verilog(
     return ViewObservation(
         view=view,
         components=tuple(components),
+        objects=tuple(design_objects),
         diagnostics=tuple(diagnostics),
         complete=complete,
         tainted_scopes=tainted | ({"*"} if early_diagnostics else set()),

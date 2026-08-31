@@ -8,6 +8,11 @@ OpenCollate is local-first:
 - Checking inputs does not require network access after installation.
 - The tool does not execute hooks from design files.
 
+SDC and UPF are parsed as static Tcl-shaped text without starting Tcl. IP-XACT parsing does not
+fetch schemas or expand external definitions, C headers do not invoke a preprocessor, and
+CDL/SPICE is not simulated. See the [security model](security-model.md) for the exact trust and
+execution boundary.
+
 Dependency installation and external CI services are separate network activities controlled by
 the user. A GitHub Actions workflow that uploads SARIF or test artifacts sends those outputs to
 GitHub under that repository's settings; OpenCollate does not do so automatically.
@@ -16,10 +21,11 @@ GitHub under that repository's settings; OpenCollate does not do so automaticall
 
 Reports and contracts may contain:
 
-- Module, cell, pin, macro, pad, and ball names.
+- Module, cell, pin, macro, pad, ball, GDSII structure, and text-label names.
 - Source paths and source spans.
 - Boolean expressions.
 - Package connectivity.
+- Hierarchical object references, constraint targets, power-intent names, and register addresses.
 - Configuration aliases plus waiver selectors, expiration dates, and reasons.
 
 Treat generated artifacts at least as confidentially as source collateral. Prefer

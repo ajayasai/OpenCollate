@@ -32,6 +32,12 @@ from opencollate.parsers.base import (
         ("timing", "liberty"),
         ("pin-map", "csv"),
         ("package", "csv"),
+        ("ip-xact", "ipxact"),
+        ("c-header", "header"),
+        ("spice", "cdl"),
+        ("design-exchange-format", "def"),
+        ("gdsii", "gds"),
+        ("stream", "gds"),
     ],
 )
 def test_format_aliases(alias: str, expected: str) -> None:
@@ -40,19 +46,38 @@ def test_format_aliases(alias: str, expected: str) -> None:
 
 def test_unknown_format_is_actionable() -> None:
     with pytest.raises(UnsupportedFormatError, match="supported formats"):
-        normalize_format("gds")
+        normalize_format("oasis")
 
 
 def test_format_inference_rejects_unknown_and_mixed_extensions() -> None:
     assert infer_format((Path("a.sv"), Path("b.v"))) == "verilog"
+    assert infer_format((Path("component.xml"),)) == "ipxact"
+    assert infer_format((Path("constraints.sdc"),)) == "sdc"
+    assert infer_format((Path("registers.h"),)) == "header"
+    assert infer_format((Path("extracted.spice"),)) == "cdl"
+    assert infer_format((Path("placed.def"),)) == "def"
+    assert infer_format((Path("chip.gds"),)) == "gds"
+    assert infer_format((Path("chip.gdsii"),)) == "gds"
     with pytest.raises(UnsupportedFormatError, match="cannot infer"):
-        infer_format((Path("chip.gds"),))
+        infer_format((Path("chip.oas"),))
     with pytest.raises(UnsupportedFormatError, match="cannot mix"):
         infer_format((Path("top.sv"), Path("cells.lib")))
 
 
 def test_registered_parser_inventory_is_stable() -> None:
-    assert registered_formats() == ("csv", "lef", "liberty", "verilog")
+    assert registered_formats() == (
+        "cdl",
+        "csv",
+        "def",
+        "gds",
+        "header",
+        "ipxact",
+        "lef",
+        "liberty",
+        "sdc",
+        "upf",
+        "verilog",
+    )
     assert get_parser("sv").format_name == "verilog"
 
 

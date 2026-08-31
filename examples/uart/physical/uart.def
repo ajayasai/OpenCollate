@@ -1,0 +1,42 @@
+# Synthetic floorplan/interface DEF. Geometry is illustrative and is skipped structurally.
+VERSION 5.8 ;
+DIVIDERCHAR "/" ;
+BUSBITCHARS "[]" ;
+DESIGN uart ;
+UNITS DISTANCE MICRONS 1000 ;
+DIEAREA ( 0 0 ) ( 100000 100000 ) ;
+
+COMPONENTS 0 ;
+END COMPONENTS
+
+PINS 9 ;
+- clk_i + NET clk_i + DIRECTION INPUT + USE CLOCK
+  + LAYER M3 ( -100 -100 ) ( 100 100 ) + PLACED ( 0 10000 ) E ;
+- rst_ni + NET rst_ni + DIRECTION INPUT + USE SIGNAL
+  + LAYER M3 ( -100 -100 ) ( 100 100 ) + PLACED ( 0 20000 ) E ;
+- tx_en_i + NET tx_en_i + DIRECTION INPUT + USE SIGNAL
+  + LAYER M3 ( -100 -100 ) ( 100 100 ) + PLACED ( 0 30000 ) E ;
+- data_i[7:0] + NET data_i + DIRECTION INPUT + USE SIGNAL
+  + LAYER M3 ( -500 -100 ) ( 500 100 ) + PLACED ( 0 45000 ) E ;
+- data_o[7:0] + NET data_o + DIRECTION OUTPUT + USE SIGNAL
+  + LAYER M3 ( -500 -100 ) ( 500 100 ) + PLACED ( 100000 45000 ) W ;
+- irq_o + NET irq_o + DIRECTION OUTPUT + USE SIGNAL
+  + LAYER M3 ( -100 -100 ) ( 100 100 ) + PLACED ( 100000 60000 ) W ;
+- tx_active_o + NET tx_active_o + DIRECTION OUTPUT + USE SIGNAL
+  + LAYER M3 ( -100 -100 ) ( 100 100 ) + PLACED ( 100000 70000 ) W ;
+- VDD_CORE + NET VDD_CORE + DIRECTION INOUT + USE POWER
+  + LAYER M5 ( -1000 -100 ) ( 1000 100 ) + PLACED ( 50000 100000 ) N ;
+- VSS + NET VSS + DIRECTION INOUT + USE GROUND
+  + LAYER M5 ( -1000 -100 ) ( 1000 100 ) + PLACED ( 50000 0 ) S ;
+END PINS
+
+NETS 1 ;
+- clk_i ( PIN clk_i ) + USE CLOCK ;
+END NETS
+
+SPECIALNETS 2 ;
+- VDD_CORE ( PIN VDD_CORE ) + USE POWER ;
+- VSS ( PIN VSS ) + USE GROUND ;
+END SPECIALNETS
+
+END DESIGN
