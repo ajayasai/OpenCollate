@@ -205,7 +205,7 @@ def _validate_csv_delimiter(source: SourceConfig, options: dict[str, Any]) -> No
     if delimiter is None:
         return
     try:
-        csv.reader((), delimiter=delimiter)
+        next(csv.reader(("",), delimiter=delimiter), None)
     except (TypeError, ValueError) as error:
         raise CliError(
             f"{source.view}: source option 'delimiter' is not a valid CSV delimiter: {delimiter!r}"
