@@ -18,7 +18,7 @@ opencollate schema contract --output contract.schema.json
 
 ## Schema version 1 contents
 
-The 0.2.0 contract persists:
+The 0.2.1 contract persists:
 
 - Components: canonical name, kind, per-view native names, required views, and ports.
 - Ports: canonical name, per-view native names, direction, role, and full bus shape.
@@ -28,7 +28,7 @@ The 0.2.0 contract persists:
 
 The live observation model is broader. It also carries hierarchical design objects, SDC queries
 and clocks, UPF objects, IP-XACT interfaces, DEF nets/endpoints, constraints, and package mappings.
-Those facts participate in 0.2.0 rules but are not all serialized in frozen-contract schema
+Those facts participate in 0.2.1 rules but are not all serialized in frozen-contract schema
 version 1. Do not assume a contract JSON file is a complete dump of every parsed fact.
 
 ## Identity and evidence

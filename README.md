@@ -17,7 +17,7 @@ ERROR OC4001  uart/irq_o has conflicting directions: RTL, CDL, DEF, IP-XACT, LEF
   help: Correct the direction in the outlying collateral or the canonical contract.
 ```
 
-> **Beta software:** OpenCollate 0.2.0 is intended for evaluation, collateral review, and CI
+> **Beta software:** OpenCollate 0.2.1 is intended for evaluation, collateral review, and CI
 > experiments. Its Python API, schema, and diagnostic surface can still change before 1.0. It is
 > not a signoff tool and does not replace simulation, formal verification, STA, CDC/RDC, DRC,
 > LVS, extraction, or implementation-tool validation.
@@ -27,7 +27,7 @@ ERROR OC4001  uart/irq_o has conflicting directions: RTL, CDL, DEF, IP-XACT, LEF
 OpenCollate requires Python 3.11 or newer.
 
 ```console
-python -m pip install "git+https://github.com/ajayasai/OpenCollate.git@v0.2.0"
+python -m pip install "git+https://github.com/ajayasai/OpenCollate.git@v0.2.1"
 opencollate --version
 ```
 
@@ -57,12 +57,12 @@ header, CDL, DEF, and experimental structural GDSII. It is expected to return st
 exactly `OC4001`, `OC4301`, and `OC5003`. See the
 [UART walkthrough](examples/uart/README.md).
 
-## 0.2.0 support matrix
+## 0.2.1 support matrix
 
 “Structural” means OpenCollate imports facts needed for consistency checks; it does not implement
 the complete language or the analysis normally performed by its native tool.
 
-| View | 0.2.0 Beta support | Deliberate boundary |
+| View | 0.2.1 Beta support | Deliberate boundary |
 | --- | --- | --- |
 | Verilog/SystemVerilog | pyslang preprocessing, parsing, and elaboration; modules, ports, parameters, dimensions, includes, defines, hierarchy, and small continuous-assignment Boolean functions | No behavioral or sequential equivalence; unsupported ports and unresolved shapes remain explicit |
 | Liberty | Libraries, cells, pins, buses, bundles, types, `pg_pin`, roles, directions, ranges, and small Boolean functions | Timing, power, noise, and characterization table contents are skipped |
@@ -88,7 +88,7 @@ recovery never turns an unestablished fact into an apparent pass.
 
 ## What OpenCollate checks
 
-The 65-rule 0.2.0 catalog covers:
+The 65-rule 0.2.1 catalog covers:
 
 - Configuration, parser completeness, unsupported constructs, and tainted scopes.
 - Component and port identity, inventory, direction, role, shape, range, and ordering.

@@ -2,7 +2,7 @@
 
 OpenCollate treats project configuration and every collateral file as untrusted input. Its parser
 boundary is designed for static extraction: source text supplies observations, never commands to
-run. This document describes 0.2.0 behavior; it is not a claim that arbitrary resource-exhaustion
+run. This document describes 0.2.1 behavior; it is not a claim that arbitrary resource-exhaustion
 attacks are impossible.
 
 ## Execution boundary
@@ -43,7 +43,7 @@ limits for decoded input, tokens/elements, nesting, expressions, or emitted obje
 breaches fail closed and taint or reject the affected view. Exact values are listed in
 [supported syntax](supported-syntax.md).
 
-The 0.2.0 UPF tokenizer does not expose the same explicit aggregate caps as SDC. For adversarial
+The 0.2.1 UPF tokenizer does not expose the same explicit aggregate caps as SDC. For adversarial
 or very large collateral, run OpenCollate inside the organization’s standard job sandbox with
 memory, CPU-time, file-size, and workspace access limits. Parser limits complement operating-system
 isolation; they do not replace it.

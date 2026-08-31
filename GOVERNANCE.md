@@ -31,9 +31,10 @@ reviewers or maintainers.
 
 ## Releases
 
-A maintainer approves a release after required CI, package, provenance, license, and clean-install
-checks pass. Releases follow Semantic Versioning. Before 1.0, breaking changes may occur in a
-minor release but must be prominent in the changelog and release notes.
+A maintainer approves a release after required CI, package, provenance, license, clean-install,
+and dependency-inclusive SBOM checks pass. Releases follow Semantic Versioning. Before 1.0,
+breaking changes may occur in a minor release but must be prominent in the changelog and release
+notes.
 
 ## Project assets and succession
 

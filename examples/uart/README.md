@@ -1,6 +1,6 @@
 # Full-stack synthetic UART
 
-This directory is a runnable OpenCollate 0.2.0 Beta showcase. Every file was created for this
+This directory is a runnable OpenCollate 0.2.1 Beta showcase. Every file was created for this
 project; none is derived from a real IP, library, PDK, package, or product. The example is licensed
 under the repository’s Apache-2.0 license.
 
@@ -56,7 +56,7 @@ opencollate contract build examples/uart/opencollate.toml --output uart-contract
 
 ## Deliberate findings
 
-The complete 0.2.0 check reports exactly three seeded rule codes:
+The complete 0.2.1 check reports exactly three seeded rule codes:
 
 1. `OC4001`: `irq_o` is an output in RTL, CDL, DEF, IP-XACT, and LEF but an input in Liberty.
 2. `OC4301`: `tx_active_o` implements different Boolean functions in RTL and Liberty.

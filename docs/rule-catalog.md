@@ -1,6 +1,6 @@
 # Rule catalog
 
-The runtime registry is authoritative. OpenCollate 0.2.0 registers 65 rules. Run
+The runtime registry is authoritative. OpenCollate 0.2.1 registers 65 rules. Run
 `opencollate explain CODE` for the installed summary and remediation, and
 `opencollate capabilities --json` for the installed rule count.
 

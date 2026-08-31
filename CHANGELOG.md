@@ -6,6 +6,15 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-31
+
+### Fixed
+
+- Release SPDX SBOM generation now inventories the built OpenCollate package and its runtime
+  dependency closure instead of only the distribution directory.
+- Release validation now fails before publication unless the dependency-inclusive SBOM contains
+  OpenCollate and its declared runtime dependencies.
+
 ## [0.2.0] - 2026-08-31
 
 ### Added
@@ -58,6 +67,7 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
 - Human-readable diagnostics plus JSON, SARIF, and Markdown reporting surfaces.
 - Synthetic UART example and public parser/check conformance documentation.
 
-[Unreleased]: https://github.com/ajayasai/OpenCollate/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ajayasai/OpenCollate/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/ajayasai/OpenCollate/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ajayasai/OpenCollate/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ajayasai/OpenCollate/releases/tag/v0.1.0

@@ -87,7 +87,7 @@ rewrite a conflicting value, and neither mechanism turns unknown evidence into k
 Schema version 1 of the frozen contract persists canonical components, ports, and registers. The
 runtime observation graph also contains clocks, interfaces, constraints, hierarchy references,
 UPF objects, DEF connectivity, and pin mappings. Rules evaluate those overlays during a check,
-but they are not all serialized as frozen-contract authorities in 0.2.0.
+but they are not all serialized as frozen-contract authorities in 0.2.1.
 
 The contract retains the selected canonical values and per-view native names. Diagnostics retain
 the observation evidence used by a rule. Build and inspect a contract with:

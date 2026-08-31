@@ -1,6 +1,6 @@
 # Supported syntax
 
-This document defines the OpenCollate 0.2.0 Beta parsing boundary. “Supported” means the
+This document defines the OpenCollate 0.2.1 Beta parsing boundary. “Supported” means the
 construct produces typed observations used by one or more rules. “Tolerated” means a parser can
 skip the construct without losing structural synchronization. Neither word implies complete
 language implementation or native-tool equivalence.
@@ -158,7 +158,7 @@ The parser retains definitions, references, scopes, options, supply functions, c
 and provenance. Tcl substitution, control flow, procedures, sourced scripts, and unrecognized
 commands are unsupported and taint affected facts; they are never executed. OpenCollate does not
 evaluate power-state logic, resolve voltages electrically, or reproduce a complete IEEE 1801
-implementation. The 0.2.0 UPF tokenizer does not publish the explicit aggregate input caps that
+implementation. The 0.2.1 UPF tokenizer does not publish the explicit aggregate input caps that
 the SDC parser does, so deployments handling untrusted very large UPF should also apply normal
 process-level memory and time limits.
 
@@ -223,7 +223,7 @@ and unsupported clauses produce explicit completeness diagnostics.
 ## Experimental structural GDSII
 
 The GDSII adapter reads the native big-endian record stream directly. Support is public but
-experimental in 0.2.0: it is intended for bounded structure, hierarchy, and explicitly selected
+experimental in 0.2.1: it is intended for bounded structure, hierarchy, and explicitly selected
 text-label inventory, not layout verification.
 
 Supported structurally:

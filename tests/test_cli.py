@@ -21,7 +21,7 @@ def test_version_uses_argparse_version_action(capsys: pytest.CaptureFixture[str]
     with pytest.raises(SystemExit) as captured:
         main(["--version"])
     assert captured.value.code == 0
-    assert capsys.readouterr().out.strip() == "OpenCollate 0.2.0"
+    assert capsys.readouterr().out.strip() == "OpenCollate 0.2.1"
 
 
 def test_capabilities_text_and_json(capsys: pytest.CaptureFixture[str]) -> None:
