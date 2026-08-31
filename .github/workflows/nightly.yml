@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHONHASHSEED: "0"
+
 jobs:
   latest:
     name: Latest Python and dependencies
@@ -28,6 +31,22 @@ jobs:
           python -m pip install --upgrade -e ".[dev]"
       - name: Run tests including Hypothesis properties
         run: pytest -q
+      - name: Run public conformance and scalability benchmarks
+        run: >-
+          python benchmarks/run.py
+          --repeat 5
+          --warmup 1
+          --diff-groups 2000
+          --enforce-budgets
+          --json-output benchmark-results.json
+      - name: Upload public benchmark results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: public-benchmarks-python-3.14
+          path: benchmark-results.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Compile every module
         run: python -m compileall -q src
       - name: Build package

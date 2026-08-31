@@ -20,6 +20,7 @@ canonical design and optional frozen contract
     ├── interface and inventory checks
     ├── object-reference and clock checks
     ├── mapping and register checks
+    ├── bounded static connectivity checks
     └── completeness and integrity checks
             │
             ▼
@@ -41,6 +42,7 @@ existing parser.
 - Static clock definitions and targets.
 - IP-XACT interfaces and logical-to-physical port maps.
 - Registers and fields with address, size, layout, access, and reset facts.
+- Bit-level transparent RTL connectivity edges and declarative required/forbidden path intent.
 - Experimental GDSII cell definitions, SREF/AREF hierarchy references, and text-label objects;
   selected labels can supply unknown-shape ports only under explicit filters.
 - Parser diagnostics, whole-view completeness, tainted scopes, and source-specific attributes.
@@ -61,6 +63,8 @@ Parsers consume untrusted text and do not write source files. The important exec
 are:
 
 - SystemVerilog is parsed and elaborated by pyslang; it is not simulated.
+- Connectivity extraction stops at procedural, dynamic, or non-transparent logic and records an
+  inconclusive frontier rather than assuming reachability or isolation.
 - SDC and UPF use static Tcl-shaped tokenizers and never start Tcl or execute commands.
 - C-header and IP-XACT integer expressions use bounded, side-effect-free evaluators.
 - IP-XACT rejects DTD/entity declarations, fetches no schemas, and expands no external definitions.
@@ -68,6 +72,8 @@ are:
 - DEF and LEF geometry is structurally skipped rather than interpreted as names or connectivity.
 - GDSII is parsed as a bounded native record stream; geometry elements are counted and discarded
   without polygon materialization or physical verification.
+- SystemRDL executable preprocessing and includes are rejected before bounded compilation through
+  `systemrdl-compiler`.
 
 Parsers with explicit size, token, nesting, and object limits fail closed. See
 [supported syntax](supported-syntax.md) and the [security model](security-model.md).
@@ -87,7 +93,8 @@ rewrite a conflicting value, and neither mechanism turns unknown evidence into k
 Schema version 1 of the frozen contract persists canonical components, ports, and registers. The
 runtime observation graph also contains clocks, interfaces, constraints, hierarchy references,
 UPF objects, DEF connectivity, and pin mappings. Rules evaluate those overlays during a check,
-but they are not all serialized as frozen-contract authorities in 0.2.1.
+but they are not all serialized as frozen-contract authorities in 0.3.0. Connectivity graph and
+intent facts are deliberately run-local in contract schema version 1.
 
 The contract retains the selected canonical values and per-view native names. Diagnostics retain
 the observation evidence used by a rule. Build and inspect a contract with:
@@ -102,6 +109,10 @@ Rules consume parser-neutral observations and canonical identities, not parser i
 runtime catalog is the authority for code, default severity, summary, and remediation. Reporters
 are pure transformations: they cannot change severity, waiver state, fingerprint, evidence, or
 exit status.
+
+Saved report review is a separate pure comparison. The diagnostic fingerprint identifies an issue;
+a full semantic content digest detects changes while ignoring source movement and evidence order.
+Fatal current findings cannot be ratcheted away.
 
 ## Determinism
 
@@ -118,11 +129,12 @@ src/opencollate/
   config.py            TOML loading and validation
   model.py             parser-neutral facts, contracts, and provenance
   engine.py            reconciliation and built-in checks
+  baseline.py          deterministic saved-report multiset comparison
   catalog.py           authoritative rule registry
   diagnostics.py       findings, fingerprints, and waivers
   reporters/           text, JSON, Markdown, and SARIF
   parsers/             format-specific adapters
-  schemas/             report and contract JSON Schemas
+  schemas/             report, contract, and report-diff JSON Schemas
 ```
 
 The precise tree can evolve before 1.0; parser neutrality, explicit fact state, provenance, and

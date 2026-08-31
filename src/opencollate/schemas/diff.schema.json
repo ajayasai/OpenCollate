@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ajayasai/OpenCollate/schemas/diff.schema.json",
+  "title": "OpenCollate report diff",
+  "description": "A deterministic comparison between two OpenCollate report-v1 artifacts.",
+  "type": "object",
+  "required": [
+    "diff_schema_version",
+    "baseline_report_schema_version",
+    "current_report_schema_version",
+    "summary",
+    "findings"
+  ],
+  "properties": {
+    "diff_schema_version": {
+      "const": 1
+    },
+    "baseline_report_schema_version": {
+      "const": 1
+    },
+    "current_report_schema_version": {
+      "const": 1
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/findingDelta"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "summary": {
+      "type": "object",
+      "required": [
+        "baseline",
+        "current",
+        "new",
+        "changed",
+        "unchanged",
+        "resolved",
+        "current_active",
+        "current_suppressed",
+        "current_fatal",
+        "current_active_fatal"
+      ],
+      "properties": {
+        "baseline": { "type": "integer", "minimum": 0 },
+        "current": { "type": "integer", "minimum": 0 },
+        "new": { "type": "integer", "minimum": 0 },
+        "changed": { "type": "integer", "minimum": 0 },
+        "unchanged": { "type": "integer", "minimum": 0 },
+        "resolved": { "type": "integer", "minimum": 0 },
+        "current_active": { "type": "integer", "minimum": 0 },
+        "current_suppressed": { "type": "integer", "minimum": 0 },
+        "current_fatal": { "type": "integer", "minimum": 0 },
+        "current_active_fatal": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "findingDelta": {
+      "type": "object",
+      "required": [
+        "state",
+        "fingerprint",
+        "baseline_content_digest",
+        "current_content_digest",
+        "current_fatal",
+        "current_suppressed"
+      ],
+      "properties": {
+        "state": {
+          "enum": ["new", "changed", "unchanged", "resolved"]
+        },
+        "fingerprint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseline_content_digest": {
+          "oneOf": [
+            { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            { "type": "null" }
+          ]
+        },
+        "current_content_digest": {
+          "oneOf": [
+            { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            { "type": "null" }
+          ]
+        },
+        "current_fatal": {
+          "type": "boolean"
+        },
+        "current_suppressed": {
+          "type": "boolean"
+        },
+        "baseline": {
+          "type": "object"
+        },
+        "current": {
+          "type": "object"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "const": "new" } } },
+          "then": {
+            "required": ["current"],
+            "properties": {
+              "baseline_content_digest": { "type": "null" },
+              "current_content_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            },
+            "not": { "required": ["baseline"] }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": { "enum": ["changed", "unchanged"] }
+            }
+          },
+          "then": {
+            "required": ["baseline", "current"],
+            "properties": {
+              "baseline_content_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "current_content_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "state": { "const": "resolved" } } },
+          "then": {
+            "required": ["baseline"],
+            "properties": {
+              "baseline_content_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "current_content_digest": { "type": "null" },
+              "current_fatal": { "const": false },
+              "current_suppressed": { "const": false }
+            },
+            "not": { "required": ["current"] }
+          }
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
+}

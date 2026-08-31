@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections import defaultdict
+from collections import defaultdict, deque
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -48,6 +48,11 @@ from opencollate.model import (
     ClockObservation,
     ComponentMember,
     ComponentObservation,
+    ConnectivityEdge,
+    ConnectivityEndpoint,
+    ConnectivityExpectation,
+    ConnectivityRequirement,
+    ConnectivityTransform,
     ContractComponent,
     ContractPort,
     ContractRegister,
@@ -89,7 +94,22 @@ _VIEW_KIND_ALIASES = {
     "gdsii": "gds",
     "gds2": "gds",
     "stream": "gds",
+    "rdl": "systemrdl",
+    "system_rdl": "systemrdl",
+    "system-rdl": "systemrdl",
+    "conn": "connectivity",
+    "connectivity_spec": "connectivity",
+    "connectivity-spec": "connectivity",
 }
+
+_CONNECTIVITY_SELECTOR = re.compile(
+    r"^(?P<base>.+?)(?:\[(?P<select>\*|[+-]?\d+|[+-]?\d+\s*:\s*[+-]?\d+)\])?$"
+)
+_MAX_CONNECTIVITY_PAIR_SEARCHES = 65_536
+_MAX_CONNECTIVITY_REQUIREMENT_BITS = 1_024
+_MAX_CONNECTIVITY_SEARCH_STATES = 500_000
+_MAX_CONNECTIVITY_INDEX_DIGITS = 4_096
+_CONNECTIVITY_SEARCH_LIMIT_SENTINEL = "@opencollate/search-limit"
 
 
 def _semantic_view_kind(view: ViewId | str) -> str:
@@ -269,6 +289,8 @@ def _view_label(view: ViewId) -> str:
         "header": "C header",
         "cdl": "CDL/SPICE",
         "gds": "GDSII",
+        "systemrdl": "SystemRDL",
+        "connectivity": "connectivity intent",
         "contract": "the contract",
     }.get(kind, kind.upper())
     if view.name in {"default", "frozen"}:
@@ -417,6 +439,7 @@ class ComparisonEngine:
         diagnostics.extend(self._check_clocks(reconciliation.design, observed))
         diagnostics.extend(self._check_interfaces(reconciliation.design, observed, resolver))
         diagnostics.extend(self._check_registers(observed, contract))
+        diagnostics.extend(self._check_connectivity(observed))
         diagnostics = self._apply_severity_overrides(diagnostics)
         diagnostics = self._apply_waivers(diagnostics, today=today or date.today())
         ordered = sort_diagnostics(diagnostics)
@@ -2328,6 +2351,949 @@ class ComparisonEngine:
         return diagnostics
 
     @staticmethod
+    def _resolve_connectivity_selector(
+        selector: str,
+        endpoints_by_name: Mapping[str, tuple[ConnectivityEndpoint, ...]],
+    ) -> tuple[tuple[ConnectivityEndpoint, ...], bool, bool]:
+        """Resolve one bounded exact/glob endpoint selector.
+
+        The second result reports ambiguity across multiple signal bases.  The
+        third reports a selector that cannot be materialized within the public
+        connectivity bit limit.  Bus bits from one matched signal are not
+        ambiguous and retain their declaration order.
+        """
+
+        match = _CONNECTIVITY_SELECTOR.fullmatch(selector)
+        if match is None:
+            return (), False, False
+        pattern = match.group("base")
+        selection = match.group("select")
+        is_glob = any(marker in pattern for marker in ("*", "?"))
+        matching_names = tuple(
+            sorted(
+                name
+                for name in endpoints_by_name
+                if (fnmatchcase(name, pattern) if is_glob else name == pattern)
+            )
+        )
+        if len(matching_names) != 1:
+            return (), len(matching_names) > 1, False
+        endpoints = endpoints_by_name[matching_names[0]]
+        if selection is None or selection == "*":
+            return endpoints, False, False
+        if ":" not in selection:
+            digits = selection.lstrip("+-")
+            if len(digits) > _MAX_CONNECTIVITY_INDEX_DIGITS:
+                return (), False, True
+            try:
+                bit = int(selection)
+            except ValueError:
+                return (), False, True
+            selected = tuple(item for item in endpoints if item.bit_index == bit)
+            return selected, False, False
+        left_text, right_text = selection.split(":", 1)
+        index_texts = (left_text.strip(), right_text.strip())
+        if any(
+            len(index_text.lstrip("+-")) > _MAX_CONNECTIVITY_INDEX_DIGITS
+            for index_text in index_texts
+        ):
+            return (), False, True
+        try:
+            left, right = (int(index_text) for index_text in index_texts)
+        except ValueError:
+            return (), False, True
+        if abs(right - left) + 1 > _MAX_CONNECTIVITY_REQUIREMENT_BITS:
+            return (), False, True
+        step = 1 if right > left else -1
+        wanted = tuple(range(left, right + step, step))
+        by_bit = {item.bit_index: item for item in endpoints}
+        if any(bit not in by_bit for bit in wanted):
+            return (), False, False
+        return tuple(by_bit[bit] for bit in wanted), False, False
+
+    @staticmethod
+    def _find_connectivity_path(
+        source: str,
+        sink: str,
+        adjacency: Mapping[str, tuple[ConnectivityEdge, ...]],
+        *,
+        through: tuple[frozenset[str], ...] = (),
+        excluded: frozenset[str] = frozenset(),
+        required_parity: bool | None = None,
+        require_tainted: bool = False,
+    ) -> tuple[tuple[ConnectivityEdge, ...] | None, frozenset[str]]:
+        if source in excluded or sink in excluded:
+            return None, frozenset((source,))
+
+        def advance(key: str, index: int) -> int:
+            while index < len(through) and key in through[index]:
+                index += 1
+            return index
+
+        initial = (source, advance(source, 0), False, False)
+        queue: deque[tuple[str, int, bool | None, bool]] = deque((initial,))
+        previous: dict[
+            tuple[str, int, bool | None, bool],
+            tuple[tuple[str, int, bool | None, bool], ConnectivityEdge] | None,
+        ] = {initial: None}
+        visited_nodes: set[str] = {source}
+        final_state: tuple[str, int, bool | None, bool] | None = None
+        while queue:
+            state = queue.popleft()
+            node, waypoint_index, parity, crossed_tainted = state
+            if (
+                node == sink
+                and waypoint_index == len(through)
+                and (required_parity is None or parity == required_parity)
+                and (not require_tainted or crossed_tainted)
+            ):
+                final_state = state
+                break
+            for edge in adjacency.get(node, ()):
+                next_node = edge.sink.key
+                if next_node in excluded:
+                    continue
+                next_parity = (
+                    None if parity is None or edge.inverted is None else parity ^ edge.inverted
+                )
+                next_state = (
+                    next_node,
+                    advance(next_node, waypoint_index),
+                    next_parity,
+                    (
+                        crossed_tainted or edge.status != FactState.KNOWN
+                        if require_tainted
+                        else False
+                    ),
+                )
+                if next_state in previous:
+                    continue
+                if len(previous) >= _MAX_CONNECTIVITY_SEARCH_STATES:
+                    visited_nodes.add(_CONNECTIVITY_SEARCH_LIMIT_SENTINEL)
+                    return None, frozenset(visited_nodes)
+                previous[next_state] = (state, edge)
+                visited_nodes.add(next_node)
+                queue.append(next_state)
+        if final_state is None:
+            return None, frozenset(visited_nodes)
+        path: list[ConnectivityEdge] = []
+        cursor = final_state
+        while True:
+            link = previous[cursor]
+            if link is None:
+                break
+            prior, edge = link
+            path.append(edge)
+            cursor = prior
+        path.reverse()
+        return tuple(path), frozenset(visited_nodes)
+
+    @staticmethod
+    def _connectivity_evidence(
+        intent_view: ViewId,
+        requirement: ConnectivityRequirement,
+        source: ConnectivityEndpoint | None = None,
+        sink: ConnectivityEndpoint | None = None,
+        path: Sequence[ConnectivityEdge] = (),
+    ) -> tuple[DiagnosticEvidence, ...]:
+        evidence: list[DiagnosticEvidence] = [
+            DiagnosticEvidence(
+                intent_view,
+                requirement.to_dict(),
+                requirement.provenance,
+                native_name=requirement.identifier,
+                label="requirement",
+            )
+        ]
+        for label, endpoint in (("source", source), ("sink", sink)):
+            if endpoint is not None and endpoint.provenance is not None:
+                evidence.append(
+                    DiagnosticEvidence(
+                        endpoint.provenance.view,
+                        endpoint.key,
+                        endpoint.provenance,
+                        native_name=endpoint.key,
+                        label=label,
+                    )
+                )
+        for index, edge in enumerate(path):
+            edge_view = edge.provenance.view if edge.provenance is not None else ViewId("rtl")
+            evidence.append(
+                DiagnosticEvidence(
+                    edge_view,
+                    edge.to_dict(),
+                    edge.provenance,
+                    label=f"path edge {index + 1}",
+                )
+            )
+        return tuple(evidence)
+
+    @staticmethod
+    def _connectivity_adjacency(
+        edges: Sequence[ConnectivityEdge],
+        *,
+        include_tainted: bool,
+    ) -> dict[str, tuple[ConnectivityEdge, ...]]:
+        grouped: dict[str, list[ConnectivityEdge]] = defaultdict(list)
+        for edge in edges:
+            if edge.status == FactState.KNOWN and edge.inverted is not None:
+                grouped[edge.source.key].append(edge)
+            elif include_tainted and edge.status in {FactState.TAINTED, FactState.UNSUPPORTED}:
+                grouped[edge.source.key].append(edge)
+        return {
+            source: tuple(
+                sorted(
+                    values,
+                    key=lambda item: (
+                        item.sink.key,
+                        item.status.value,
+                        item.kind,
+                        -1 if item.inverted is None else int(item.inverted),
+                    ),
+                )
+            )
+            for source, values in grouped.items()
+        }
+
+    def _check_connectivity(
+        self,
+        observations: Sequence[ViewObservation],
+    ) -> list[Diagnostic]:
+        rtl_views = [item for item in observations if _semantic_view_kind(item.view) == "rtl"]
+        intent_views = [item for item in observations if item.connectivity_requirements]
+        diagnostics: list[Diagnostic] = []
+        if not rtl_views:
+            return diagnostics
+
+        for intent in intent_views:
+            for requirement in intent.connectivity_requirements:
+                if requirement.status != FactState.KNOWN:
+                    continue
+                for rtl in rtl_views:
+                    endpoints_by_name_lists: dict[str, list[ConnectivityEndpoint]] = defaultdict(
+                        list
+                    )
+                    for endpoint in rtl.connectivity_endpoints:
+                        endpoints_by_name_lists[endpoint.native_name].append(endpoint)
+                    endpoints_by_name = {
+                        name: tuple(sorted(values, key=lambda item: item.ordinal))
+                        for name, values in endpoints_by_name_lists.items()
+                    }
+                    entity = _object(
+                        "connectivity_requirement",
+                        f"connectivity:{intent.view.key}:{requirement.identifier}:{rtl.view.key}",
+                        requirement.identifier,
+                    )
+
+                    def resolve(
+                        selector: str,
+                        label: str,
+                        endpoints_index: Mapping[
+                            str, tuple[ConnectivityEndpoint, ...]
+                        ] = endpoints_by_name,
+                        selected_requirement: ConnectivityRequirement = requirement,
+                        rtl_observation: ViewObservation = rtl,
+                        selected_entity: DiagnosticObject = entity,
+                        intent_view: ViewId = intent.view,
+                    ) -> tuple[ConnectivityEndpoint, ...] | None:
+                        resolved, ambiguous, selector_limited = self._resolve_connectivity_selector(
+                            selector, endpoints_index
+                        )
+                        if resolved:
+                            return resolved
+                        if selector_limited:
+                            code = "OC6505"
+                        elif ambiguous:
+                            code = "OC6502"
+                        else:
+                            code = "OC6501"
+                        detail = (
+                            f"expands beyond the bounded "
+                            f"{_MAX_CONNECTIVITY_REQUIREMENT_BITS:,}-bit selector limit"
+                            if selector_limited
+                            else "matches multiple RTL signals"
+                            if ambiguous
+                            else "matches no RTL signal"
+                        )
+                        diagnostics.append(
+                            Diagnostic.from_rule(
+                                code,
+                                f"Connectivity requirement "
+                                f"{selected_requirement.identifier!r} {label} "
+                                f"{selector!r} {detail} in "
+                                f"{_view_label(rtl_observation.view)}.",
+                                provenance=selected_requirement.provenance,
+                                object=selected_entity,
+                                property_name=f"connectivity.{label}",
+                                evidence=self._connectivity_evidence(
+                                    intent_view, selected_requirement
+                                ),
+                                metadata={
+                                    "selector": selector,
+                                    "rtl_view": str(rtl_observation.view),
+                                    **(
+                                        {"limit": _MAX_CONNECTIVITY_REQUIREMENT_BITS}
+                                        if selector_limited
+                                        else {}
+                                    ),
+                                },
+                            )
+                        )
+                        return None
+
+                    sources = resolve(requirement.source, "source")
+                    sinks = resolve(requirement.sink, "sink")
+                    if sources is None or sinks is None:
+                        continue
+                    through_groups: list[frozenset[str]] = []
+                    selector_failed = False
+                    for selector in requirement.through:
+                        resolved = resolve(selector, "through")
+                        if resolved is None:
+                            selector_failed = True
+                            break
+                        through_groups.append(frozenset(item.key for item in resolved))
+                    excluded_keys: set[str] = set()
+                    if not selector_failed:
+                        for selector in requirement.exclude:
+                            resolved = resolve(selector, "exclude")
+                            if resolved is None:
+                                selector_failed = True
+                                break
+                            excluded_keys.update(item.key for item in resolved)
+                    if selector_failed:
+                        continue
+                    if max(len(sources), len(sinks)) > _MAX_CONNECTIVITY_REQUIREMENT_BITS:
+                        diagnostics.append(
+                            Diagnostic.from_rule(
+                                "OC6505",
+                                f"Connectivity requirement {requirement.identifier!r} selects "
+                                f"more than {_MAX_CONNECTIVITY_REQUIREMENT_BITS:,} bits and "
+                                "is outside the bounded path-checking limit.",
+                                provenance=requirement.provenance,
+                                object=entity,
+                                property_name="connectivity.width",
+                                evidence=self._connectivity_evidence(
+                                    intent.view, requirement, sources[0], sinks[0]
+                                ),
+                                metadata={
+                                    "source_width": len(sources),
+                                    "sink_width": len(sinks),
+                                    "limit": _MAX_CONNECTIVITY_REQUIREMENT_BITS,
+                                },
+                            )
+                        )
+                        continue
+                    if len(sources) != len(sinks):
+                        diagnostics.append(
+                            Diagnostic.from_rule(
+                                "OC6506",
+                                f"Connectivity requirement {requirement.identifier!r} selects "
+                                f"{len(sources)} source bits but {len(sinks)} sink bits.",
+                                provenance=requirement.provenance,
+                                object=entity,
+                                property_name="connectivity.width",
+                                evidence=self._connectivity_evidence(
+                                    intent.view,
+                                    requirement,
+                                    sources[0] if sources else None,
+                                    sinks[0] if sinks else None,
+                                ),
+                                metadata={
+                                    "source_width": len(sources),
+                                    "sink_width": len(sinks),
+                                    "rtl_view": str(rtl.view),
+                                },
+                            )
+                        )
+                        continue
+                    known_adjacency = self._connectivity_adjacency(
+                        rtl.connectivity_edges, include_tainted=False
+                    )
+                    possible_adjacency = self._connectivity_adjacency(
+                        rtl.connectivity_edges, include_tainted=True
+                    )
+                    has_tainted_edges = any(
+                        edge.status in {FactState.TAINTED, FactState.UNSUPPORTED}
+                        for edge in rtl.connectivity_edges
+                    )
+                    through = tuple(through_groups)
+                    excluded = frozenset(excluded_keys)
+                    graph_complete = rtl.attributes.get("connectivity_complete") is not False
+
+                    if requirement.expectation == ConnectivityExpectation.UNREACHABLE:
+                        pair_count = len(sources) * len(sinks)
+                        if pair_count > _MAX_CONNECTIVITY_PAIR_SEARCHES:
+                            diagnostics.append(
+                                Diagnostic.from_rule(
+                                    "OC6505",
+                                    f"Connectivity requirement {requirement.identifier!r} expands "
+                                    f"to {pair_count:,} endpoint pairs, above the bounded search "
+                                    f"limit of {_MAX_CONNECTIVITY_PAIR_SEARCHES:,}.",
+                                    provenance=requirement.provenance,
+                                    object=entity,
+                                    property_name="connectivity.path",
+                                    evidence=self._connectivity_evidence(intent.view, requirement),
+                                )
+                            )
+                            continue
+                        found = False
+                        search_limited = False
+                        possible: (
+                            tuple[
+                                ConnectivityEndpoint,
+                                ConnectivityEndpoint,
+                                tuple[ConnectivityEdge, ...],
+                            ]
+                            | None
+                        ) = None
+                        for source in sources:
+                            for sink in sinks:
+                                path, visited = self._find_connectivity_path(
+                                    source.key,
+                                    sink.key,
+                                    known_adjacency,
+                                    through=through,
+                                    excluded=excluded,
+                                )
+                                search_limited = search_limited or (
+                                    _CONNECTIVITY_SEARCH_LIMIT_SENTINEL in visited
+                                )
+                                if path is not None:
+                                    diagnostics.append(
+                                        Diagnostic.from_rule(
+                                            "OC6504",
+                                            f"Connectivity requirement {requirement.identifier!r} "
+                                            f"forbids {source.key} reaching {sink.key}, but a "
+                                            f"{len(path)}-edge static path exists.",
+                                            provenance=requirement.provenance,
+                                            object=entity,
+                                            property_name="connectivity.path",
+                                            evidence=self._connectivity_evidence(
+                                                intent.view, requirement, source, sink, path
+                                            ),
+                                            metadata={
+                                                "witness_path": [edge.to_dict() for edge in path],
+                                                "rtl_view": str(rtl.view),
+                                            },
+                                        )
+                                    )
+                                    found = True
+                                    break
+                                possible_path, possible_visited = self._find_connectivity_path(
+                                    source.key,
+                                    sink.key,
+                                    possible_adjacency,
+                                    through=through,
+                                    excluded=excluded,
+                                )
+                                search_limited = search_limited or (
+                                    _CONNECTIVITY_SEARCH_LIMIT_SENTINEL in possible_visited
+                                )
+                                if possible is None and possible_path is not None:
+                                    possible = (source, sink, possible_path)
+                            if found:
+                                break
+                        if found:
+                            continue
+                        if possible is not None or not graph_complete or search_limited:
+                            source, sink, path = possible or (sources[0], sinks[0], ())
+                            frontier = next(
+                                (edge for edge in path if edge.status != FactState.KNOWN),
+                                None,
+                            )
+                            reason = (
+                                str(frontier.attributes.get("reason") or frontier.kind)
+                                if frontier is not None
+                                else "the bounded path search reached its state limit"
+                                if search_limited
+                                else "the RTL connectivity graph has an unrepresented frontier"
+                            )
+                            diagnostics.append(
+                                Diagnostic.from_rule(
+                                    "OC6505",
+                                    f"Connectivity requirement {requirement.identifier!r} "
+                                    f"cannot prove isolation between {source.key} and {sink.key}: "
+                                    f"{reason}.",
+                                    provenance=requirement.provenance,
+                                    object=entity,
+                                    property_name="connectivity.path",
+                                    evidence=self._connectivity_evidence(
+                                        intent.view, requirement, source, sink, path
+                                    ),
+                                    metadata={
+                                        "frontier": frontier.to_dict()
+                                        if frontier is not None
+                                        else None,
+                                        "rtl_view": str(rtl.view),
+                                    },
+                                )
+                            )
+                        continue
+
+                    ordered_sinks = (
+                        tuple(reversed(sinks))
+                        if requirement.transform == ConnectivityTransform.REVERSE
+                        else sinks
+                    )
+                    required_parity = (
+                        True
+                        if requirement.transform == ConnectivityTransform.INVERTED
+                        else False
+                        if requirement.transform
+                        in {ConnectivityTransform.IDENTITY, ConnectivityTransform.REVERSE}
+                        else None
+                    )
+                    exact_mapping = requirement.transform in {
+                        ConnectivityTransform.IDENTITY,
+                        ConnectivityTransform.REVERSE,
+                    }
+                    mapping_pair_count = len(sources) * max(0, len(ordered_sinks) - 1)
+                    if exact_mapping and mapping_pair_count > _MAX_CONNECTIVITY_PAIR_SEARCHES:
+                        diagnostics.append(
+                            Diagnostic.from_rule(
+                                "OC6505",
+                                f"Connectivity requirement {requirement.identifier!r} needs "
+                                f"{mapping_pair_count:,} alternate selected-sink searches, "
+                                f"above the bounded limit of "
+                                f"{_MAX_CONNECTIVITY_PAIR_SEARCHES:,}.",
+                                provenance=requirement.provenance,
+                                object=entity,
+                                property_name="connectivity.bit_mapping",
+                                evidence=self._connectivity_evidence(intent.view, requirement),
+                                metadata={
+                                    "pairs": mapping_pair_count,
+                                    "limit": _MAX_CONNECTIVITY_PAIR_SEARCHES,
+                                },
+                            )
+                        )
+                        continue
+                    failure_emitted = False
+                    for bit_ordinal, (source, sink) in enumerate(
+                        zip(sources, ordered_sinks, strict=True)
+                    ):
+                        path, visited = self._find_connectivity_path(
+                            source.key,
+                            sink.key,
+                            known_adjacency,
+                            through=through,
+                            excluded=excluded,
+                            required_parity=required_parity,
+                        )
+                        if _CONNECTIVITY_SEARCH_LIMIT_SENTINEL in visited:
+                            diagnostics.append(
+                                Diagnostic.from_rule(
+                                    "OC6505",
+                                    f"Connectivity requirement {requirement.identifier!r} "
+                                    f"exceeded the bounded path-search state limit from "
+                                    f"{source.key} toward {sink.key}.",
+                                    provenance=requirement.provenance,
+                                    object=entity,
+                                    property_name="connectivity.path",
+                                    evidence=self._connectivity_evidence(
+                                        intent.view, requirement, source, sink
+                                    ),
+                                    metadata={"limit": _MAX_CONNECTIVITY_SEARCH_STATES},
+                                )
+                            )
+                            failure_emitted = True
+                            break
+                        if path is not None:
+                            if required_parity is not None:
+                                alternate, alternate_visited = self._find_connectivity_path(
+                                    source.key,
+                                    sink.key,
+                                    known_adjacency,
+                                    through=through,
+                                    excluded=excluded,
+                                    required_parity=not required_parity,
+                                )
+                                if (
+                                    alternate is not None
+                                    or _CONNECTIVITY_SEARCH_LIMIT_SENTINEL in alternate_visited
+                                ):
+                                    diagnostics.append(
+                                        Diagnostic.from_rule(
+                                            "OC6505",
+                                            f"Connectivity requirement {requirement.identifier!r} "
+                                            + (
+                                                "has both inverted and non-inverted static paths "
+                                                if alternate is not None
+                                                else "cannot exclude an alternate-polarity path "
+                                            )
+                                            + f"between {source.key} and {sink.key}.",
+                                            provenance=requirement.provenance,
+                                            object=entity,
+                                            property_name="connectivity.transform",
+                                            evidence=self._connectivity_evidence(
+                                                intent.view, requirement, source, sink, path
+                                            ),
+                                            metadata={
+                                                "witness_path": [edge.to_dict() for edge in path],
+                                                "alternate_path": [
+                                                    edge.to_dict() for edge in alternate or ()
+                                                ],
+                                            },
+                                        )
+                                    )
+                                    failure_emitted = True
+                                    break
+                                if exact_mapping:
+                                    for candidate in ordered_sinks:
+                                        if candidate.key == sink.key:
+                                            continue
+                                        cross_path, cross_visited = self._find_connectivity_path(
+                                            source.key,
+                                            candidate.key,
+                                            known_adjacency,
+                                            through=through,
+                                            excluded=excluded,
+                                        )
+                                        cross_limited = (
+                                            _CONNECTIVITY_SEARCH_LIMIT_SENTINEL in cross_visited
+                                        )
+                                        if cross_path is None and not cross_limited:
+                                            continue
+                                        if cross_limited:
+                                            diagnostics.append(
+                                                Diagnostic.from_rule(
+                                                    "OC6505",
+                                                    f"Connectivity requirement "
+                                                    f"{requirement.identifier!r} cannot exclude "
+                                                    f"an alternate selected-sink path from "
+                                                    f"{source.key} to {candidate.key} within the "
+                                                    "bounded search limit.",
+                                                    provenance=requirement.provenance,
+                                                    object=entity,
+                                                    property_name=("connectivity.bit_mapping"),
+                                                    evidence=self._connectivity_evidence(
+                                                        intent.view,
+                                                        requirement,
+                                                        source,
+                                                        candidate,
+                                                        path,
+                                                    ),
+                                                    metadata={
+                                                        "bit_ordinal": bit_ordinal,
+                                                        "expected_sink": sink.key,
+                                                        "candidate_sink": candidate.key,
+                                                        "limit": (_MAX_CONNECTIVITY_SEARCH_STATES),
+                                                        "witness_path": [
+                                                            edge.to_dict() for edge in path
+                                                        ],
+                                                    },
+                                                )
+                                            )
+                                        else:
+                                            diagnostics.append(
+                                                Diagnostic.from_rule(
+                                                    "OC6507",
+                                                    f"Connectivity requirement "
+                                                    f"{requirement.identifier!r} maps source "
+                                                    f"bit {source.key} to expected sink bit "
+                                                    f"{sink.key}, but it also reaches selected "
+                                                    f"sink bit {candidate.key}.",
+                                                    provenance=requirement.provenance,
+                                                    object=entity,
+                                                    property_name=("connectivity.bit_mapping"),
+                                                    evidence=self._connectivity_evidence(
+                                                        intent.view,
+                                                        requirement,
+                                                        source,
+                                                        candidate,
+                                                        cross_path or (),
+                                                    ),
+                                                    metadata={
+                                                        "bit_ordinal": bit_ordinal,
+                                                        "expected_sink": sink.key,
+                                                        "actual_sink": candidate.key,
+                                                        "expected_path": [
+                                                            edge.to_dict() for edge in path
+                                                        ],
+                                                        "witness_path": [
+                                                            edge.to_dict()
+                                                            for edge in cross_path or ()
+                                                        ],
+                                                    },
+                                                )
+                                            )
+                                        failure_emitted = True
+                                        break
+                                    if failure_emitted:
+                                        break
+                                tainted_path: tuple[ConnectivityEdge, ...] | None = None
+                                tainted_visited: frozenset[str] = frozenset()
+                                tainted_sink = sink
+                                if has_tainted_edges:
+                                    tainted_path, tainted_visited = self._find_connectivity_path(
+                                        source.key,
+                                        sink.key,
+                                        possible_adjacency,
+                                        through=through,
+                                        excluded=excluded,
+                                        require_tainted=True,
+                                    )
+                                    if (
+                                        exact_mapping
+                                        and tainted_path is None
+                                        and _CONNECTIVITY_SEARCH_LIMIT_SENTINEL
+                                        not in tainted_visited
+                                    ):
+                                        for candidate in ordered_sinks:
+                                            if candidate.key == sink.key:
+                                                continue
+                                            candidate_path, candidate_visited = (
+                                                self._find_connectivity_path(
+                                                    source.key,
+                                                    candidate.key,
+                                                    possible_adjacency,
+                                                    through=through,
+                                                    excluded=excluded,
+                                                    require_tainted=True,
+                                                )
+                                            )
+                                            tainted_visited = tainted_visited | candidate_visited
+                                            if candidate_path is not None:
+                                                tainted_path = candidate_path
+                                                tainted_sink = candidate
+                                                break
+                                            if (
+                                                _CONNECTIVITY_SEARCH_LIMIT_SENTINEL
+                                                in candidate_visited
+                                            ):
+                                                tainted_sink = candidate
+                                                break
+                                tainted_limited = (
+                                    _CONNECTIVITY_SEARCH_LIMIT_SENTINEL in tainted_visited
+                                )
+                                if (
+                                    tainted_path is not None
+                                    or not graph_complete
+                                    or tainted_limited
+                                ):
+                                    frontier = next(
+                                        (
+                                            edge
+                                            for edge in tainted_path or ()
+                                            if edge.status != FactState.KNOWN
+                                        ),
+                                        None,
+                                    )
+                                    reason = (
+                                        str(frontier.attributes.get("reason") or frontier.kind)
+                                        if frontier is not None
+                                        else (
+                                            "the bounded alternate-path search reached "
+                                            "its state limit"
+                                        )
+                                        if tainted_limited
+                                        else (
+                                            "the RTL connectivity graph has an "
+                                            "unrepresented frontier"
+                                        )
+                                    )
+                                    diagnostics.append(
+                                        Diagnostic.from_rule(
+                                            "OC6505",
+                                            f"Connectivity requirement {requirement.identifier!r} "
+                                            f"has a supported path from {source.key} to "
+                                            f"{sink.key}, but its exact transform is "
+                                            f"inconclusive: {reason}.",
+                                            provenance=requirement.provenance,
+                                            object=entity,
+                                            property_name="connectivity.transform",
+                                            evidence=self._connectivity_evidence(
+                                                intent.view,
+                                                requirement,
+                                                source,
+                                                tainted_sink,
+                                                tainted_path or path,
+                                            ),
+                                            metadata={
+                                                "witness_path": [edge.to_dict() for edge in path],
+                                                "alternate_path": [
+                                                    edge.to_dict() for edge in tainted_path or ()
+                                                ],
+                                                "frontier": frontier.to_dict()
+                                                if frontier is not None
+                                                else None,
+                                                "expected_sink": sink.key,
+                                                "possible_sink": tainted_sink.key,
+                                                "rtl_view": str(rtl.view),
+                                            },
+                                        )
+                                    )
+                                    failure_emitted = True
+                                    break
+                            continue
+
+                        any_polarity, any_visited = self._find_connectivity_path(
+                            source.key,
+                            sink.key,
+                            known_adjacency,
+                            through=through,
+                            excluded=excluded,
+                        )
+                        if _CONNECTIVITY_SEARCH_LIMIT_SENTINEL in any_visited:
+                            diagnostics.append(
+                                Diagnostic.from_rule(
+                                    "OC6505",
+                                    f"Connectivity requirement {requirement.identifier!r} "
+                                    "exceeded the bounded polarity search limit between "
+                                    f"{source.key} and {sink.key}.",
+                                    provenance=requirement.provenance,
+                                    object=entity,
+                                    property_name="connectivity.transform",
+                                    evidence=self._connectivity_evidence(
+                                        intent.view, requirement, source, sink
+                                    ),
+                                    metadata={"limit": _MAX_CONNECTIVITY_SEARCH_STATES},
+                                )
+                            )
+                            failure_emitted = True
+                            break
+                        if any_polarity is not None and required_parity is not None:
+                            diagnostics.append(
+                                Diagnostic.from_rule(
+                                    "OC6508",
+                                    f"Connectivity requirement {requirement.identifier!r} "
+                                    f"has the wrong inversion polarity between {source.key} "
+                                    f"and {sink.key}.",
+                                    provenance=requirement.provenance,
+                                    object=entity,
+                                    property_name="connectivity.transform",
+                                    evidence=self._connectivity_evidence(
+                                        intent.view, requirement, source, sink, any_polarity
+                                    ),
+                                    metadata={
+                                        "expected_inverted": required_parity,
+                                        "witness_path": [edge.to_dict() for edge in any_polarity],
+                                    },
+                                )
+                            )
+                            failure_emitted = True
+                            break
+
+                        wrong_sink: ConnectivityEndpoint | None = None
+                        wrong_path: tuple[ConnectivityEdge, ...] | None = None
+                        for candidate in ordered_sinks:
+                            if candidate.key == sink.key or candidate.key not in visited:
+                                continue
+                            candidate_path, _ = self._find_connectivity_path(
+                                source.key,
+                                candidate.key,
+                                known_adjacency,
+                                through=through,
+                                excluded=excluded,
+                                required_parity=required_parity,
+                            )
+                            if candidate_path is not None:
+                                wrong_sink, wrong_path = candidate, candidate_path
+                                break
+                        if wrong_sink is not None and wrong_path is not None:
+                            diagnostics.append(
+                                Diagnostic.from_rule(
+                                    "OC6507",
+                                    f"Connectivity requirement {requirement.identifier!r} maps "
+                                    f"source bit {source.key} to {wrong_sink.key}, not expected "
+                                    f"sink bit {sink.key}.",
+                                    provenance=requirement.provenance,
+                                    object=entity,
+                                    property_name="connectivity.bit_mapping",
+                                    evidence=self._connectivity_evidence(
+                                        intent.view, requirement, source, wrong_sink, wrong_path
+                                    ),
+                                    metadata={
+                                        "bit_ordinal": bit_ordinal,
+                                        "expected_sink": sink.key,
+                                        "actual_sink": wrong_sink.key,
+                                        "witness_path": [edge.to_dict() for edge in wrong_path],
+                                    },
+                                )
+                            )
+                            failure_emitted = True
+                            break
+
+                        possible_path, possible_visited = self._find_connectivity_path(
+                            source.key,
+                            sink.key,
+                            possible_adjacency,
+                            through=through,
+                            excluded=excluded,
+                        )
+                        possible_limited = _CONNECTIVITY_SEARCH_LIMIT_SENTINEL in possible_visited
+                        if possible_path is not None or not graph_complete or possible_limited:
+                            frontier = next(
+                                (
+                                    edge
+                                    for edge in possible_path or ()
+                                    if edge.status != FactState.KNOWN
+                                ),
+                                None,
+                            )
+                            reason = (
+                                str(frontier.attributes.get("reason") or frontier.kind)
+                                if frontier is not None
+                                else "the bounded path search reached its state limit"
+                                if possible_limited
+                                else "the RTL connectivity graph has an unrepresented frontier"
+                            )
+                            diagnostics.append(
+                                Diagnostic.from_rule(
+                                    "OC6505",
+                                    f"Connectivity requirement {requirement.identifier!r} "
+                                    f"cannot prove a static path from {source.key} to "
+                                    f"{sink.key}: {reason}.",
+                                    provenance=requirement.provenance,
+                                    object=entity,
+                                    property_name="connectivity.path",
+                                    evidence=self._connectivity_evidence(
+                                        intent.view,
+                                        requirement,
+                                        source,
+                                        sink,
+                                        possible_path or (),
+                                    ),
+                                    metadata={
+                                        "bit_ordinal": bit_ordinal,
+                                        "frontier": frontier.to_dict()
+                                        if frontier is not None
+                                        else None,
+                                    },
+                                )
+                            )
+                        else:
+                            cut = tuple(
+                                sorted(node for node in visited if not known_adjacency.get(node))[
+                                    :32
+                                ]
+                            )
+                            diagnostics.append(
+                                Diagnostic.from_rule(
+                                    "OC6503",
+                                    f"Connectivity requirement {requirement.identifier!r} "
+                                    f"expects {source.key} to reach {sink.key}, but no static "
+                                    "path exists in the supported graph.",
+                                    provenance=requirement.provenance,
+                                    object=entity,
+                                    property_name="connectivity.path",
+                                    evidence=self._connectivity_evidence(
+                                        intent.view, requirement, source, sink
+                                    ),
+                                    metadata={
+                                        "bit_ordinal": bit_ordinal,
+                                        "reachable_cut": list(cut),
+                                        "rtl_view": str(rtl.view),
+                                    },
+                                )
+                            )
+                        failure_emitted = True
+                        break
+                    if failure_emitted:
+                        continue
+        return diagnostics
+
+    @staticmethod
     def _register_component(register: RegisterObservation) -> str:
         return decoded_identifier(
             register.component or register.memory_map or "<unspecified>"
@@ -2345,12 +3311,35 @@ class ComparisonEngine:
         return decoded_identifier(name).strip().casefold()
 
     @staticmethod
-    def _register_scope(register: RegisterObservation) -> tuple[str, ...]:
-        return tuple(
-            decoded_identifier(item).strip().casefold()
-            for item in (register.memory_map, register.address_block)
-            if item and decoded_identifier(item).strip()
+    def _register_scope(
+        view: ViewId,
+        register: RegisterObservation,
+    ) -> tuple[str, ...]:
+        # Software headers generally repeat the component/macro prefix in
+        # memory_map; that is not structural address-map scope.  Keeping them
+        # unscoped lets duplicate hardware registers produce OC6310 instead of
+        # being paired arbitrarily.
+        if _semantic_view_kind(view) == "header":
+            return ()
+
+        raw_register_files = register.attributes.get("register_files", ())
+        register_files = (
+            tuple(raw_register_files)
+            if isinstance(raw_register_files, (list, tuple))
+            and all(isinstance(item, str) for item in raw_register_files)
+            else ()
         )
+        anchor = register.address_block or register.memory_map
+        segments: list[str] = []
+        for item in (anchor, *register_files):
+            if not item:
+                continue
+            segments.extend(
+                normalized
+                for segment in item.split("/")
+                if (normalized := decoded_identifier(segment).strip().casefold())
+            )
+        return tuple(segments)
 
     @classmethod
     def _group_register_entries(
@@ -2398,7 +3387,7 @@ class ComparisonEngine:
         for (component, name), members in sorted(by_base.items()):
             scopes_by_view: dict[ViewId, set[tuple[str, ...]]] = defaultdict(set)
             for view, register in members:
-                scope = cls._register_scope(register)
+                scope = cls._register_scope(view, register)
                 if scope:
                     scopes_by_view[view].add(scope)
             requires_scope = any(len(scopes) > 1 for scopes in scopes_by_view.values())
@@ -2406,22 +3395,26 @@ class ComparisonEngine:
                 groups[(component, name)].extend(members)
                 continue
 
-            scoped_views = {view for view, register in members if cls._register_scope(register)}
+            scoped_views = {
+                view for view, register in members if cls._register_scope(view, register)
+            }
             unscoped_members = tuple(
-                (view, register) for view, register in members if not cls._register_scope(register)
+                (view, register)
+                for view, register in members
+                if not cls._register_scope(view, register)
             )
             unscoped_views = {view for view, _ in unscoped_members}
             distinct_scopes = tuple(
                 sorted(
                     {
-                        cls._register_scope(register)
-                        for _, register in members
-                        if cls._register_scope(register)
+                        cls._register_scope(view, register)
+                        for view, register in members
+                        if cls._register_scope(view, register)
                     }
                 )
             )
             for view, register in members:
-                scope = cls._register_scope(register)
+                scope = cls._register_scope(view, register)
                 identity = "/".join((*scope, name)) if scope else name
                 groups[(component, identity)].append((view, register))
                 if scope:
@@ -3106,7 +4099,10 @@ class ComparisonEngine:
                 usable,
                 key=lambda item: member_rank(item[0], item[1].native_name),
             )
-            del preferred_view
+            preferred_scope = self._register_scope(preferred_view, preferred)
+            contract_address_block = (
+                "/".join(preferred_scope) if preferred_scope else preferred.address_block
+            )
             names: dict[str, str] = {}
             field_groups: dict[str, list[tuple[ViewId, RegisterFieldObservation]]] = defaultdict(
                 list
@@ -3150,7 +4146,7 @@ class ComparisonEngine:
                     component=component,
                     names=names,
                     memory_map=preferred.memory_map,
-                    address_block=preferred.address_block,
+                    address_block=contract_address_block,
                     address_offset=preferred.address_offset,
                     absolute_address=preferred.absolute_address,
                     size_bits=preferred.size_bits,

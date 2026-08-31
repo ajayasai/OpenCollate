@@ -21,7 +21,7 @@ def test_version_uses_argparse_version_action(capsys: pytest.CaptureFixture[str]
     with pytest.raises(SystemExit) as captured:
         main(["--version"])
     assert captured.value.code == 0
-    assert capsys.readouterr().out.strip() == "OpenCollate 0.2.1"
+    assert capsys.readouterr().out.strip() == "OpenCollate 0.3.0"
 
 
 def test_capabilities_text_and_json(capsys: pytest.CaptureFixture[str]) -> None:
@@ -55,7 +55,7 @@ def test_init_is_non_destructive(tmp_path: Path, capsys: pytest.CaptureFixture[s
 
 
 def test_schema_commands_emit_valid_schemas(tmp_path: Path) -> None:
-    for kind in ("report", "contract"):
+    for kind in ("report", "contract", "diff"):
         target = tmp_path / f"{kind}.schema.json"
         assert main(["schema", kind, "--output", str(target)]) == 0
         schema = json.loads(target.read_text(encoding="utf-8"))

@@ -37,8 +37,9 @@ Code families are intentionally separated:
 | OC6001–OC6003 | Static SDC object and clock consistency |
 | OC6101–OC6104 | Static UPF references and object integrity |
 | OC6201–OC6202 | IP-XACT interface port maps |
-| OC6301–OC6309 | Hardware/software register maps and fields |
+| OC6301–OC6310 | Hardware/software register maps and fields |
 | OC6401 | DEF endpoint resolution against elaborated RTL |
+| OC6501–OC6509 | Bounded declarative static connectivity |
 | OC9001 and above | Internal integrity failures |
 
 Use `capabilities` to inspect the installed format/output surface and `explain` for a rule's
@@ -78,11 +79,17 @@ findings remain in complete machine reports and summary counts.
 Avoid broad code-only waivers. If a source edit changes the semantic fingerprint, review the
 waiver again.
 
+For Git-native regression review, compare the semantic content behind a fingerprint rather than
+using a waiver as a baseline. See [baseline review](baseline-review.md).
+
 ## SARIF
 
 SARIF maps diagnostic code to `ruleId`, message to the result message, evidence spans to
 locations, and the OpenCollate fingerprint to a partial fingerprint. Downstream annotation is a
 presentation; the OpenCollate JSON report remains the complete audit record.
+
+Report-diff SARIF also uses `baselineState` to classify new, updated, unchanged, and absent
+findings. It never changes the current report's severity or exit trust state.
 
 ## Completeness before mismatch
 

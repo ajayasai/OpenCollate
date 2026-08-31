@@ -9,17 +9,34 @@ import sys
 import tempfile
 from collections.abc import Mapping
 from dataclasses import replace
-from importlib import import_module, resources
+from importlib import import_module, metadata, resources
 from pathlib import Path
 from typing import Any
 
 from opencollate import __version__
+from opencollate.baseline import (
+    MAX_REPORT_JSON_BYTES,
+    MAX_REPORT_JSON_NESTING,
+    BaselineReportError,
+    FindingState,
+    ReportDiff,
+    diff_reports,
+)
 from opencollate.catalog import get_rule, iter_rules
 from opencollate.config import ConfigError, ProjectConfig, SourceConfig, load_config
 from opencollate.demo import write_demo
 from opencollate.engine import ComparisonEngine, EngineResult, write_contract
 from opencollate.model import ViewObservation
-from opencollate.reporters import render_json, render_markdown, render_sarif, render_text
+from opencollate.reporters import (
+    render_diff_json,
+    render_diff_markdown,
+    render_diff_sarif,
+    render_diff_text,
+    render_json,
+    render_markdown,
+    render_sarif,
+    render_text,
+)
 
 
 class CliError(RuntimeError):
@@ -64,6 +81,40 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--verbose", action="store_true", help="include diagnostic fingerprints")
     check.set_defaults(handler=_command_check)
 
+    review = subparsers.add_parser(
+        "review", help="compare a live check against a committed report baseline"
+    )
+    _config_argument(review)
+    review.add_argument("--baseline", required=True, help="prior OpenCollate JSON report")
+    review.add_argument("--write-report", help="write the complete current JSON report")
+    review.add_argument(
+        "--fail-on",
+        choices=("new", "changed", "all", "none"),
+        default="changed",
+        help="gate new; new-or-changed; all current; or no findings (default: changed)",
+    )
+    review.add_argument("--format", choices=("text", "json", "sarif", "markdown"), default="text")
+    review.add_argument("-o", "--output", help="write the diff artifact instead of stdout")
+    review.add_argument("--include-unchanged", action="store_true")
+    review.add_argument("--deny-warnings", action="store_true")
+    review.set_defaults(handler=_command_review)
+
+    report = subparsers.add_parser("report", help="inspect and compare saved reports")
+    report_subparsers = report.add_subparsers(dest="report_command", required=True)
+    report_diff = report_subparsers.add_parser(
+        "diff", help="classify new, changed, unchanged, and resolved findings"
+    )
+    report_diff.add_argument("baseline", help="prior OpenCollate JSON report")
+    report_diff.add_argument("current", help="current OpenCollate JSON report")
+    report_diff.add_argument(
+        "--format", choices=("text", "json", "sarif", "markdown"), default="text"
+    )
+    report_diff.add_argument("-o", "--output")
+    report_diff.add_argument("--include-unchanged", action="store_true")
+    report_diff.add_argument("--fail-on", choices=("new", "changed", "all", "none"), default="none")
+    report_diff.add_argument("--deny-warnings", action="store_true")
+    report_diff.set_defaults(handler=_command_report_diff)
+
     demo = subparsers.add_parser("demo", help="run a self-contained synthetic demonstration")
     demo.add_argument("--output-dir", help="keep generated sources in this directory")
     demo.add_argument(
@@ -93,7 +144,7 @@ def build_parser() -> argparse.ArgumentParser:
     explain.set_defaults(handler=_command_explain)
 
     schema = subparsers.add_parser("schema", help="print a bundled JSON Schema")
-    schema.add_argument("kind", nargs="?", choices=("report", "contract"), default="report")
+    schema.add_argument("kind", nargs="?", choices=("report", "contract", "diff"), default="report")
     schema.add_argument("-o", "--output")
     schema.set_defaults(handler=_command_schema)
 
@@ -114,10 +165,43 @@ def _selected_config(args: argparse.Namespace) -> Path:
     return Path(optional or positional or "opencollate.toml")
 
 
+def _reject_inapplicable_source_fields(
+    source: SourceConfig,
+    *,
+    allowed: frozenset[str],
+) -> None:
+    configured = {
+        "include_dirs": bool(source.include_dirs),
+        "defines": bool(source.defines),
+        "profile": source.profile is not None,
+        "columns": bool(source.columns),
+    }
+    inapplicable = sorted(
+        name for name, present in configured.items() if present and name not in allowed
+    )
+    if inapplicable:
+        raise CliError(
+            f"{source.view}: source field(s) are not supported for this format: "
+            + ", ".join(inapplicable)
+        )
+
+
 def _parse_source(source: SourceConfig) -> ViewObservation:
     paths = source.expand_files()
     kind = source.view.kind.lower()
     options = dict(source.options)
+    generic_fields = (
+        frozenset(("include_dirs", "defines"))
+        if kind in {"rtl", "sv", "systemverilog", "verilog"}
+        else frozenset(("defines",))
+        if kind in {"systemrdl", "system_rdl", "system-rdl", "rdl"}
+        else frozenset(("profile", "columns"))
+        if kind in {"csv", "pinmap", "pin_map"}
+        else frozenset(("columns",))
+        if kind in {"connectivity", "connectivity_spec", "connectivity-spec", "conn"}
+        else frozenset()
+    )
+    _reject_inapplicable_source_fields(source, allowed=generic_fields)
     if kind in {"rtl", "sv", "systemverilog", "verilog"}:
         _reject_unknown_source_options(source, options, {"top"})
         _validate_top_option(source, options)
@@ -127,6 +211,18 @@ def _parse_source(source: SourceConfig) -> ViewObservation:
             paths,
             view_id=source.view,
             include_dirs=source.include_dirs,
+            defines=source.defines,
+            **options,
+        )
+    if kind in {"systemrdl", "system_rdl", "system-rdl", "rdl"}:
+        _reject_unknown_source_options(source, options, {"top", "component_name"})
+        _validate_string_option(source, options, "top", nonempty=True)
+        _validate_string_option(source, options, "component_name", nonempty=True)
+        from opencollate.parsers.systemrdl import parse_systemrdl
+
+        return parse_systemrdl(
+            paths,
+            view_id=source.view,
             defines=source.defines,
             **options,
         )
@@ -145,9 +241,30 @@ def _parse_source(source: SourceConfig) -> ViewObservation:
         _validate_string_option(source, options, "component_name")
         _validate_string_option(source, options, "delimiter", length=1)
         _validate_csv_delimiter(source, options)
+        if source.profile is not None:
+            profile = source.profile.strip().casefold().replace("-", "_")
+            if profile not in {"auto", "component_pins", "package_map"}:
+                raise CliError(
+                    f"{source.view}: profile must be auto, component_pins, or package_map"
+                )
+            options["profile"] = profile
         from opencollate.parsers.csvpins import parse_pin_csv
 
         return parse_pin_csv(
+            paths,
+            view_id=source.view,
+            column_map={
+                source_name: canonical for canonical, source_name in source.columns.items()
+            },
+            **options,
+        )
+    if kind in {"connectivity", "connectivity_spec", "connectivity-spec", "conn"}:
+        _reject_unknown_source_options(source, options, {"delimiter"})
+        _validate_string_option(source, options, "delimiter", length=1)
+        _validate_csv_delimiter(source, options)
+        from opencollate.parsers.connectivity import parse_connectivity_csv
+
+        return parse_connectivity_csv(
             paths,
             view_id=source.view,
             column_map={
@@ -168,7 +285,13 @@ def _parse_source(source: SourceConfig) -> ViewObservation:
         return parse_sdc(paths, view_id=source.view)
     if kind == "upf":
         _reject_unknown_source_options(source, options, {"component_name"})
-        _validate_string_option(source, options, "component_name", nonempty=True)
+        _validate_string_option(
+            source,
+            options,
+            "component_name",
+            nonempty=True,
+            maximum_length=16_384,
+        )
         from opencollate.parsers.upf import parse_upf
 
         return parse_upf(paths, view_id=source.view, **options)
@@ -195,6 +318,7 @@ def _parse_source(source: SourceConfig) -> ViewObservation:
         supported = {"top_cells", "pin_text_layers", "pin_text_types"}
         _reject_unknown_source_options(source, options, supported)
         _validate_name_or_name_array_option(source, options, "top_cells")
+        _validate_gds_top_cells(source, options)
         _validate_integer_or_integer_array_option(source, options, "pin_text_layers")
         _validate_integer_or_integer_array_option(source, options, "pin_text_types")
         from opencollate.parsers.gds import parse_gds
@@ -259,12 +383,40 @@ def _validate_integer_or_integer_array_option(
         raise CliError(f"{source.view}: source option {name!r} values must be between 0 and 32767")
 
 
+def _validate_gds_top_cells(source: SourceConfig, options: dict[str, Any]) -> None:
+    if "top_cells" not in options:
+        return
+    raw = options["top_cells"]
+    names = [raw] if isinstance(raw, str) else raw
+    # The generic validator has already established this shape.
+    if not isinstance(names, list) or not all(isinstance(item, str) for item in names):
+        return
+    seen: set[str] = set()
+    for name in names:
+        try:
+            encoded = name.encode("ascii")
+        except UnicodeEncodeError as error:
+            raise CliError(
+                f"{source.view}: source option 'top_cells' names must be 7-bit ASCII"
+            ) from error
+        if name in seen:
+            raise CliError(
+                f"{source.view}: source option 'top_cells' contains duplicate name {name!r}"
+            )
+        if len(encoded) > 16_384:
+            raise CliError(
+                f"{source.view}: source option 'top_cells' names must not exceed 16,384 bytes"
+            )
+        seen.add(name)
+
+
 def _validate_string_option(
     source: SourceConfig,
     options: dict[str, Any],
     name: str,
     *,
     length: int | None = None,
+    maximum_length: int | None = None,
     nonempty: bool = False,
 ) -> None:
     if name not in options:
@@ -277,6 +429,10 @@ def _validate_string_option(
     if length is not None and len(value) != length:
         qualifier = "exactly one character" if length == 1 else f"exactly {length} characters"
         raise CliError(f"{source.view}: source option {name!r} must be {qualifier}")
+    if maximum_length is not None and len(value) > maximum_length:
+        raise CliError(
+            f"{source.view}: source option {name!r} must not exceed {maximum_length:,} characters"
+        )
 
 
 def _validate_positive_integer_option(
@@ -355,6 +511,144 @@ def _write_text_file(target: Path, text: str, *, description: str) -> None:
         raise CliError(f"cannot write {description} {target}: {error}") from error
 
 
+def _json_nesting_overflow(text: str) -> tuple[int, int] | None:
+    depth = 0
+    line = 1
+    column = 1
+    in_string = False
+    escaped = False
+    for character in text:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+        elif character == '"':
+            in_string = True
+        elif character in "[{":
+            depth += 1
+            if depth > MAX_REPORT_JSON_NESTING:
+                return line, column
+        elif character in "]}" and depth:
+            depth -= 1
+
+        if character == "\n":
+            line += 1
+            column = 1
+        else:
+            column += 1
+    return None
+
+
+def _read_json_report(path: str | Path, *, label: str) -> dict[str, Any]:
+    source = Path(path).expanduser().resolve()
+    try:
+        with source.open("rb") as stream:
+            data = stream.read(MAX_REPORT_JSON_BYTES + 1)
+    except OSError as error:
+        raise CliError(f"cannot read {label} report {source}: {error}") from error
+    if len(data) > MAX_REPORT_JSON_BYTES:
+        raise CliError(
+            f"cannot read {label} report {source}: file exceeds the "
+            f"{MAX_REPORT_JSON_BYTES:,}-byte limit"
+        )
+    try:
+        text = data.decode("utf-8")
+    except UnicodeError as error:
+        raise CliError(f"cannot decode {label} report {source} as UTF-8: {error}") from error
+
+    overflow = _json_nesting_overflow(text)
+    if overflow is not None:
+        line, column = overflow
+        raise CliError(
+            f"cannot parse {label} report {source}: line {line}, column {column}: "
+            f"JSON nesting exceeds the limit of {MAX_REPORT_JSON_NESTING}"
+        )
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError as error:
+        raise CliError(
+            f"cannot parse {label} report {source}: line {error.lineno}, column {error.colno}: "
+            f"{error.msg}"
+        ) from error
+    except RecursionError as error:
+        raise CliError(
+            f"cannot parse {label} report {source}: JSON nesting exceeds the supported limit"
+        ) from error
+    except ValueError as error:
+        raise CliError(
+            f"cannot parse {label} report {source}: invalid JSON value: {error}"
+        ) from error
+    if not isinstance(value, Mapping):
+        raise CliError(f"{label} report {source} must contain a JSON object")
+    return {str(key): item for key, item in value.items()}
+
+
+def _paths_alias(first: str | Path, second: str | Path) -> bool:
+    first_path = Path(first).expanduser().resolve()
+    second_path = Path(second).expanduser().resolve()
+    if first_path == second_path:
+        return True
+    try:
+        return first_path.samefile(second_path)
+    except OSError:
+        return False
+
+
+def _reject_path_alias(
+    first: str | Path,
+    first_label: str,
+    second: str | Path | None,
+    second_label: str,
+) -> None:
+    if second is not None and _paths_alias(first, second):
+        raise CliError(f"{first_label} and {second_label} must not alias the same file")
+
+
+def _saved_report_exit_code(report: Mapping[str, Any], *, label: str) -> int:
+    value = report.get("exit_code")
+    if type(value) is not int or value not in {0, 1, 2}:
+        raise BaselineReportError(f"{label} report exit_code must be 0, 1, or 2")
+    return value
+
+
+def _render_diff(diff: ReportDiff, format_name: str, *, include_unchanged: bool = False) -> str:
+    if format_name == "json":
+        return render_diff_json(diff)
+    if format_name == "sarif":
+        return render_diff_sarif(diff, include_unchanged=include_unchanged)
+    if format_name == "markdown":
+        return render_diff_markdown(diff, include_unchanged=include_unchanged)
+    return render_diff_text(diff, include_unchanged=include_unchanged)
+
+
+def _diff_exit_code(
+    diff: ReportDiff,
+    *,
+    fail_on: str,
+    deny_warnings: bool,
+    current_exit_code: object | None = None,
+) -> int:
+    if current_exit_code == 2 or diff.summary.current_fatal:
+        return 2
+    states = {
+        "none": frozenset(),
+        "new": frozenset((FindingState.NEW,)),
+        "changed": frozenset((FindingState.NEW, FindingState.CHANGED)),
+        "all": frozenset((FindingState.NEW, FindingState.CHANGED, FindingState.UNCHANGED)),
+    }[fail_on]
+    for item in diff.findings:
+        current = item.current
+        if item.state not in states or current is None or item.current_suppressed:
+            continue
+        severity = current.get("severity")
+        if severity in {"fatal", "error"} or (deny_warnings and severity == "warning"):
+            return 1
+    return 0
+
+
 def _command_check(args: argparse.Namespace) -> int:
     config = load_config(_selected_config(args))
     if args.deny_warnings and not config.policy.deny_warnings:
@@ -362,6 +656,55 @@ def _command_check(args: argparse.Namespace) -> int:
     result = _run(config)
     _emit(_render(result, args.format, verbose=args.verbose), args.output)
     return result.exit_code
+
+
+def _command_review(args: argparse.Namespace) -> int:
+    _reject_path_alias(args.baseline, "baseline report", args.write_report, "current report output")
+    _reject_path_alias(args.baseline, "baseline report", args.output, "diff output")
+    if args.write_report is not None:
+        _reject_path_alias(args.write_report, "current report output", args.output, "diff output")
+    baseline = _read_json_report(args.baseline, label="baseline")
+    config = load_config(_selected_config(args))
+    if args.deny_warnings and not config.policy.deny_warnings:
+        config = replace(config, policy=replace(config.policy, deny_warnings=True))
+    result = _run(config)
+    current = result.to_dict()
+    if args.write_report:
+        _write_text_file(
+            Path(args.write_report).expanduser().resolve(),
+            render_json(result),
+            description="current report",
+        )
+    diff = diff_reports(baseline, current)
+    _emit(
+        _render_diff(diff, args.format, include_unchanged=args.include_unchanged),
+        args.output,
+    )
+    return _diff_exit_code(
+        diff,
+        fail_on=args.fail_on,
+        deny_warnings=config.policy.deny_warnings,
+        current_exit_code=result.exit_code,
+    )
+
+
+def _command_report_diff(args: argparse.Namespace) -> int:
+    _reject_path_alias(args.baseline, "baseline report", args.output, "diff output")
+    _reject_path_alias(args.current, "current report", args.output, "diff output")
+    baseline = _read_json_report(args.baseline, label="baseline")
+    current = _read_json_report(args.current, label="current")
+    current_exit_code = _saved_report_exit_code(current, label="current")
+    diff = diff_reports(baseline, current)
+    _emit(
+        _render_diff(diff, args.format, include_unchanged=args.include_unchanged),
+        args.output,
+    )
+    return _diff_exit_code(
+        diff,
+        fail_on=args.fail_on,
+        deny_warnings=args.deny_warnings,
+        current_exit_code=current_exit_code,
+    )
 
 
 def _command_demo(args: argparse.Namespace) -> int:
@@ -420,6 +763,16 @@ profile = "package_map"
 # macro_prefix = "UART0"
 # default_register_width = 32
 #
+# [sources.systemrdl.registers]
+# files = ["registers/**/*.rdl"]
+# top = "soc_registers"
+# component_name = "soc_top"
+#
+# [sources.connectivity.intent]
+# files = ["connectivity/requirements.csv"]
+# # Required columns: id, source, sink, expect.
+# # Optional columns: transform, through, exclude, description.
+#
 # [sources.cdl.extracted]
 # files = ["netlist/**/*.cdl"]
 #
@@ -458,6 +811,10 @@ def _capability_data() -> dict[str, Any]:
         slang_version = getattr(pyslang, "__version__", "installed")
     except ImportError:  # pragma: no cover - package metadata requires pyslang
         slang_version = None
+    try:
+        systemrdl_version = metadata.version("systemrdl-compiler")
+    except metadata.PackageNotFoundError:  # pragma: no cover - required package metadata
+        systemrdl_version = None
     return {
         "tool": {"name": "OpenCollate", "version": __version__},
         "formats": {
@@ -479,8 +836,24 @@ def _capability_data() -> dict[str, Any]:
                 "status": "supported",
                 "backend": "native-structural-streaming",
             },
+            "systemrdl_2_0": {
+                "status": "supported",
+                "backend": "systemrdl-compiler",
+                "version": systemrdl_version,
+            },
+            "connectivity_csv": {
+                "status": "supported",
+                "backend": "native-bounded-static",
+            },
         },
-        "outputs": ["text", "json", "sarif", "markdown", "contract-json"],
+        "outputs": [
+            "text",
+            "json",
+            "sarif",
+            "markdown",
+            "contract-json",
+            "report-diff-json",
+        ],
         "rules": len(list(iter_rules())),
     }
 
@@ -548,7 +921,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     try:
         return int(handler(args))
-    except (ConfigError, CliError, FileExistsError) as error:
+    except (BaselineReportError, ConfigError, CliError, FileExistsError) as error:
         code = getattr(error, "code", "OC1001")
         print(f"{code}: {error}", file=sys.stderr)
         return 2

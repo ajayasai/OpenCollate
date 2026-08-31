@@ -41,6 +41,14 @@ component_name = "uart"
 macro_prefix = "UART"
 default_register_width = 32
 
+[sources.systemrdl.registers]
+files = ["registers/uart.rdl"]
+top = "uart_registers"
+component_name = "uart"
+
+[sources.connectivity.intent]
+files = ["connectivity/requirements.csv"]
+
 [sources.cdl.netlist]
 files = ["netlist/uart.cdl"]
 

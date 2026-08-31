@@ -77,6 +77,7 @@ for _canonical, _names in {
 _RANGE = re.compile(r"^[\[<(]?\s*(-?\d+)\s*:\s*(-?\d+)\s*[\])>]?$")
 _SIGNAL_RANGE = re.compile(r"^(.*?)[\[<]\s*(-?\d+)\s*:\s*(-?\d+)\s*[\]>]$")
 _SIGNAL_BIT = re.compile(r"^(.*?)[\[<]\s*(-?\d+)\s*[\]>]$")
+_PROFILES = frozenset(("auto", "component_pins", "package_map"))
 
 
 @dataclass(frozen=True, slots=True)
@@ -348,6 +349,7 @@ def parse_pin_csv(
     view_id: ViewId | str | None = None,
     view_name: str = "default",
     component_name: str | None = None,
+    profile: str | None = None,
     delimiter: str | None = None,
     column_map: Mapping[str, str] | None = None,
 ) -> ViewObservation:
@@ -360,6 +362,11 @@ def parse_pin_csv(
 
     source_paths = coerce_paths(paths)
     view = coerce_view(view_id, kind="csv", name=view_name)
+    selected_profile = (profile or "auto").strip().casefold().replace("-", "_")
+    if selected_profile not in _PROFILES:
+        raise ValueError(
+            f"CSV profile must be auto, component_pins, or package_map, got {profile!r}"
+        )
     custom_columns = column_map or {}
     diagnostics: list[Diagnostic] = []
     port_rows: list[_PortRow] = []
@@ -433,6 +440,23 @@ def parse_pin_csv(
             complete = False
             tainted.add("*")
             continue
+        if selected_profile == "package_map":
+            missing_mapping_columns = sorted(
+                column for column in ("die_pad", "package_ball") if column not in resolved
+            )
+            if missing_mapping_columns:
+                diagnostics.append(
+                    parser_diagnostic(
+                        "OC5006",
+                        Severity.ERROR,
+                        f"Package-map CSV {path} is missing required columns: "
+                        + ", ".join(missing_mapping_columns),
+                        location=Provenance(str(path), view=view),
+                    )
+                )
+                complete = False
+                tainted.add("*")
+                continue
 
         data_rows, csv_error = _read_rows(reader)
         for row_line, raw_row in data_rows:
@@ -476,17 +500,18 @@ def parse_pin_csv(
                 )
                 complete = False
                 tainted.add(row_component)
-                mappings.append(
-                    PinMappingObservation(
-                        die_pad=values.get("die_pad") or None,
-                        package_ball=values.get("package_ball") or None,
-                        signal=None,
-                        component=row_component,
-                        provenance=location,
-                        attributes={"row": raw_values},
-                        status=FactState.TAINTED,
+                if selected_profile != "component_pins":
+                    mappings.append(
+                        PinMappingObservation(
+                            die_pad=values.get("die_pad") or None,
+                            package_ball=values.get("package_ball") or None,
+                            signal=None,
+                            component=row_component,
+                            provenance=location,
+                            attributes={"row": raw_values},
+                            status=FactState.TAINTED,
+                        )
                     )
-                )
                 continue
 
             direction_text = values.get("direction")
@@ -614,26 +639,27 @@ def parse_pin_csv(
                     attributes={**values, "row": raw_values},
                 )
             )
-            mappings.append(
-                PinMappingObservation(
-                    die_pad=values.get("die_pad") or None,
-                    package_ball=values.get("package_ball") or None,
-                    signal=signal,
-                    component=row_component,
-                    direction=direction,
-                    role=role,
-                    provenance=location,
-                    attributes={"domain": values.get("domain"), "row": raw_values},
-                    status=(
-                        FactState.UNSUPPORTED
-                        if direction_state == FactState.UNSUPPORTED
-                        or role_state == FactState.UNSUPPORTED
-                        else FactState.TAINTED
-                        if shape_state != FactState.KNOWN
-                        else FactState.KNOWN
-                    ),
+            if selected_profile != "component_pins":
+                mappings.append(
+                    PinMappingObservation(
+                        die_pad=values.get("die_pad") or None,
+                        package_ball=values.get("package_ball") or None,
+                        signal=signal,
+                        component=row_component,
+                        direction=direction,
+                        role=role,
+                        provenance=location,
+                        attributes={"domain": values.get("domain"), "row": raw_values},
+                        status=(
+                            FactState.UNSUPPORTED
+                            if direction_state == FactState.UNSUPPORTED
+                            or role_state == FactState.UNSUPPORTED
+                            else FactState.TAINTED
+                            if shape_state != FactState.KNOWN
+                            else FactState.KNOWN
+                        ),
+                    )
                 )
-            )
         if csv_error is not None:
             diagnostics.append(
                 parser_diagnostic(
@@ -663,6 +689,7 @@ def parse_pin_csv(
             "parser": "stdlib-csv",
             "source_files": [str(path) for path in source_paths],
             "dialects": dialects,
+            "profile": selected_profile,
         },
     )
 

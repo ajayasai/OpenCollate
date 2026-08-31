@@ -1,0 +1,2 @@
+id,source,sink,expect,transform,description
+UART_DATA,uart/data_i[7:0],uart/data_o[7:0],reachable,identity,Transmit data bus remains bit-aligned

@@ -42,6 +42,7 @@ class SourceConfig:
         """
 
         expanded: list[Path] = []
+        seen: set[str] = set()
         for pattern in self.files:
             text = str(pattern)
             has_magic = glob.has_magic(text)
@@ -59,11 +60,18 @@ class SourceConfig:
                         code="OC1002",
                     )
                 matches = [pattern]
-            expanded.extend(matches)
-        unique = {str(item): item for item in expanded}
-        return tuple(
-            sorted(unique.values(), key=lambda item: (item.as_posix().casefold(), item.as_posix()))
-        )
+            for item in sorted(
+                matches,
+                key=lambda candidate: (
+                    candidate.as_posix().casefold(),
+                    candidate.as_posix(),
+                ),
+            ):
+                key = str(item)
+                if key not in seen:
+                    seen.add(key)
+                    expanded.append(item)
+        return tuple(expanded)
 
 
 @dataclass(frozen=True, slots=True)
@@ -237,9 +245,12 @@ def _parse_defines(value: Any, where: str) -> dict[str, str | None]:
     if isinstance(value, Mapping):
         result: dict[str, str | None] = {}
         for key, item in value.items():
+            name = str(key).strip()
+            if not name:
+                raise ConfigError(f"{where} contains an empty define")
             if item is not None and not isinstance(item, (str, int, float, bool)):
                 raise ConfigError(f"{where}.{key} must be a scalar")
-            result[str(key)] = None if item is None else str(item)
+            result[name] = None if item is None else str(item)
         return result
     result = {}
     for item in _as_string_list(value, where):
@@ -570,13 +581,13 @@ def load_contract(path: str | Path) -> DesignContract:
         raise ConfigError(f"contract file does not exist: {contract_path}", code="OC1002")
     try:
         data = json.loads(contract_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeError, ValueError, RecursionError) as exc:
         raise ConfigError(f"invalid contract JSON in {contract_path}: {exc}") from exc
     if not isinstance(data, Mapping):
         raise ConfigError("contract root must be a JSON object")
     try:
         return DesignContract.from_dict(data)
-    except (KeyError, TypeError, ValueError) as exc:
+    except (KeyError, TypeError, ValueError, RecursionError) as exc:
         raise ConfigError(f"invalid contract schema in {contract_path}: {exc}") from exc
 
 

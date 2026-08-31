@@ -32,3 +32,4 @@ Thumbs.db
 # OpenCollate output is reproducible and should not be committed by default.
 .opencollate/
 opencollate-report.*
+benchmark-results.json

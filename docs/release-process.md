@@ -2,13 +2,14 @@
 
 This checklist is for maintainers.
 
-1. Confirm CI, security, conformance, and nightly jobs are green.
+1. Confirm CI, security, conformance, optimized-Python, and nightly benchmark jobs are green.
 2. Audit runtime dependency and fixture licenses.
 3. Update `CHANGELOG.md`, `ROADMAP.md`, version metadata, and compatibility tables.
 4. Build wheel and sdist from a clean checkout.
 5. Run `twine check` and inspect distribution contents.
 6. Install the wheel in clean Linux and Windows environments.
-7. Run `opencollate demo` and the committed UART example from the installed wheel.
+7. Run `opencollate demo`, the committed UART example, report diffing, and the public benchmark
+   conformance oracles from the installed wheel.
 8. Generate the SPDX SBOM from a clean target installation of the built wheel and its runtime
    dependencies, not from the distribution directory alone.
 9. Verify the SBOM names OpenCollate at the release version, inventories every declared runtime

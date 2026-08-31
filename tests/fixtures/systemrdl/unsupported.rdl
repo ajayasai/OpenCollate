@@ -1,0 +1,17 @@
+addrmap unsupported_top {
+    reg {
+        regwidth = 8;
+        field {
+            sw = rw;
+            hw = rw;
+            reset = 0;
+            onwrite = woclr;
+        } VALUE[7:0];
+    } CTRL @ 0x0;
+
+    reg {
+        regwidth = 8;
+        field { sw = r; hw = w; } READ_VIEW[7:0];
+        field { sw = w; hw = r; } WRITE_VIEW[7:0];
+    } ALIASED_LAYOUT @ 0x4;
+};

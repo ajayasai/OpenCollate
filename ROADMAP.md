@@ -25,7 +25,17 @@ real designs, contributor capacity, parser licensing, and standards access.
 - Cross-view object reference, clock, IP-XACT interface, register-map, and DEF endpoint rule families.
 - An eleven-view synthetic UART example and explicit parser security/unknown-state documentation.
 
-## 0.3 — Physical and conformance depth
+## 0.3 — Reviewable conformance Beta (delivered)
+
+- SystemRDL structural register import and three-way IP-XACT/SystemRDL/C-header consistency.
+- Declarative, bounded static RTL connectivity intent with witnesses and explicit inconclusive
+  results at unsupported or tainted frontiers.
+- Git-native baseline review and deterministic report diffing with a strict public schema.
+- Schema-validated, oracle-backed public benchmarks with nightly reproducibility checks.
+- Enforced CSV source profiles, adversarial/property tests, and optimized-Python CI.
+- A thirteen-view synthetic UART example and a 74-rule runtime catalog.
+
+## 0.4 — Physical and conformance depth
 
 - Broader public GDSII hierarchy and text-label conformance fixtures plus performance baselines;
   geometry materialization and physical verification remain out of scope.
@@ -34,7 +44,7 @@ real designs, contributor capacity, parser licensing, and standards access.
 - Differential-pair, polarity, and voltage-domain consistency rules.
 - Fuzzing, adversarial corpus growth, and reproducible parser performance baselines.
 
-## 0.4 — Contract maturity
+## 0.5 — Contract maturity
 
 - Versioned schema migrations for frozen contracts and reports.
 - Wider register-description inputs and reserved-bit policies.

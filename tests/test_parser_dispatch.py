@@ -38,6 +38,9 @@ from opencollate.parsers.base import (
         ("design-exchange-format", "def"),
         ("gdsii", "gds"),
         ("stream", "gds"),
+        ("rdl", "systemrdl"),
+        ("system-rdl", "systemrdl"),
+        ("conn", "connectivity"),
     ],
 )
 def test_format_aliases(alias: str, expected: str) -> None:
@@ -58,6 +61,8 @@ def test_format_inference_rejects_unknown_and_mixed_extensions() -> None:
     assert infer_format((Path("placed.def"),)) == "def"
     assert infer_format((Path("chip.gds"),)) == "gds"
     assert infer_format((Path("chip.gdsii"),)) == "gds"
+    assert infer_format((Path("registers.rdl"),)) == "systemrdl"
+    assert infer_format((Path("intent.occonn"),)) == "connectivity"
     with pytest.raises(UnsupportedFormatError, match="cannot infer"):
         infer_format((Path("chip.oas"),))
     with pytest.raises(UnsupportedFormatError, match="cannot mix"):
@@ -67,6 +72,7 @@ def test_format_inference_rejects_unknown_and_mixed_extensions() -> None:
 def test_registered_parser_inventory_is_stable() -> None:
     assert registered_formats() == (
         "cdl",
+        "connectivity",
         "csv",
         "def",
         "gds",
@@ -75,10 +81,13 @@ def test_registered_parser_inventory_is_stable() -> None:
         "lef",
         "liberty",
         "sdc",
+        "systemrdl",
         "upf",
         "verilog",
     )
     assert get_parser("sv").format_name == "verilog"
+    assert get_parser("rdl").format_name == "systemrdl"
+    assert get_parser("conn").format_name == "connectivity"
 
 
 def test_dispatch_supports_explicit_and_inferred_call_styles(tmp_path: Path) -> None:
@@ -146,6 +155,11 @@ def test_read_source_missing_and_non_utf8_are_tainted(tmp_path: Path) -> None:
     assert decoded.tainted
     assert decoded.encoding == "latin-1"
     assert decoded.diagnostics[0].code == "OC1104"
+
+    over_limit = read_source(legacy, ViewId("csv"), max_bytes=4)
+    assert over_limit.tainted
+    assert over_limit.encoding == "over-limit"
+    assert over_limit.diagnostics[0].code == "OC1101"
 
 
 def test_unavailable_view_is_explicitly_unsupported() -> None:

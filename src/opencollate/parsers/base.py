@@ -138,10 +138,28 @@ def infer_role_from_name(name: str) -> tuple[PortRole, FactState]:
     return PortRole.UNKNOWN, FactState.UNKNOWN
 
 
-def read_source(path: Pathish, view: ViewId) -> SourceText:
+def read_source(
+    path: Pathish,
+    view: ViewId,
+    *,
+    max_bytes: int | None = None,
+) -> SourceText:
+    """Read one text source, optionally through a hard byte ceiling.
+
+    The bounded form reads at most one byte beyond the ceiling, so a file that
+    changes between metadata inspection and opening cannot bypass a parser's
+    advertised resource limit.
+    """
+
     source_path = Path(path)
     try:
-        data = source_path.read_bytes()
+        if max_bytes is None:
+            data = source_path.read_bytes()
+        else:
+            if max_bytes < 1:
+                raise ValueError("max_bytes must be positive")
+            with source_path.open("rb") as handle:
+                data = handle.read(max_bytes + 1)
     except OSError as error:
         diagnostic = parser_diagnostic(
             "OC1002",
@@ -150,6 +168,15 @@ def read_source(path: Pathish, view: ViewId) -> SourceText:
             location=provenance(source_path, view),
         )
         return SourceText(source_path, "", "unreadable", (diagnostic,), True)
+
+    if max_bytes is not None and len(data) > max_bytes:
+        diagnostic = parser_diagnostic(
+            "OC1101",
+            Severity.FATAL,
+            f"Cannot read {source_path}: source exceeds the {max_bytes:,}-byte limit",
+            location=provenance(source_path, view),
+        )
+        return SourceText(source_path, "", "over-limit", (diagnostic,), True)
 
     try:
         return SourceText(source_path, data.decode("utf-8-sig"), "utf-8-sig")

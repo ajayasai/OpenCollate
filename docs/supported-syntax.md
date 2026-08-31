@@ -1,6 +1,6 @@
 # Supported syntax
 
-This document defines the OpenCollate 0.2.1 Beta parsing boundary. “Supported” means the
+This document defines the OpenCollate 0.3.0 Beta parsing boundary. “Supported” means the
 construct produces typed observations used by one or more rules. “Tolerated” means a parser can
 skip the construct without losing structural synchronization. Neither word implies complete
 language implementation or native-tool equivalence.
@@ -33,6 +33,9 @@ Supported:
 - Include directories, preprocessor defines, and one or more explicit top names.
 - Escaped identifiers and source spans.
 - Simple scalar-output continuous assignments for bounded Boolean comparison with Liberty.
+- A bit-level static connectivity graph for transparent continuous assignments, exact net
+  aliases, `buf`/`not` and `tran`/`rtran` primitives, hierarchy port bindings, constant
+  ranges/element selects, concatenation, order reversal, and bitwise inversion.
 
 Unsupported or inconclusive:
 
@@ -40,6 +43,12 @@ Unsupported or inconclusive:
 - Shapes whose dimensions cannot be evaluated in the selected elaboration context.
 - Arbitrary procedural, sequential, temporal, or behavioral equivalence.
 - Simulation semantics, assertions, timing checks, synthesis, and formal proof.
+
+Procedural logic, dynamic selections, arithmetic/data transforms, width-changing conversions, and
+other non-transparent cones form a tainted connectivity frontier. They can make a connectivity
+requirement inconclusive but can never prove a required or forbidden path. Static connectivity is
+bounded to 250,000 endpoints, 1,000,000 edges, 4,096 bits per flattened vector, and a 16,384-edge
+cross product at one unsupported frontier.
 
 Parser or elaboration errors taint dependent observations. OpenCollate does not fall back to a
 regular-expression parser.
@@ -119,6 +128,73 @@ Security and limits:
 Unsupported namespaces are retained as tainted local evidence rather than silently treated as a
 known IEEE version.
 
+## SystemRDL 2.0
+
+SystemRDL is compiled with the public `systemrdl-compiler` 1.32.x node API and converted into the
+same register observations used for IP-XACT and C-header comparison.
+
+Supported:
+
+- Explicitly ordered compilation units, selected or default top-level address map, and a configured
+  canonical component name.
+- Nested address maps and register files, concrete register instances, unrolled register arrays,
+  address-map-relative canonical offsets, immediate parent-local offset metadata, and absolute
+  addresses.
+- Register widths plus field positions, widths, software access, and reset values.
+- Definition/instance provenance and deterministic concrete hierarchy paths.
+
+Security and completeness boundaries:
+
+- Perl preprocessing tags and source `` `include `` directives are rejected during a complete
+  preflight before the compiler backend is loaded. The backend compiles private snapshots of the
+  captured text, not paths that can be swapped after preflight. List every unit explicitly.
+- Memories and signals are not imported as registers. User-defined properties and behavioral
+  properties outside layout/access/reset comparison remain explicit unsupported metadata.
+- Aliased, virtual, overlapping, or otherwise non-comparable layouts are tainted rather than
+  flattened into an apparent match.
+- Limits are 256 source files, 16 MiB per file, 64 MiB aggregate source, 250,000 node definitions,
+  100,000 register definitions, 65,536 elements per array, 250,000 concrete registers, 65,536
+  fields per register, 1,000,000 fields total, 128 hierarchy levels, and 256 detailed unsupported
+  semantic diagnostics before a bounded summary.
+
+OpenCollate does not generate register RTL, UVM models, software, or documentation and does not
+verify register behavior against RTL transactions.
+
+## Declarative static connectivity
+
+Connectivity intent is a strict CSV input under an explicit `connectivity` source kind. Ordinary
+`.csv` inference remains the pin/package-map format; use `.occonn` only when extension inference
+is desired.
+
+Required columns are `id`, `source`, `sink`, and `expect`. `expect` is `reachable` or
+`unreachable`. Optional columns are `transform` (`any`, `identity`, `reverse`, or `inverted`),
+semicolon-separated `through` and `exclude` selectors, and `description`.
+
+Selectors name slash-separated elaborated RTL signals and can use a bounded `*`/`?` glob plus an
+optional exact bit, `[*]`, or constant range. Elaborated generate and instance-array indices stay
+inside path segments, for example `top/lanes[0]/u/data`. To keep names collision-free, reserved
+characters inside a SystemVerilog escaped identifier use uppercase percent encoding: `%25`,
+`%2F`, `%5B`, `%5D`, `%2A`, `%3F`, `%3B`, and `%5C` represent `%`, `/`, `[`, `]`, `*`, `?`, `;`,
+and `\` respectively. Thus escaped net `\a/b` is selected as `top/a%2Fb`, while `top/a/b` names
+ordinary hierarchy. A selector must resolve to one signal base; an ambiguous glob is an error. The
+checker can establish:
+
+- Required or forbidden transparent static paths, including a witness path or reachable cut.
+- Equal endpoint width and declared bit identity/reversal.
+- Known inversion parity for scalar inverted paths.
+- Ordered waypoint and excluded-node constraints.
+
+This is graph reachability over the documented transparent RTL subset, not formal connectivity.
+It has no clocks, latency, temporal sequences, mode constraints, symbolic data values, or proof
+engine. A tainted/unsupported edge, incomplete graph frontier, or search bound produces `OC6505`
+instead of a false pass.
+
+CSV limits are 32 MiB per file, 250,000 rows, 32 columns, 65,536 characters per field, 4,096
+characters per selector, and 64 `through` or `exclude` selectors. Each requirement is capped at
+1,024 selected bits and 65,536 endpoint-pair searches; one graph search is capped at 500,000
+states. Duplicate IDs and duplicate or contradictory endpoint requirements are tainted and
+diagnosed.
+
 ## Static SDC
 
 SDC is parsed by a non-executing Tcl tokenizer. OpenCollate does not start Tcl, source another
@@ -158,9 +234,15 @@ The parser retains definitions, references, scopes, options, supply functions, c
 and provenance. Tcl substitution, control flow, procedures, sourced scripts, and unrecognized
 commands are unsupported and taint affected facts; they are never executed. OpenCollate does not
 evaluate power-state logic, resolve voltages electrically, or reproduce a complete IEEE 1801
-implementation. The 0.2.1 UPF tokenizer does not publish the explicit aggregate input caps that
-the SDC parser does, so deployments handling untrusted very large UPF should also apply normal
-process-level memory and time limits.
+implementation. The UPF tokenizer publishes explicit aggregate input caps; deployments handling
+untrusted collateral should still apply normal process-level memory and time limits.
+
+Limits are 256 source files; 16 MiB and 16 Mi decoded characters per file; 64 MiB and
+64 Mi decoded characters per view; 500,000 physical and 250,000 logical commands; 2 million
+lexical tokens and 2 million evaluated static-list words; 1 MiB per token or evaluated word;
+16,384 characters per object/scope name; 128 levels of grouping, substitution, or static-list
+evaluation; and 2 million emitted objects, ports, and components. Budgets are shared across every
+file in a view. A breach stops parsing with a fatal diagnostic and global taint.
 
 ## C register headers
 
@@ -223,7 +305,7 @@ and unsupported clauses produce explicit completeness diagnostics.
 ## Experimental structural GDSII
 
 The GDSII adapter reads the native big-endian record stream directly. Support is public but
-experimental in 0.2.1: it is intended for bounded structure, hierarchy, and explicitly selected
+experimental in 0.3.0: it is intended for bounded structure, hierarchy, and explicitly selected
 text-label inventory, not layout verification.
 
 Supported structurally:

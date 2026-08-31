@@ -32,13 +32,18 @@ jobs:
           test "v$PACKAGE_VERSION" = "$GITHUB_REF_NAME"
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main
       - name: Install project and release tools
-        run: python -m pip install -e ".[dev]"
+        run: |
+          python -m pip install -e ".[dev]"
+          python -m pip install pip-audit==2.10.1
       - name: Verify source
         run: |
           ruff format --check .
           ruff check .
           mypy src/opencollate
+          python -m bandit -q -r src/opencollate
+          pip-audit --strict --progress-spinner off .
           pytest -q
+          python -O -m pytest -q
       - name: Build distributions
         run: python -m build
       - name: Check distribution metadata
@@ -50,13 +55,21 @@ jobs:
           release-smoke/bin/opencollate --version
           release-smoke/bin/opencollate capabilities
           release-smoke/bin/opencollate schema report --output report.schema.json
+          release-smoke/bin/opencollate schema diff --output diff.schema.json
           release-smoke/bin/opencollate demo
           set +e
           release-smoke/bin/opencollate check examples/uart/opencollate.toml --format json --output uart-report.json
           STATUS=$?
           set -e
           test "$STATUS" -eq 1
+          release-smoke/bin/opencollate report diff uart-report.json uart-report.json --format json --output uart-diff.json
           release-smoke/bin/python -c "import json; json.load(open('uart-report.json', encoding='utf-8'))"
+          release-smoke/bin/python -c "import json; json.load(open('uart-diff.json', encoding='utf-8'))"
+          release-smoke/bin/python benchmarks/run.py \
+            --repeat 3 \
+            --warmup 1 \
+            --enforce-budgets \
+            --json-output dist/opencollate-benchmark-results.json
       - name: Stage wheel and runtime dependencies for SBOM
         run: |
           python -m pip install \
@@ -80,24 +93,38 @@ jobs:
         run: |
           python - <<'PY'
           import json
+          import re
           import tomllib
+
+          from packaging.requirements import Requirement
 
           with open("dist/opencollate.spdx.json", encoding="utf-8") as handle:
               document = json.load(handle)
           with open("pyproject.toml", "rb") as handle:
-              expected_version = tomllib.load(handle)["project"]["version"]
+              project = tomllib.load(handle)["project"]
+          expected_version = project["version"]
+
+          def normalize_name(value):
+              return re.sub(r"[-_.]+", "-", value).casefold()
 
           packages = {
-              package.get("name", "").casefold(): package
+              normalize_name(package.get("name", "")): package
               for package in document.get("packages", [])
+          }
+          runtime_dependencies = {
+              normalize_name(Requirement(value).name)
+              for value in project.get("dependencies", [])
           }
           failures = []
           if document.get("spdxVersion") != "SPDX-2.3":
               failures.append("document is not SPDX 2.3")
           if packages.get("opencollate", {}).get("versionInfo") != expected_version:
               failures.append(f"missing opencollate {expected_version!r}")
-          if "pyslang" not in packages:
-              failures.append("missing runtime dependency package pyslang")
+          missing_dependencies = sorted(runtime_dependencies - packages.keys())
+          if missing_dependencies:
+              failures.append(
+                  "missing runtime dependency packages " + ", ".join(missing_dependencies)
+              )
           if not any(
               relationship.get("relationshipType") == "DEPENDENCY_OF"
               for relationship in document.get("relationships", [])
@@ -111,7 +138,9 @@ jobs:
       - name: Generate checksums
         run: |
           cd dist
-          sha256sum * > SHA256SUMS
+          find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 \
+            | sort -z \
+            | xargs -0 -r sha256sum > SHA256SUMS
       - name: Attest release artifacts
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:

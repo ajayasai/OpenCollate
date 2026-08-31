@@ -1,0 +1,18 @@
+property vendor_tag {
+    type = string;
+    component = reg;
+};
+
+addrmap semantic_frontiers {
+    signal {
+        signalwidth = 1;
+    } reset_n;
+
+    reg {
+        vendor_tag = "retained-by-backend";
+        field {
+            sw = rw;
+            hw = r;
+        } VALUE[7:0] = 0;
+    } CTRL @ 0x0;
+};

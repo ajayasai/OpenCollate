@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "opencollate"
-version = "0.2.1"
+version = "0.3.0"
 description = "Open-source SoC design-collateral consistency checker"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -19,6 +19,8 @@ keywords = [
   "ip-xact",
   "lef",
   "liberty",
+  "systemrdl",
+  "connectivity",
   "sdc",
   "soc",
   "systemverilog",
@@ -40,6 +42,7 @@ classifiers = [
 ]
 dependencies = [
   "pyslang>=11,<12",
+  "systemrdl-compiler>=1.32,<1.33",
 ]
 
 [project.optional-dependencies]
@@ -73,6 +76,7 @@ packages = ["src/opencollate"]
 include = [
   "/src",
   "/tests",
+  "/benchmarks",
   "/docs",
   "/examples",
   "/README.md",

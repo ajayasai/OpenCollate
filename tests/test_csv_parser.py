@@ -39,6 +39,41 @@ def test_component_inventory_csv_supports_bom_ranges_and_synonyms(tmp_path: Path
     assert view.pin_mappings[0].package_ball == "A01"
 
 
+def test_component_pins_profile_does_not_invent_package_mappings(tmp_path: Path) -> None:
+    path = tmp_path / "component-pins.csv"
+    path.write_text(
+        "component,signal,direction,width\nuart,irq,output,1\n",
+        encoding="utf-8",
+    )
+
+    view = parse_pin_csv(path, profile="component_pins")
+
+    assert view.complete
+    assert view.components[0].ports[0].name == "irq"
+    assert view.pin_mappings == ()
+    assert view.attributes["profile"] == "component_pins"
+
+
+def test_package_map_profile_requires_both_physical_endpoint_columns(tmp_path: Path) -> None:
+    path = tmp_path / "incomplete-package.csv"
+    path.write_text("component,signal,die_pad\nuart,irq,PAD_IRQ\n", encoding="utf-8")
+
+    view = parse_pin_csv(path, profile="package_map")
+
+    assert not view.complete
+    assert view.components == ()
+    assert view.pin_mappings == ()
+    assert "package_ball" in view.diagnostics[0].message
+
+
+def test_unknown_csv_profile_is_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "pins.csv"
+    path.write_text("signal\nirq\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="CSV profile"):
+        parse_pin_csv(path, profile="spreadsheet")
+
+
 def test_one_row_per_bit_is_aggregated_without_losing_order(tmp_path: Path) -> None:
     path = tmp_path / "bits.csv"
     path.write_text(

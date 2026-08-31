@@ -1,6 +1,6 @@
 # Full-stack synthetic UART
 
-This directory is a runnable OpenCollate 0.2.1 Beta showcase. Every file was created for this
+This directory is a runnable OpenCollate 0.3.0 Beta showcase. Every file was created for this
 project; none is derived from a real IP, library, PDK, package, or product. The example is licensed
 under the repository’s Apache-2.0 license.
 
@@ -16,6 +16,8 @@ under the repository’s Apache-2.0 license.
 | Static SDC | `constraints/uart.sdc` | Primary clock plus input/output delays against RTL ports |
 | Static UPF | `power/uart.upf` | Top domain, supply ports/nets, connections, and primary supplies |
 | C header | `software/uart_regs.h` | The software view of the same `CTRL` register and fields |
+| SystemRDL 2.0 | `registers/uart.rdl` | A third view of the `CTRL` register, fields, reset, and absolute address |
+| Connectivity CSV | `connectivity/requirements.csv` | Declarative bit-aligned `data_i` to `data_o` static path intent |
 | CDL | `netlist/uart.cdl` | Subcircuit interface and explicit pin directions/rail roles |
 | DEF 5.8 | `physical/uart.def` | Design pins, bus ranges, placements, nets, and special nets |
 | GDSII (experimental) | `physical/uart.gds` | Native cell structure, skipped boundary geometry, and layer/type-filtered text-label ports |
@@ -56,15 +58,17 @@ opencollate contract build examples/uart/opencollate.toml --output uart-contract
 
 ## Deliberate findings
 
-The complete 0.2.1 check reports exactly three seeded rule codes:
+The complete 0.3.0 check reports exactly three seeded rule codes:
 
 1. `OC4001`: `irq_o` is an output in RTL, CDL, DEF, IP-XACT, and LEF but an input in Liberty.
 2. `OC4301`: `tx_active_o` implements different Boolean functions in RTL and Liberty.
 3. `OC5003`: package ball `B1` is assigned to both `irq_o` and `tx_active_o`.
 
-All other interface, object-reference, clock, power-intent, IP-XACT port-map, register-map, DEF
+All other interface, object-reference, clock, power-intent, IP-XACT port-map, register-map, static
+connectivity, DEF
 endpoint, and GDSII cell/text-port facts align. In particular, IP-XACT and the C header agree on
-the `CTRL` register address, width, `ENABLE`/`MODE` field layout, and known reset value.
+the `CTRL` register address, width, `ENABLE`/`MODE` field layout, and known reset value, and
+SystemRDL independently agrees with the same known register facts.
 
 To create a clean derivative:
 

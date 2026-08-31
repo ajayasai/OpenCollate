@@ -8,7 +8,8 @@ opencollate init .
 ```
 
 Paths are resolved relative to the configuration file after applying `project.root`. A source
-accepts `files = [...]` or the singular `path = "..."`; glob expansion is deterministic and an
+accepts `files = [...]` or the singular `path = "..."`. Configured entries retain their declared
+order, matches are sorted within each glob, and duplicate paths keep their first occurrence. An
 empty configured glob is fatal.
 
 ## Full-stack project
@@ -59,6 +60,14 @@ component_name = "uart"
 macro_prefix = "UART"
 default_register_width = 32
 
+[sources.systemrdl.registers]
+files = ["registers/uart.rdl"]
+top = "uart_regs"
+component_name = "uart"
+
+[sources.connectivity.intent]
+files = ["connectivity/uart.csv"]
+
 [sources.cdl.netlist]
 files = ["netlist/uart.cdl"]
 
@@ -88,7 +97,7 @@ Tables use `[sources.<kind>.<name>]`; the full view ID is `kind.name`. Names pre
 corners or variants, such as `liberty.tt` and `liberty.ss`.
 
 The canonical configuration kinds are `rtl`/`verilog`, `liberty`, `lef`, `csv`, `ipxact`, `sdc`,
-`upf`, `header`, `cdl`, `def`, and `gds`. Common dispatch aliases and file extensions are accepted
+`upf`, `header`, `systemrdl`, `connectivity`, `cdl`, `def`, and `gds`. Common dispatch aliases and file extensions are accepted
 by the Python parser registry, but explicit configuration kind names are preferable for
 reviewability. GDS aliases include `gdsii`, `gds2`, and `stream`; `.gds` and `.gdsii` extensions
 are inferred as GDSII.
@@ -107,6 +116,8 @@ Unknown options are fatal rather than ignored.
 | SDC | No parser-specific options; multiple files share ordered static scalar variables |
 | UPF | Optional nonempty `component_name` when the source does not establish the design top |
 | C header | Optional nonempty `component_name`, nonempty `macro_prefix`, and positive integer `default_register_width` |
+| SystemRDL | `defines`, optional nonempty `top`, and optional nonempty `component_name`; compilation-unit order follows `files` after deterministic expansion |
+| Connectivity CSV | Configurable `columns` plus a one-character `delimiter`; use an explicit `connectivity` kind because ordinary `.csv` inference selects pin maps |
 | CDL/SPICE | No parser-specific options |
 | DEF | No parser-specific options |
 | GDSII | Optional `top_cells` string/string array plus integer or integer-array `pin_text_layers` and `pin_text_types` selectors in the range 0–32767 |

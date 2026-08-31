@@ -1,0 +1,8 @@
+reg shared_status_t {
+    regwidth = 32;
+    field {
+        sw = r;
+        hw = w;
+        reset = 0;
+    } DONE[0:0];
+};

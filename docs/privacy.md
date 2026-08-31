@@ -17,6 +17,12 @@ Dependency installation and external CI services are separate network activities
 the user. A GitHub Actions workflow that uploads SARIF or test artifacts sends those outputs to
 GitHub under that repository's settings; OpenCollate does not do so automatically.
 
+The SystemRDL backend requires a filesystem path. OpenCollate therefore compiles private,
+randomly named temporary copies of the bytes that already passed preflight and removes them before
+a normal return. A killed process can leave plaintext OS-temporary residue. Configure `TMPDIR`,
+`TEMP`, or the platform equivalent to protected/encrypted scratch storage when register collateral
+is sensitive; see the [security model](security-model.md#filesystem-and-network-behavior).
+
 ## Reports can still be sensitive
 
 Reports and contracts may contain:

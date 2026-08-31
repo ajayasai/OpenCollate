@@ -17,7 +17,7 @@ ERROR OC4001  uart/irq_o has conflicting directions: RTL, CDL, DEF, IP-XACT, LEF
   help: Correct the direction in the outlying collateral or the canonical contract.
 ```
 
-> **Beta software:** OpenCollate 0.2.1 is intended for evaluation, collateral review, and CI
+> **Beta software:** OpenCollate 0.3.0 is intended for evaluation, collateral review, and CI
 > experiments. Its Python API, schema, and diagnostic surface can still change before 1.0. It is
 > not a signoff tool and does not replace simulation, formal verification, STA, CDC/RDC, DRC,
 > LVS, extraction, or implementation-tool validation.
@@ -27,7 +27,7 @@ ERROR OC4001  uart/irq_o has conflicting directions: RTL, CDL, DEF, IP-XACT, LEF
 OpenCollate requires Python 3.11 or newer.
 
 ```console
-python -m pip install "git+https://github.com/ajayasai/OpenCollate.git@v0.2.1"
+python -m pip install "git+https://github.com/ajayasai/OpenCollate.git@v0.3.0"
 opencollate --version
 ```
 
@@ -45,30 +45,32 @@ Run the generated demonstration:
 opencollate demo
 ```
 
-Or run the repository’s synthetic, deliberately inconsistent UART across all eleven supported view
+Or run the repository’s synthetic, deliberately inconsistent UART across all thirteen supported view
 kinds:
 
 ```console
 opencollate check examples/uart/opencollate.toml
 ```
 
-The full-stack example imports SystemVerilog, Liberty, LEF, CSV, IP-XACT, SDC, UPF, a C register
-header, CDL, DEF, and experimental structural GDSII. It is expected to return status 1 with
+The full-stack example imports SystemVerilog, Liberty, LEF, CSV, IP-XACT, SystemRDL, declarative
+connectivity intent, SDC, UPF, a C register header, CDL, DEF, and experimental structural GDSII. It is expected to return status 1 with
 exactly `OC4001`, `OC4301`, and `OC5003`. See the
 [UART walkthrough](examples/uart/README.md).
 
-## 0.2.1 support matrix
+## 0.3.0 support matrix
 
 “Structural” means OpenCollate imports facts needed for consistency checks; it does not implement
 the complete language or the analysis normally performed by its native tool.
 
-| View | 0.2.1 Beta support | Deliberate boundary |
+| View | 0.3.0 Beta support | Deliberate boundary |
 | --- | --- | --- |
 | Verilog/SystemVerilog | pyslang preprocessing, parsing, and elaboration; modules, ports, parameters, dimensions, includes, defines, hierarchy, and small continuous-assignment Boolean functions | No behavioral or sequential equivalence; unsupported ports and unresolved shapes remain explicit |
 | Liberty | Libraries, cells, pins, buses, bundles, types, `pg_pin`, roles, directions, ranges, and small Boolean functions | Timing, power, noise, and characterization table contents are skipped |
 | LEF | Macro/pin interface, direction, use, and declared bus naming | Geometry, vias, obstructions, and antenna/vendor properties are skipped |
 | CSV | Component-pin and package-map profiles, configurable columns, ranges/per-bit rows, roles, directions, pads, balls, and signals | It is not a general spreadsheet importer; ambiguous identity columns must be mapped |
 | IP-XACT | IEEE 1685 2009/2014/2022 components, ports, vectors/arrays, parameters, interfaces/port maps, memory maps, registers, and fields | No XSD validation, schema fetching, or external definition expansion |
+| SystemRDL 2.0 | Ordered explicit units through `systemrdl-compiler`; selected top, nested maps/regfiles, arrays, addresses, widths, access, fields, and resets | Perl preprocessing and source includes are rejected; no RTL/UVM/software/document generation or behavioral verification |
+| Connectivity CSV | Required/forbidden transparent RTL paths across assignments, hierarchy, net aliases, and simple primitives, with collision-free escaped names, bit identity/reversal, known inversion, waypoints/exclusions, witnesses, cuts, and fail-closed tainted frontiers | Bounded static graph analysis only; no temporal, conditional, sequential, mode-aware, or formal proof |
 | SDC | Non-executing Tcl tokenizer; static queries, clocks, generated clocks, I/O delays, false paths, and multicycle paths | Tcl control flow, arbitrary commands, and environment-dependent substitution are not executed |
 | UPF | Non-executing structural subset for design/scope, domains, supplies, isolation, retention, level shifting, switches, and power states | It is not a UPF interpreter or power-intent signoff engine; dynamic Tcl is not executed |
 | C register headers | Conventional base/address/offset and field position/mask/width/reset integer macros | No C preprocessor, conditional-build selection, compiler, or arbitrary macro execution |
@@ -88,7 +90,7 @@ recovery never turns an unestablished fact into an apparent pass.
 
 ## What OpenCollate checks
 
-The 65-rule 0.2.1 catalog covers:
+The 74-rule 0.3.0 catalog covers:
 
 - Configuration, parser completeness, unsupported constructs, and tainted scopes.
 - Component and port identity, inventory, direction, role, shape, range, and ordering.
@@ -97,7 +99,9 @@ The 65-rule 0.2.1 catalog covers:
 - SDC objects and clocks against statically elaborated RTL.
 - UPF object references and duplicate or missing power-intent objects.
 - IP-XACT interface-to-physical-port maps.
-- IP-XACT versus C-header register addresses, widths, fields, access, resets, and layout.
+- IP-XACT, SystemRDL, and C-header register addresses, widths, fields, access, resets, and layout.
+- Declarative required/forbidden RTL connectivity, width, bit ordering, known polarity, waypoints,
+  and excluded nodes inside the transparent static subset.
 - DEF endpoints against the elaborated RTL hierarchy.
 - GDSII structure and explicitly selected text-label port inventory through the common component
   contract; geometry is not checked.
@@ -109,12 +113,14 @@ not-applicable diagnostic; absence of a mismatch is not proof of equivalence.
 
 ```text
 opencollate check [CONFIG]                  # default: opencollate.toml
+opencollate review [CONFIG] --baseline REPORT
+opencollate report diff BASELINE CURRENT
 opencollate check -c path/to/config.toml
 opencollate demo [--output-dir DIR]
 opencollate init [PATH]
 opencollate capabilities [--json]
 opencollate explain CODE
-opencollate schema [report|contract] [--output PATH]
+opencollate schema [report|contract|diff] [--output PATH]
 opencollate contract build [CONFIG] --output contract.oc.json
 ```
 
@@ -126,6 +132,8 @@ opencollate contract build [CONFIG] --output contract.oc.json
 
 `demo` returns 0 by default because its inconsistencies are intentional; use `demo --strict-exit`
 to propagate its check status. Read [exit codes](docs/exit-codes.md) before CI integration.
+Use [baseline review](docs/baseline-review.md) to gate only new or changed findings while retaining
+fatal-analysis semantics.
 
 ## Design contract, not pairwise spaghetti
 
@@ -134,9 +142,9 @@ groups them into canonical identities; rules consume those identities and retain
 every view.
 
 ```text
-RTL / Liberty / LEF / CDL / DEF / GDSII / IP-XACT
+RTL / Liberty / LEF / CDL / DEF / GDSII / IP-XACT / SystemRDL
                     │
-CSV / SDC / UPF / C headers
+CSV / connectivity intent / SDC / UPF / C headers
                     ▼
         observations + provenance
                     ▼
@@ -161,7 +169,8 @@ all frozen-contract fields in schema version 1. Read the [architecture](docs/arc
 OpenCollate treats configuration and collateral as untrusted input. SDC and UPF are tokenized as
 static text; Tcl is never started. C macro and IP-XACT integer expressions use small bounded
 evaluators, not compilers or `eval`. IP-XACT rejects DTD/entity declarations and never fetches a
-schema. CDL/SPICE is never simulated; DEF/LEF geometry is skipped structurally; and GDSII
+schema. SystemRDL Perl tags/includes are rejected before compilation, and connectivity intent is
+bounded declarative data rather than a property language. CDL/SPICE is never simulated; DEF/LEF geometry is skipped structurally; and GDSII
 geometry records are bounded and discarded without polygon construction.
 
 OpenCollate has no telemetry, account, upload, or network-reporting feature. Reports still contain
@@ -178,6 +187,8 @@ tainted scopes, configuration participation, and parser coverage before relying 
 ## Project
 
 - [Roadmap](ROADMAP.md)
+- [Competitive evidence](docs/competitive-scorecard.md)
+- [Public benchmarks](benchmarks/README.md)
 - [Contributing](CONTRIBUTING.md)
 - [Governance](GOVERNANCE.md)
 - [Support](SUPPORT.md)

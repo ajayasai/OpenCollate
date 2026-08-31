@@ -116,6 +116,22 @@ class ComponentKind(StrEnum):
             return cls.UNKNOWN
 
 
+class ConnectivityExpectation(StrEnum):
+    """The static path property requested by a connectivity specification."""
+
+    REACHABLE = "reachable"
+    UNREACHABLE = "unreachable"
+
+
+class ConnectivityTransform(StrEnum):
+    """A transform that can be established from transparent bit-level edges."""
+
+    ANY = "any"
+    IDENTITY = "identity"
+    REVERSE = "reverse"
+    INVERTED = "inverted"
+
+
 @dataclass(frozen=True, order=True, slots=True)
 class ViewId:
     """A source-view identity, for example ``rtl.default`` or ``liberty.tt``."""
@@ -636,6 +652,156 @@ class RegisterObservation:
 
 
 @dataclass(frozen=True, slots=True)
+class ConnectivityEndpoint:
+    """One statically identifiable scalar or bit-level RTL endpoint.
+
+    ``native_name`` is the slash-separated elaborated hierarchy without a bit
+    suffix.  Vector bits carry their source-language index and declaration
+    ordinal separately so ordering is never inferred from the numeric value.
+    """
+
+    native_name: str
+    bit_index: int | None = None
+    ordinal: int = 0
+    width: int = 1
+    provenance: Provenance | None = None
+    status: FactState = FactState.KNOWN
+    attributes: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.native_name, str):
+            raise TypeError("connectivity endpoint name must be a string")
+        name = self.native_name.strip().strip("/")
+        if not name:
+            raise ValueError("connectivity endpoint name must not be empty")
+        if self.bit_index is not None and type(self.bit_index) is not int:
+            raise TypeError("connectivity endpoint bit index must be an integer")
+        if type(self.ordinal) is not int or type(self.width) is not int:
+            raise TypeError("connectivity endpoint ordinal and width must be integers")
+        if self.ordinal < 0:
+            raise ValueError("connectivity endpoint ordinal must not be negative")
+        if self.width < 1:
+            raise ValueError("connectivity endpoint width must be positive")
+        if self.ordinal >= self.width:
+            raise ValueError("connectivity endpoint ordinal must be smaller than its width")
+        if self.bit_index is None and self.width != 1:
+            raise ValueError("a vector connectivity endpoint requires a bit index")
+        object.__setattr__(self, "native_name", name)
+        object.__setattr__(self, "status", FactState(self.status))
+        object.__setattr__(self, "attributes", dict(self.attributes))
+
+    @property
+    def key(self) -> str:
+        if self.bit_index is None:
+            return self.native_name
+        return f"{self.native_name}[{self.bit_index}]"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.native_name,
+            "bit_index": self.bit_index,
+            "ordinal": self.ordinal,
+            "width": self.width,
+            "key": self.key,
+            "status": self.status.value,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ConnectivityEdge:
+    """A directed, statically observed signal-flow edge.
+
+    Known edges are limited to transparent assignments and elaborated module
+    port bindings.  Tainted edges describe a possible unsupported frontier;
+    checkers may use them to report an inconclusive result, never as proof of a
+    required path.
+    """
+
+    source: ConnectivityEndpoint
+    sink: ConnectivityEndpoint
+    kind: str = "assign"
+    inverted: bool | None = False
+    provenance: Provenance | None = None
+    status: FactState = FactState.KNOWN
+    attributes: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.kind, str):
+            raise TypeError("connectivity edge kind must be a string")
+        kind = self.kind.strip().lower().replace("-", "_")
+        if not kind:
+            raise ValueError("connectivity edge kind must not be empty")
+        if self.inverted is not None and type(self.inverted) is not bool:
+            raise TypeError("connectivity edge inversion must be boolean or null")
+        object.__setattr__(self, "kind", kind)
+        object.__setattr__(self, "status", FactState(self.status))
+        if self.status == FactState.KNOWN and self.inverted is None:
+            raise ValueError("a known connectivity edge must have known inversion polarity")
+        object.__setattr__(self, "attributes", dict(self.attributes))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "source": self.source.key,
+            "sink": self.sink.key,
+            "kind": self.kind,
+            "inverted": self.inverted,
+            "status": self.status.value,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ConnectivityRequirement:
+    """A bounded declarative static connectivity requirement."""
+
+    identifier: str
+    source: str
+    sink: str
+    expectation: ConnectivityExpectation = ConnectivityExpectation.REACHABLE
+    transform: ConnectivityTransform = ConnectivityTransform.ANY
+    through: tuple[str, ...] = ()
+    exclude: tuple[str, ...] = ()
+    description: str | None = None
+    provenance: Provenance | None = None
+    status: FactState = FactState.KNOWN
+    attributes: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not all(isinstance(value, str) for value in (self.identifier, self.source, self.sink)):
+            raise TypeError("connectivity requirement id, source, and sink must be strings")
+        identifier = self.identifier.strip()
+        source = self.source.strip()
+        sink = self.sink.strip()
+        if not identifier or not source or not sink:
+            raise ValueError("connectivity requirement id, source, and sink must not be empty")
+        object.__setattr__(self, "identifier", identifier)
+        object.__setattr__(self, "source", source)
+        object.__setattr__(self, "sink", sink)
+        object.__setattr__(self, "expectation", ConnectivityExpectation(self.expectation))
+        object.__setattr__(self, "transform", ConnectivityTransform(self.transform))
+        object.__setattr__(self, "through", tuple(self.through))
+        object.__setattr__(self, "exclude", tuple(self.exclude))
+        if not all(isinstance(item, str) and item for item in (*self.through, *self.exclude)):
+            raise TypeError("connectivity through/exclude selectors must be nonempty strings")
+        if self.description is not None and not isinstance(self.description, str):
+            raise TypeError("connectivity requirement description must be a string or null")
+        object.__setattr__(self, "status", FactState(self.status))
+        object.__setattr__(self, "attributes", dict(self.attributes))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.identifier,
+            "source": self.source,
+            "sink": self.sink,
+            "expectation": self.expectation.value,
+            "transform": self.transform.value,
+            "through": list(self.through),
+            "exclude": list(self.exclude),
+            "description": self.description,
+            "status": self.status.value,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ViewObservation:
     view: ViewId
     components: tuple[ComponentObservation, ...] = ()
@@ -647,6 +813,9 @@ class ViewObservation:
     clocks: tuple[ClockObservation, ...] = ()
     interfaces: tuple[InterfaceObservation, ...] = ()
     registers: tuple[RegisterObservation, ...] = ()
+    connectivity_endpoints: tuple[ConnectivityEndpoint, ...] = ()
+    connectivity_edges: tuple[ConnectivityEdge, ...] = ()
+    connectivity_requirements: tuple[ConnectivityRequirement, ...] = ()
     attributes: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -659,6 +828,13 @@ class ViewObservation:
         object.__setattr__(self, "clocks", tuple(self.clocks))
         object.__setattr__(self, "interfaces", tuple(self.interfaces))
         object.__setattr__(self, "registers", tuple(self.registers))
+        object.__setattr__(self, "connectivity_endpoints", tuple(self.connectivity_endpoints))
+        object.__setattr__(self, "connectivity_edges", tuple(self.connectivity_edges))
+        object.__setattr__(
+            self,
+            "connectivity_requirements",
+            tuple(self.connectivity_requirements),
+        )
         object.__setattr__(self, "attributes", dict(self.attributes))
 
     def scope_is_tainted(self, native_name: str | None = None) -> bool:

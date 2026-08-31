@@ -1,0 +1,26 @@
+addrmap benchmark_regs {
+    reg {
+        regwidth = 32;
+        field {
+            sw = rw;
+            hw = r;
+            reset = 0;
+        } ENABLE[0:0];
+        field {
+            sw = r;
+            hw = w;
+            reset = 1;
+        } READY[1:1];
+    } CTRL @ 0x0;
+
+    regfile {
+        reg {
+            regwidth = 16;
+            field {
+                sw = rw;
+                hw = r;
+                reset = 8'h5a;
+            } VALUE[7:0];
+        } DATA[2] @ 0x10 += 0x4;
+    } channel @ 0x100;
+};

@@ -1,0 +1,296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OpenCollate public benchmark results v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "suite",
+    "status",
+    "conformance_status",
+    "budget_status",
+    "environment",
+    "parameters",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "suite": {
+      "const": "opencollate-public-benchmarks"
+    },
+    "status": {
+      "$ref": "#/$defs/passFail"
+    },
+    "conformance_status": {
+      "$ref": "#/$defs/passFail"
+    },
+    "budget_status": {
+      "$ref": "#/$defs/passFail"
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "opencollate_version",
+        "python_implementation",
+        "python_version",
+        "system",
+        "machine"
+      ],
+      "properties": {
+        "opencollate_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "python_implementation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "python_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "system": {
+          "type": "string",
+          "minLength": 1
+        },
+        "machine": {
+          "type": "string"
+        }
+      }
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repeat",
+        "warmup",
+        "diff_groups",
+        "enforce_budgets"
+      ],
+      "properties": {
+        "repeat": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "warmup": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "diff_groups": {
+          "type": "integer",
+          "minimum": 4
+        },
+        "enforce_budgets": {
+          "type": "boolean"
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "passFail": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "fail"
+      ]
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "description",
+        "workload",
+        "unit_name",
+        "units_per_run",
+        "status",
+        "conformance_status",
+        "budget_status",
+        "budget"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": [
+            "report-diff",
+            "systemrdl-import",
+            "rtl-connectivity",
+            "uart-check"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workload": {
+          "type": "object"
+        },
+        "unit_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "units_per_run": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "status": {
+          "$ref": "#/$defs/passFail"
+        },
+        "conformance_status": {
+          "$ref": "#/$defs/passFail"
+        },
+        "budget_status": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "fail",
+            "not-run"
+          ]
+        },
+        "result_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "verification": {
+          "type": "object"
+        },
+        "timing": {
+          "$ref": "#/$defs/timing"
+        },
+        "budget": {
+          "$ref": "#/$defs/budget"
+        },
+        "error": {
+          "$ref": "#/$defs/error"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "conformance_status": {
+                "const": "pass"
+              }
+            },
+            "required": [
+              "conformance_status"
+            ]
+          },
+          "then": {
+            "required": [
+              "result_sha256",
+              "verification",
+              "timing"
+            ],
+            "not": {
+              "required": [
+                "error"
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "error"
+            ]
+          }
+        }
+      ]
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "samples_seconds",
+        "minimum_seconds",
+        "median_seconds",
+        "maximum_seconds",
+        "units_per_second"
+      ],
+      "properties": {
+        "samples_seconds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "minimum_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "median_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "units_per_second": {
+          "oneOf": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enforced",
+        "maximum_median_seconds",
+        "within_budget"
+      ],
+      "properties": {
+        "enforced": {
+          "type": "boolean"
+        },
+        "maximum_median_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "within_budget": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "message"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

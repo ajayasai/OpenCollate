@@ -30,12 +30,156 @@ from opencollate.model import (
 )
 from opencollate.parsers.base import (
     Pathish,
+    SourceText,
     coerce_paths,
     coerce_view,
     infer_role_from_name,
     parser_diagnostic,
-    read_source,
+    provenance,
 )
+
+_MAX_SOURCE_FILES = 256
+_MAX_SOURCE_BYTES = 16 * 1024 * 1024
+_MAX_TOTAL_SOURCE_BYTES = 64 * 1024 * 1024
+_MAX_SOURCE_CHARACTERS = 16 * 1024 * 1024
+_MAX_TOTAL_SOURCE_CHARACTERS = 64 * 1024 * 1024
+_MAX_PHYSICAL_COMMANDS = 500_000
+_MAX_LOGICAL_COMMANDS = 250_000
+_MAX_TOKENS = 2_000_000
+_MAX_WORDS = 2_000_000
+_MAX_TOKEN_CHARACTERS = 1024 * 1024
+_MAX_NAME_CHARACTERS = 16_384
+_MAX_GROUPING_DEPTH = 128
+_MAX_SUBSTITUTION_DEPTH = 128
+_MAX_EVALUATION_DEPTH = 128
+_MAX_OBSERVATIONS = 2_000_000
+
+
+class _ResourceLimit(RuntimeError):
+    def __init__(
+        self,
+        resource: str,
+        limit: int,
+        actual: int,
+        *,
+        line: int = 1,
+        column: int = 1,
+    ) -> None:
+        super().__init__(resource)
+        self.resource = resource
+        self.limit = limit
+        self.actual = actual
+        self.line = max(1, line)
+        self.column = max(1, column)
+
+
+@dataclass(slots=True)
+class _ResourceBudget:
+    source_bytes: int = 0
+    source_characters: int = 0
+    physical_commands: int = 0
+    logical_commands: int = 0
+    tokens: int = 0
+    words: int = 0
+    observations: int = 0
+    exhausted: bool = False
+
+    def charge(
+        self,
+        attribute: str,
+        amount: int,
+        limit: int,
+        resource: str,
+        *,
+        line: int = 1,
+        column: int = 1,
+    ) -> None:
+        current = int(getattr(self, attribute))
+        actual = current + amount
+        if actual > limit:
+            raise _ResourceLimit(
+                resource,
+                limit,
+                actual,
+                line=line,
+                column=column,
+            )
+        setattr(self, attribute, actual)
+
+
+def _read_bounded_source(
+    path: Path,
+    view: ViewId,
+    budget: _ResourceBudget,
+) -> SourceText:
+    remaining_total = _MAX_TOTAL_SOURCE_BYTES - budget.source_bytes
+    allowed = min(_MAX_SOURCE_BYTES, max(0, remaining_total))
+    try:
+        with path.open("rb") as stream:
+            data = stream.read(allowed + 1)
+    except OSError as error:
+        diagnostic = parser_diagnostic(
+            "OC1002",
+            Severity.FATAL,
+            f"Cannot read {path}: {error}",
+            location=provenance(path, view),
+        )
+        return SourceText(path, "", "unreadable", (diagnostic,), True)
+
+    if len(data) > allowed:
+        if _MAX_SOURCE_BYTES <= remaining_total:
+            raise _ResourceLimit(
+                f"source {path} byte count",
+                _MAX_SOURCE_BYTES,
+                len(data),
+            )
+        raise _ResourceLimit(
+            "aggregate decoded-source byte count",
+            _MAX_TOTAL_SOURCE_BYTES,
+            budget.source_bytes + len(data),
+        )
+    budget.charge(
+        "source_bytes",
+        len(data),
+        _MAX_TOTAL_SOURCE_BYTES,
+        "aggregate decoded-source byte count",
+    )
+
+    diagnostics: tuple[Diagnostic, ...] = ()
+    tainted = False
+    encoding = "utf-8-sig"
+    try:
+        text = data.decode(encoding)
+    except UnicodeDecodeError as error:
+        encoding = "latin-1"
+        text = data.decode(encoding)
+        tainted = True
+        diagnostics = (
+            parser_diagnostic(
+                "OC1104",
+                Severity.WARNING,
+                (
+                    f"{path} is not valid UTF-8 near byte {error.start}; "
+                    "decoded as Latin-1 and marked tainted"
+                ),
+                location=provenance(path, view),
+                help="Convert collateral to UTF-8 to make identifier spelling portable.",
+            ),
+        )
+
+    if len(text) > _MAX_SOURCE_CHARACTERS:
+        raise _ResourceLimit(
+            f"source {path} decoded-character count",
+            _MAX_SOURCE_CHARACTERS,
+            len(text),
+        )
+    budget.charge(
+        "source_characters",
+        len(text),
+        _MAX_TOTAL_SOURCE_CHARACTERS,
+        "aggregate decoded-source character count",
+    )
+    return SourceText(path, text, encoding, diagnostics, tainted)
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,10 +213,17 @@ class _Command:
 class _Scanner:
     """Small Tcl command/word scanner that performs no substitutions."""
 
-    def __init__(self, text: str, path: Path, view: ViewId) -> None:
+    def __init__(
+        self,
+        text: str,
+        path: Path,
+        view: ViewId,
+        budget: _ResourceBudget,
+    ) -> None:
         self.text = text.replace("\r\n", "\n").replace("\r", "\n")
         self.path = path
         self.view = view
+        self.budget = budget
         self.index = 0
         self.line = 1
         self.column = 1
@@ -111,6 +262,26 @@ class _Scanner:
                 ),
             )
         )
+
+    def _accept_word(self, word: _Word, words: list[_Word]) -> None:
+        token_characters = max(len(word.raw), len(word.text))
+        if token_characters > _MAX_TOKEN_CHARACTERS:
+            raise _ResourceLimit(
+                "Tcl token length",
+                _MAX_TOKEN_CHARACTERS,
+                token_characters,
+                line=word.line,
+                column=word.column,
+            )
+        self.budget.charge(
+            "tokens",
+            1,
+            _MAX_TOKENS,
+            "aggregate Tcl token count",
+            line=word.line,
+            column=word.column,
+        )
+        words.append(word)
 
     def _continuation(self) -> bool:
         if self._peek() != "\\" or self._peek(1) != "\n":
@@ -151,6 +322,14 @@ class _Scanner:
             if brace_depth:
                 if character == "{":
                     brace_depth += 1
+                    if brace_depth > _MAX_GROUPING_DEPTH:
+                        raise _ResourceLimit(
+                            "Tcl grouping depth",
+                            _MAX_GROUPING_DEPTH,
+                            brace_depth,
+                            line=self.line,
+                            column=self.column,
+                        )
                 elif character == "}":
                     brace_depth -= 1
                 self._advance()
@@ -165,6 +344,14 @@ class _Scanner:
                 continue
             if character == "[":
                 depth += 1
+                if depth > _MAX_SUBSTITUTION_DEPTH:
+                    raise _ResourceLimit(
+                        "Tcl command-substitution depth",
+                        _MAX_SUBSTITUTION_DEPTH,
+                        depth,
+                        line=self.line,
+                        column=self.column,
+                    )
             elif character == "]":
                 depth -= 1
                 self._advance()
@@ -192,6 +379,14 @@ class _Scanner:
                 continue
             if character == "{":
                 depth += 1
+                if depth > _MAX_GROUPING_DEPTH:
+                    raise _ResourceLimit(
+                        "Tcl grouping depth",
+                        _MAX_GROUPING_DEPTH,
+                        depth,
+                        line=self.line,
+                        column=self.column,
+                    )
                 value.append(self._advance())
                 continue
             if character == "}":
@@ -293,7 +488,23 @@ class _Scanner:
                 self._advance()
                 continue
             if character in {"\n", ";"}:
+                self.budget.charge(
+                    "physical_commands",
+                    1,
+                    _MAX_PHYSICAL_COMMANDS,
+                    "aggregate physical-command count",
+                    line=self.line,
+                    column=self.column,
+                )
                 if words:
+                    self.budget.charge(
+                        "logical_commands",
+                        1,
+                        _MAX_LOGICAL_COMMANDS,
+                        "aggregate logical-command count",
+                        line=words[0].line,
+                        column=words[0].column,
+                    )
                     commands.append(_Command(tuple(words), self.path))
                     words = []
                 self._advance()
@@ -330,13 +541,35 @@ class _Scanner:
             else:
                 word = self._bare_word(line, column)
             if word.raw:
-                words.append(word)
+                self._accept_word(word, words)
         if words:
+            self.budget.charge(
+                "physical_commands",
+                1,
+                _MAX_PHYSICAL_COMMANDS,
+                "aggregate physical-command count",
+                line=words[0].line,
+                column=words[0].column,
+            )
+            self.budget.charge(
+                "logical_commands",
+                1,
+                _MAX_LOGICAL_COMMANDS,
+                "aggregate logical-command count",
+                line=words[0].line,
+                column=words[0].column,
+            )
             commands.append(_Command(tuple(words), self.path))
         return tuple(commands), tuple(self.diagnostics), self.complete
 
 
-def _split_list(value: str) -> tuple[str, ...] | None:
+def _split_list(
+    value: str,
+    budget: _ResourceBudget,
+    *,
+    line: int,
+    column: int,
+) -> tuple[str, ...] | None:
     """Split a static Tcl list without invoking a Tcl interpreter."""
 
     items: list[str] = []
@@ -359,6 +592,14 @@ def _split_list(value: str) -> tuple[str, ...] | None:
                     continue
                 if character == "{":
                     depth += 1
+                    if depth > _MAX_EVALUATION_DEPTH:
+                        raise _ResourceLimit(
+                            "static Tcl-list evaluation depth",
+                            _MAX_EVALUATION_DEPTH,
+                            depth,
+                            line=line,
+                            column=column,
+                        )
                     if depth > 1:
                         result.append(character)
                 elif character == "}":
@@ -396,7 +637,24 @@ def _split_list(value: str) -> tuple[str, ...] | None:
                     index += 1
                 result.append(value[index])
                 index += 1
-        items.append("".join(result))
+        item = "".join(result)
+        if len(item) > _MAX_TOKEN_CHARACTERS:
+            raise _ResourceLimit(
+                "evaluated Tcl word length",
+                _MAX_TOKEN_CHARACTERS,
+                len(item),
+                line=line,
+                column=column,
+            )
+        budget.charge(
+            "words",
+            1,
+            _MAX_WORDS,
+            "aggregate evaluated Tcl word count",
+            line=line,
+            column=column,
+        )
+        items.append(item)
     return tuple(items)
 
 
@@ -480,10 +738,15 @@ def _provenance(command: _Command, view: ViewId, word: _Word | None = None) -> P
     )
 
 
-def _word_list(word: _Word | None) -> tuple[str, ...]:
+def _word_list(word: _Word | None, budget: _ResourceBudget) -> tuple[str, ...]:
     if word is None or word.dynamic:
         return ()
-    parsed = _split_list(word.text)
+    parsed = _split_list(
+        word.text,
+        budget,
+        line=word.line,
+        column=word.column,
+    )
     if parsed is None:
         return ()
     return parsed
@@ -496,9 +759,15 @@ def _word_text(word: _Word | None) -> str | None:
 
 
 class _Collector:
-    def __init__(self, view: ViewId, component_name: str | None) -> None:
+    def __init__(
+        self,
+        view: ViewId,
+        component_name: str | None,
+        budget: _ResourceBudget,
+    ) -> None:
         self.view = view
         self.component_name = component_name.strip() if component_name else None
+        self.budget = budget
         self.current_scope: str | None = None
         self.complete = True
         self.tainted_scopes: set[str] = set()
@@ -523,6 +792,52 @@ class _Collector:
             "unsupported_facts": [],
         }
         self.upf_versions: list[str] = []
+
+    def resource_limit(self, error: _ResourceLimit, path: Path) -> None:
+        if self.budget.exhausted:
+            return
+        self.budget.exhausted = True
+        self.complete = False
+        self.tainted_scopes.add("*")
+        location = Provenance(
+            str(path),
+            error.line,
+            error.column,
+            self.view,
+        )
+        metadata = {
+            "resource": error.resource,
+            "limit": error.limit,
+            "actual": error.actual,
+        }
+        self.diagnostics.append(
+            parser_diagnostic(
+                "OC1101",
+                Severity.FATAL,
+                (
+                    f"UPF resource limit exceeded: {error.resource} is "
+                    f"{error.actual:,}; limit is {error.limit:,}"
+                ),
+                location=location,
+                help=(
+                    "Split the UPF view into smaller reviewed inputs or raise the explicit "
+                    "parser limit only after validating the source size."
+                ),
+                metadata=metadata,
+            )
+        )
+        self.diagnostics.append(
+            parser_diagnostic(
+                "OC1104",
+                Severity.WARNING,
+                (
+                    "UPF parsing stopped at a resource boundary; the whole view is tainted "
+                    "and absence checks are inconclusive"
+                ),
+                location=location,
+                metadata=metadata,
+            )
+        )
 
     def _state(self, command: _Command) -> FactState:
         return FactState.TAINTED if str(command.path) in self.tainted_sources else FactState.KNOWN
@@ -549,6 +864,23 @@ class _Collector:
     ) -> None:
         if not name:
             return
+        for candidate in (name, scope):
+            if candidate is not None and len(candidate) > _MAX_NAME_CHARACTERS:
+                raise _ResourceLimit(
+                    "UPF object or scope name length",
+                    _MAX_NAME_CHARACTERS,
+                    len(candidate),
+                    line=(word or command.provenance_word).line,
+                    column=(word or command.provenance_word).column,
+                )
+        self.budget.charge(
+            "observations",
+            1,
+            _MAX_OBSERVATIONS,
+            "aggregate emitted-observation count",
+            line=(word or command.provenance_word).line,
+            column=(word or command.provenance_word).column,
+        )
         native_name, resolved_scope = self._scope_for(name, scope)
         cleaned = {key: value for key, value in attributes.items() if value is not None}
         cleaned.setdefault("command", command.name)
@@ -697,7 +1029,18 @@ class _Collector:
         word = arguments.positionals[0]
         if word.dynamic or not word.text:
             return None, word
+        if len(word.text) > _MAX_NAME_CHARACTERS:
+            raise _ResourceLimit(
+                "UPF object name length",
+                _MAX_NAME_CHARACTERS,
+                len(word.text),
+                line=word.line,
+                column=word.column,
+            )
         return word.text, word
+
+    def _word_list(self, word: _Word | None) -> tuple[str, ...]:
+        return _word_list(word, self.budget)
 
     @staticmethod
     def _record(
@@ -789,7 +1132,7 @@ class _Collector:
         name, word = self._name(command, arguments)
         if name is None:
             return
-        elements = _word_list(arguments.one("elements"))
+        elements = self._word_list(arguments.one("elements"))
         scope = _word_text(arguments.one("scope")) or self.current_scope
         record = self._record(
             command,
@@ -911,7 +1254,7 @@ class _Collector:
         name, word = self._name(command, arguments)
         if name is None:
             return
-        functions = [_word_list(item) for item in arguments.many("function")]
+        functions = [self._word_list(item) for item in arguments.many("function")]
         if any(not item for item in functions):
             self._malformed(command, "-function must be a static Tcl list", scope=name)
             state = FactState.TAINTED
@@ -957,8 +1300,8 @@ class _Collector:
         net, word = self._name(command, arguments)
         if net is None:
             return
-        ports = _word_list(arguments.one("ports"))
-        pins = _word_list(arguments.one("pins"))
+        ports = self._word_list(arguments.one("ports"))
+        pins = self._word_list(arguments.one("pins"))
         if not ports and not pins:
             self._malformed(command, "requires a static -ports or -pins list", scope=net)
             state = FactState.TAINTED
@@ -1040,7 +1383,7 @@ class _Collector:
         for option in value_options:
             value = arguments.one(option)
             serialized[option] = (
-                list(_word_list(value)) if option in list_options else _word_text(value)
+                list(self._word_list(value)) if option in list_options else _word_text(value)
             )
         for option in flag_options or set():
             serialized[option] = arguments.flag(option)
@@ -1070,7 +1413,7 @@ class _Collector:
                 domain=domain,
             )
         for option in path_options or set():
-            raw = _word_list(arguments.one(option))
+            raw = self._word_list(arguments.one(option))
             paths = raw[:1] if raw else ()
             self._reference_ports(
                 paths,
@@ -1189,7 +1532,7 @@ class _Collector:
             return
         domain = _word_text(arguments.one("domain"))
         values = {
-            option: [list(_word_list(item)) for item in arguments.many(option)]
+            option: [list(self._word_list(item)) for item in arguments.many(option)]
             for option in repeated
         }
         record = self._record(
@@ -1262,7 +1605,7 @@ class _Collector:
         target, word = self._name(command, arguments)
         if target is None:
             return
-        states = [list(_word_list(item)) for item in arguments.many("state")]
+        states = [list(self._word_list(item)) for item in arguments.many("state")]
         if not states:
             self._malformed(command, "requires at least one static -state list", scope=target)
             state = FactState.TAINTED
@@ -1294,7 +1637,7 @@ class _Collector:
         target, word = self._name(command, arguments)
         if target is None:
             return
-        states = [list(_word_list(item)) for item in arguments.many("state")]
+        states = [list(self._word_list(item)) for item in arguments.many("state")]
         if not states:
             self._malformed(command, "requires at least one static -state list", scope=target)
             state = FactState.TAINTED
@@ -1368,6 +1711,14 @@ class _Collector:
             grouped.setdefault(str(record["name"]), []).append(record)
         ports: list[PortObservation] = []
         for name, records in grouped.items():
+            self.budget.charge(
+                "observations",
+                1,
+                _MAX_OBSERVATIONS,
+                "aggregate emitted-observation count",
+                line=records[0]["provenance_object"].line,
+                column=records[0]["provenance_object"].column,
+            )
             states = {FactState(str(record["state"])) for record in records}
             status = FactState.KNOWN if states == {FactState.KNOWN} else FactState.TAINTED
             directions = {Direction.parse(str(record["direction"])) for record in records}
@@ -1421,6 +1772,15 @@ class _Collector:
         )
         top_locations = [location for name, location in self.design_tops if name == top_name]
         provenance = choose_provenance(top_locations + [port.provenance for port in ports])
+        selected_location = provenance or Provenance("<upf>", 1, 1, self.view)
+        self.budget.charge(
+            "observations",
+            1,
+            _MAX_OBSERVATIONS,
+            "aggregate emitted-observation count",
+            line=selected_location.line,
+            column=selected_location.column,
+        )
         return (
             ComponentObservation(
                 native_name=top_name,
@@ -1444,9 +1804,15 @@ class _Collector:
             "upf_versions": list(dict.fromkeys(self.upf_versions)),
         }
         attributes.update(self.records)
+        components: tuple[ComponentObservation, ...] = ()
+        if not self.budget.exhausted:
+            try:
+                components = self._components()
+            except _ResourceLimit as error:
+                self.resource_limit(error, paths[0])
         return ViewObservation(
             view=self.view,
-            components=self._components(),
+            components=components,
             diagnostics=tuple(self.diagnostics),
             complete=self.complete,
             tainted_scopes=frozenset(self.tainted_scopes),
@@ -1472,11 +1838,28 @@ def parse_upf(
 
     if component_name is not None and not component_name.strip():
         raise ValueError("component_name must be a nonempty string")
+    if component_name is not None and len(component_name.strip()) > _MAX_NAME_CHARACTERS:
+        raise ValueError(f"component_name must not exceed {_MAX_NAME_CHARACTERS:,} characters")
     source_paths = coerce_paths(paths)
     view = coerce_view(view_id, kind="upf", name=view_name)
-    collector = _Collector(view, component_name)
+    budget = _ResourceBudget()
+    collector = _Collector(view, component_name, budget)
+    if len(source_paths) > _MAX_SOURCE_FILES:
+        collector.resource_limit(
+            _ResourceLimit(
+                "source-file count",
+                _MAX_SOURCE_FILES,
+                len(source_paths),
+            ),
+            source_paths[0],
+        )
+        return collector.finish(source_paths)
     for path in source_paths:
-        source = read_source(path, view)
+        try:
+            source = _read_bounded_source(path, view, budget)
+        except _ResourceLimit as error:
+            collector.resource_limit(error, path)
+            break
         collector.diagnostics.extend(source.diagnostics)
         if source.tainted:
             collector.complete = False
@@ -1484,14 +1867,25 @@ def parse_upf(
             collector.tainted_sources.add(str(path))
         if not source.text:
             continue
-        scanner = _Scanner(source.text, path, view)
-        commands, diagnostics, complete = scanner.scan()
+        scanner = _Scanner(source.text, path, view, budget)
+        try:
+            commands, diagnostics, complete = scanner.scan()
+        except _ResourceLimit as error:
+            collector.diagnostics.extend(scanner.diagnostics)
+            collector.resource_limit(error, path)
+            break
         collector.diagnostics.extend(diagnostics)
         if not complete:
             collector.complete = False
             collector.tainted_scopes.add("*")
         for command in commands:
-            collector.handle(command)
+            try:
+                collector.handle(command)
+            except _ResourceLimit as error:
+                collector.resource_limit(error, path)
+                break
+        if budget.exhausted:
+            break
     return collector.finish(source_paths)
 
 

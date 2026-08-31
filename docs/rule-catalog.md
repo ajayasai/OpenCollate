@@ -1,6 +1,6 @@
 # Rule catalog
 
-The runtime registry is authoritative. OpenCollate 0.2.1 registers 65 rules. Run
+The runtime registry is authoritative. OpenCollate 0.3.0 registers 74 rules. Run
 `opencollate explain CODE` for the installed summary and remediation, and
 `opencollate capabilities --json` for the installed rule count.
 
@@ -128,7 +128,7 @@ definitions, protocol behavior, or an IP-XACT schema.
 | OC6309 | invalid-register-field-layout | error | Register fields overlap or extend beyond the declared register width |
 | OC6310 | ambiguous-register-identity | error | An unscoped register name matches multiple address-map scopes |
 
-Known IP-XACT and C-header facts participate. A C header that does not encode access or reset data
+Known IP-XACT, SystemRDL, and C-header facts participate. A source that does not encode access or reset data
 leaves those properties unknown; it does not inherit them from hardware collateral.
 
 ## DEF references — OC64xx
@@ -139,6 +139,25 @@ leaves those properties unknown; it does not inherit them from hardware collater
 
 Only structural DEF endpoints are checked. Skipped route coordinates and geometry never become
 candidate RTL object names.
+
+## Bounded static connectivity — OC65xx
+
+| Code | Name | Default | Meaning |
+| --- | --- | --- | --- |
+| OC6501 | connectivity-endpoint-not-found | error | A requirement endpoint matches no elaborated RTL signal |
+| OC6502 | connectivity-endpoint-ambiguous | error | A selector matches multiple signal bases |
+| OC6503 | required-connectivity-missing | error | No required transparent static path was found |
+| OC6504 | forbidden-connectivity-present | error | A forbidden transparent path exists and includes witness evidence |
+| OC6505 | connectivity-inconclusive | warning | Unsupported syntax, an incomplete frontier, or a resource bound prevents a sound conclusion |
+| OC6506 | connectivity-width-mismatch | error | Source and sink selections have different widths |
+| OC6507 | connectivity-bit-mapping-mismatch | error | A path exists with the wrong declared bit ordering |
+| OC6508 | connectivity-polarity-mismatch | error | A path has the wrong known inversion parity |
+| OC6509 | contradictory-connectivity-requirement | error | Intent contains a duplicate or contradictory requirement |
+
+These rules prove only reachability in the extracted transparent graph. Tainted edges are searched
+only to decide whether absence is inconclusive; they never satisfy a required path or establish
+isolation. Use a native formal tool for temporal, conditional, sequential, or exhaustive RTL
+connectivity.
 
 ## Internal integrity — OC9xxx
 

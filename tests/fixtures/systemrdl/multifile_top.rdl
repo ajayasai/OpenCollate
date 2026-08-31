@@ -1,0 +1,3 @@
+addrmap multi_top {
+    shared_status_t STATUS @ 0x20;
+};

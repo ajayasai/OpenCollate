@@ -85,6 +85,12 @@ def test_glob_expansion_is_sorted_and_deduplicated(tmp_path: Path) -> None:
     )
     assert [path.name for path in source.expand_files()] == ["A.sv", "b.sv"]
 
+    ordered = SourceConfig(
+        ViewId("systemrdl"),
+        (tmp_path / "b.sv", tmp_path / "A.sv", tmp_path / "b.sv"),
+    )
+    assert [path.name for path in ordered.expand_files()] == ["b.sv", "A.sv"]
+
 
 def test_source_shorthand_mapping_defines_and_project_root(tmp_path: Path) -> None:
     source_root = tmp_path / "inputs"
@@ -299,6 +305,10 @@ def test_invalid_manifest_boundaries_are_config_errors(
         ("[sources.rtl.default]\nfiles = ['x.sv']\ninclude_dirs = 3", "array of strings"),
         ("[sources.rtl.default]\nfiles = ['x.sv']\ndefines = ['']", "empty define"),
         (
+            "[sources.systemrdl.default]\nfiles = ['x.rdl']\ndefines = { \"\" = 1 }",
+            "empty define",
+        ),
+        (
             "[sources.rtl.default]\nfiles = ['x.sv']\ndefines = { BAD = [1] }",
             "must be a scalar",
         ),
@@ -332,6 +342,23 @@ def test_contract_loader_failures_are_normalized(tmp_path: Path) -> None:
         path.write_text(payload, encoding="utf-8")
         with pytest.raises(ConfigError, match=message):
             load_contract(path)
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    (
+        ('{"schema_version": ' + "9" * 5_000 + "}", "invalid contract JSON"),
+        ("[" * 2_000 + "]" * 2_000, "contract root must be a JSON object"),
+    ),
+)
+def test_contract_loader_decoder_safety_failures_are_normalized(
+    tmp_path: Path, payload: str, message: str
+) -> None:
+    path = tmp_path / "decoder-limit.json"
+    path.write_text(payload, encoding="utf-8")
+
+    with pytest.raises(ConfigError, match=message):
+        load_contract(path)
 
 
 def test_full_contract_round_trip_preserves_shape_and_roles(tmp_path: Path) -> None:

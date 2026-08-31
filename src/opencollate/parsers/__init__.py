@@ -13,6 +13,7 @@ from opencollate.parsers.cdl import (
     parse_spice,
 )
 from opencollate.parsers.cheader import CHeaderParser, parse_c_header
+from opencollate.parsers.connectivity import ConnectivityCsvParser, parse_connectivity_csv
 from opencollate.parsers.csvpins import CsvPinMapParser, parse_pin_csv
 from opencollate.parsers.defparser import DefLimits, DefParser, parse_def
 from opencollate.parsers.dispatch import (
@@ -39,6 +40,7 @@ from opencollate.parsers.ipxact import (
 from opencollate.parsers.lef import LefParser, parse_lef
 from opencollate.parsers.liberty import LibertyParser, parse_liberty
 from opencollate.parsers.sdc import SdcParser, TimingConstraintObservation, parse_sdc
+from opencollate.parsers.systemrdl import SystemRDLParser, SystemRdlParser, parse_systemrdl
 from opencollate.parsers.upf import UpfParser, parse_upf
 from opencollate.parsers.verilog import VerilogParser, parse_verilog
 
@@ -47,6 +49,7 @@ __all__ = [
     "CDLParser",
     "CdlParser",
     "CsvPinMapParser",
+    "ConnectivityCsvParser",
     "DefLimits",
     "DefParser",
     "GDSIIParser",
@@ -59,6 +62,8 @@ __all__ = [
     "LibertyParser",
     "ParserDependencyError",
     "SdcParser",
+    "SystemRDLParser",
+    "SystemRdlParser",
     "SpiceParser",
     "TimingConstraintObservation",
     "UnsupportedFormatError",
@@ -71,6 +76,7 @@ __all__ = [
     "parse",
     "parse_c_header",
     "parse_cdl",
+    "parse_connectivity_csv",
     "parse_def",
     "parse_gds",
     "parse_gdsii",
@@ -80,6 +86,7 @@ __all__ = [
     "parse_liberty",
     "parse_pin_csv",
     "parse_sdc",
+    "parse_systemrdl",
     "parse_spice",
     "parse_upf",
     "parse_verilog",

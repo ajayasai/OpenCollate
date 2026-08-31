@@ -1,0 +1,5 @@
+addrmap broken {
+    reg {
+        field { sw = rw; } DATA[7:0]
+    } CTRL @ 0x0;
+};

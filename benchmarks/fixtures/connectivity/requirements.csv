@@ -1,0 +1,4 @@
+id,source,sink,expect,transform,description
+REQUIRED_PASS,top/a,top/y,reachable,identity,Known two-edge path must pass
+FORBIDDEN_WITNESS,top/middle,top/y,unreachable,any,Known path must produce a witness
+TAINTED_FRONTIER,top/a,top/selected,reachable,any,Unsupported binary logic must be inconclusive

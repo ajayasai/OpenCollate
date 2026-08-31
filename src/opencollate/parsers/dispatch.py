@@ -15,6 +15,7 @@ from opencollate.parsers.base import (
 )
 from opencollate.parsers.cdl import CdlParser
 from opencollate.parsers.cheader import CHeaderParser
+from opencollate.parsers.connectivity import ConnectivityCsvParser
 from opencollate.parsers.csvpins import CsvPinMapParser
 from opencollate.parsers.defparser import DefParser
 from opencollate.parsers.gds import GdsParser
@@ -22,11 +23,13 @@ from opencollate.parsers.ipxact import IpxactParser
 from opencollate.parsers.lef import LefParser
 from opencollate.parsers.liberty import LibertyParser
 from opencollate.parsers.sdc import SdcParser
+from opencollate.parsers.systemrdl import SystemRdlParser
 from opencollate.parsers.upf import UpfParser
 from opencollate.parsers.verilog import VerilogParser
 
 _PARSERS: dict[str, ViewParser] = {
     "verilog": VerilogParser(),
+    "connectivity": ConnectivityCsvParser(),
     "liberty": LibertyParser(),
     "lef": LefParser(),
     "csv": CsvPinMapParser(),
@@ -37,6 +40,7 @@ _PARSERS: dict[str, ViewParser] = {
     "cdl": CdlParser(),
     "def": DefParser(),
     "gds": GdsParser(),
+    "systemrdl": SystemRdlParser(),
 }
 
 _ALIASES = {
@@ -64,6 +68,12 @@ _ALIASES = {
     "gdsii": "gds",
     "gds2": "gds",
     "stream": "gds",
+    "rdl": "systemrdl",
+    "system-rdl": "systemrdl",
+    "system_rdl": "systemrdl",
+    "conn": "connectivity",
+    "connectivity-spec": "connectivity",
+    "connectivity_spec": "connectivity",
 }
 
 _EXTENSIONS = {
@@ -91,6 +101,8 @@ _EXTENSIONS = {
     ".def": "def",
     ".gds": "gds",
     ".gdsii": "gds",
+    ".rdl": "systemrdl",
+    ".occonn": "connectivity",
 }
 
 
@@ -150,7 +162,7 @@ def parse(
     else:
         source_paths = coerce_paths(paths)
         selected_format = normalize_format(format or str(format_or_paths))
-    if selected_format == "csv" and source_paths[0].suffix.lower() == ".tsv":
+    if selected_format in {"csv", "connectivity"} and source_paths[0].suffix.lower() == ".tsv":
         options.setdefault("delimiter", "\t")
     parser = get_parser(selected_format)
     return parser.parse(

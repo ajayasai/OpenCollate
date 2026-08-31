@@ -11,6 +11,11 @@ OpenCollate uses three normal process exit statuses:
 Warnings alone do not produce status 1 unless policy promotes their rule. A waived error remains
 in complete reports but does not produce status 1. Fatal findings cannot be downgraded or waived.
 
+`review` and `report diff` apply their selected `--fail-on` ratchet after validating both reports.
+`review` defaults to new-or-changed active errors; saved `report diff` is non-gating by default.
+Regardless of the ratchet, a current fatal finding or current status 2 returns 2. See
+[baseline review](baseline-review.md).
+
 ## Recommended CI pattern
 
 ```sh

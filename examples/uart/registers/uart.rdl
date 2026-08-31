@@ -1,0 +1,19 @@
+// Synthetic SystemRDL view of the UART register map.
+addrmap uart_register_block {
+    reg {
+        regwidth = 32;
+        field {
+            sw = rw;
+            hw = r;
+            reset = 0;
+        } ENABLE[0:0];
+        field {
+            sw = rw;
+            hw = r;
+        } MODE[5:4];
+    } CTRL @ 0x0;
+};
+
+addrmap uart_registers {
+    external uart_register_block uart_regs @ 0x40001000;
+};
