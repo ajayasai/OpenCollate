@@ -8,7 +8,7 @@ import json
 import sys
 import tempfile
 from dataclasses import replace
-from importlib import resources
+from importlib import import_module, resources
 from pathlib import Path
 from typing import Any
 
@@ -204,6 +204,10 @@ def _validate_csv_delimiter(source: SourceConfig, options: dict[str, Any]) -> No
     delimiter = options.get("delimiter")
     if delimiter is None:
         return
+    if delimiter in {"\r", "\n", '"'}:
+        raise CliError(
+            f"{source.view}: source option 'delimiter' is not a valid CSV delimiter: {delimiter!r}"
+        )
     try:
         next(csv.reader(("",), delimiter=delimiter), None)
     except (TypeError, ValueError) as error:
@@ -315,8 +319,7 @@ def _command_init(args: argparse.Namespace) -> int:
 
 def _capability_data() -> dict[str, Any]:
     try:
-        import pyslang
-
+        pyslang = import_module("pyslang")
         slang_version = getattr(pyslang, "__version__", "installed")
     except ImportError:  # pragma: no cover - package metadata requires pyslang
         slang_version = None
