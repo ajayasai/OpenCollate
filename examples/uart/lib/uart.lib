@@ -1,0 +1,60 @@
+/* Synthetic OpenCollate example. Contains deliberate inconsistencies. */
+library (synthetic_uart_lib) {
+    type (bus8_desc) {
+        base_type : array;
+        data_type : bit;
+        bit_width : 8;
+        bit_from : 7;
+        bit_to : 0;
+        downto : true;
+    }
+
+    cell (uart) {
+        area : 1.0;
+
+        pin (clk_i) {
+            direction : input;
+            clock : true;
+        }
+
+        pin (rst_ni) {
+            direction : input;
+        }
+
+        pin (tx_en_i) {
+            direction : input;
+        }
+
+        bus (data_i) {
+            bus_type : bus8_desc;
+            direction : input;
+        }
+
+        bus (data_o) {
+            bus_type : bus8_desc;
+            direction : output;
+            function : "data_i";
+        }
+
+        pin (irq_o) {
+            /* Deliberate mismatch: RTL declares output. */
+            direction : input;
+        }
+
+        pin (tx_active_o) {
+            direction : output;
+            /* Deliberate mismatch: RTL gates the inverted reset. */
+            function : "tx_en_i & rst_ni";
+        }
+
+        pg_pin (VDD_CORE) {
+            pg_type : primary_power;
+            voltage_name : VDD_CORE;
+        }
+
+        pg_pin (VSS) {
+            pg_type : primary_ground;
+            voltage_name : VSS;
+        }
+    }
+}

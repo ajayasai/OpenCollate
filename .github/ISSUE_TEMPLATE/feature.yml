@@ -1,0 +1,35 @@
+name: Feature request
+description: Propose an improvement to an existing OpenCollate workflow.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What engineering task is difficult today?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Show the command, diagnostic, contract, or integration you want.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and proof boundary
+      description: Note schema, CLI, diagnostic, performance, or correctness implications.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Data-safety confirmation
+      options:
+        - label: I have not included proprietary or confidential design collateral.
+          required: true

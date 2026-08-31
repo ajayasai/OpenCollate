@@ -1,0 +1,1 @@
+"""Bundled OpenCollate JSON Schemas."""

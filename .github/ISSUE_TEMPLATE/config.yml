@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Usage questions and support
+    url: https://github.com/ajayasai/OpenCollate/discussions
+    about: Ask configuration and usage questions without creating a defect.
+  - name: Private security report
+    url: https://github.com/ajayasai/OpenCollate/security/advisories/new
+    about: Report a suspected vulnerability privately. Never include confidential collateral.

@@ -1,0 +1,28 @@
+minimum_pre_commit_version: "4.0.0"
+default_language_version:
+  python: python3.11
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: ruff check
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: ruff format check
+        entry: ruff format --check
+        language: system
+        types: [python]
+      - id: mypy
+        name: mypy
+        entry: mypy src/opencollate
+        language: system
+        pass_filenames: false
+        types: [python]
+      - id: pytest-fast
+        name: pytest fast suite
+        entry: pytest -q
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

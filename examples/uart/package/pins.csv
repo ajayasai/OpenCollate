@@ -1,0 +1,7 @@
+Pad,Ball,Signal,Component
+PAD_CLK,A1,clk_i,uart
+PAD_RESET,A2,rst_ni,uart
+PAD_IRQ,B1,irq_o,uart
+PAD_TX_ACTIVE,B1,tx_active_o,uart
+PAD_VDD,C1,VDD_CORE,uart
+PAD_VSS,C2,VSS,uart

@@ -1,0 +1,1 @@
+"""OpenCollate tests."""

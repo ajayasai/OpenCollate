@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ajayasai/OpenCollate/schemas/contract.schema.json",
+  "title": "OpenCollate canonical design contract",
+  "type": "object",
+  "required": ["schema_version", "generated_by", "components"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "generated_by": { "type": "string" },
+    "components": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/component" }
+    }
+  },
+  "$defs": {
+    "range": {
+      "type": "object",
+      "required": ["left", "right", "step", "width"],
+      "properties": {
+        "left": { "type": "integer" },
+        "right": { "type": "integer" },
+        "step": { "enum": [-1, 0, 1] },
+        "width": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "shape": {
+      "type": "object",
+      "required": ["width", "packed", "unpacked"],
+      "properties": {
+        "width": { "type": ["integer", "null"], "minimum": 1 },
+        "left": { "type": "integer" },
+        "right": { "type": "integer" },
+        "ascending": { "type": "boolean" },
+        "packed": { "type": "array", "items": { "$ref": "#/$defs/range" } },
+        "unpacked": { "type": "array", "items": { "$ref": "#/$defs/range" } },
+        "bit_indices": { "type": "array", "items": { "type": "integer" } },
+        "explicit_scalar": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "port": {
+      "type": "object",
+      "required": ["canonical_name", "names", "direction", "role", "shape"],
+      "properties": {
+        "canonical_name": { "type": "string", "minLength": 1 },
+        "names": { "type": "object", "additionalProperties": { "type": "string" } },
+        "direction": {
+          "enum": ["input", "output", "inout", "internal", "feedthrough", "unknown"]
+        },
+        "role": {
+          "enum": ["signal", "clock", "reset", "power", "ground", "analog", "tie", "unknown"]
+        },
+        "shape": { "$ref": "#/$defs/shape" }
+      },
+      "additionalProperties": false
+    },
+    "component": {
+      "type": "object",
+      "required": ["canonical_name", "kind", "names", "required_views", "ports"],
+      "properties": {
+        "canonical_name": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["module", "cell", "macro", "pad", "unknown"] },
+        "names": { "type": "object", "additionalProperties": { "type": "string" } },
+        "required_views": { "type": "array", "items": { "type": "string" } },
+        "ports": { "type": "array", "items": { "$ref": "#/$defs/port" } }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

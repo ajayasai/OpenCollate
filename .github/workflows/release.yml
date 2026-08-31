@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]*.[0-9]*.[0-9]*"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    name: Build and publish GitHub release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: github-release
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Verify tag matches package version
+        run: |
+          PACKAGE_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          test "v$PACKAGE_VERSION" = "$GITHUB_REF_NAME"
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - name: Install project and release tools
+        run: python -m pip install -e ".[dev]"
+      - name: Verify source
+        run: |
+          ruff format --check .
+          ruff check .
+          mypy src/opencollate
+          pytest -q
+      - name: Build distributions
+        run: python -m build
+      - name: Check distribution metadata
+        run: twine check dist/*
+      - name: Smoke-test built wheel
+        run: |
+          python -m venv release-smoke
+          release-smoke/bin/python -m pip install dist/*.whl
+          release-smoke/bin/opencollate --version
+          release-smoke/bin/opencollate capabilities
+          release-smoke/bin/opencollate schema report --output report.schema.json
+          release-smoke/bin/opencollate demo
+          set +e
+          release-smoke/bin/opencollate check examples/uart/opencollate.toml --format json --output uart-report.json
+          STATUS=$?
+          set -e
+          test "$STATUS" -eq 1
+          release-smoke/bin/python -c "import json; json.load(open('uart-report.json', encoding='utf-8'))"
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          path: dist
+          format: spdx-json
+          output-file: dist/opencollate.spdx.json
+          upload-artifact: false
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS
+      - name: Attest release artifacts
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes --title "OpenCollate $GITHUB_REF_NAME"

@@ -1,0 +1,94 @@
+# Synthetic OpenCollate example. Geometry exists only to exercise tolerant skipping.
+VERSION 5.8 ;
+BUSBITCHARS "[]" ;
+DIVIDERCHAR "/" ;
+
+MACRO uart
+  CLASS BLOCK ;
+  ORIGIN 0 0 ;
+  SIZE 100 BY 100 ;
+  SYMMETRY X Y ;
+
+  PIN clk_i
+    DIRECTION INPUT ;
+    USE CLOCK ;
+    PORT
+      LAYER M2 ;
+      RECT 1 1 2 2 ;
+    END
+  END clk_i
+
+  PIN rst_ni
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    PORT
+      LAYER M2 ;
+      RECT 3 1 4 2 ;
+    END
+  END rst_ni
+
+  PIN tx_en_i
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    PORT
+      LAYER M2 ;
+      RECT 5 1 6 2 ;
+    END
+  END tx_en_i
+
+  PIN data_i[7:0]
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    PORT
+      LAYER M2 ;
+      RECT 10 1 20 2 ;
+    END
+  END data_i[7:0]
+
+  PIN data_o[7:0]
+    DIRECTION OUTPUT ;
+    USE SIGNAL ;
+    PORT
+      LAYER M2 ;
+      RECT 30 1 40 2 ;
+    END
+  END data_o[7:0]
+
+  PIN irq_o
+    DIRECTION OUTPUT ;
+    USE SIGNAL ;
+    PORT
+      LAYER M2 ;
+      RECT 50 1 51 2 ;
+    END
+  END irq_o
+
+  PIN tx_active_o
+    DIRECTION OUTPUT ;
+    USE SIGNAL ;
+    PORT
+      LAYER M2 ;
+      RECT 52 1 53 2 ;
+    END
+  END tx_active_o
+
+  PIN VDD_CORE
+    DIRECTION INOUT ;
+    USE POWER ;
+    PORT
+      LAYER M3 ;
+      RECT 0 98 100 100 ;
+    END
+  END VDD_CORE
+
+  PIN VSS
+    DIRECTION INOUT ;
+    USE GROUND ;
+    PORT
+      LAYER M3 ;
+      RECT 0 0 100 2 ;
+    END
+  END VSS
+END uart
+
+END LIBRARY

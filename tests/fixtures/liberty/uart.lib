@@ -1,0 +1,34 @@
+library (demo) {
+  type (bus8) {
+    base_type : array;
+    data_type : bit;
+    bit_width : 8;
+    bit_from : 7;
+    bit_to : 0;
+    downto : true;
+  }
+
+  cell (uart) {
+    bus (data) {
+      bus_type : bus8;
+      direction : input;
+    }
+    pin (clk) {
+      direction : input;
+      clock : true;
+    }
+    pin (enable) {
+      direction : input;
+    }
+    pin (irq) {
+      direction : output;
+      function : "clk & enable";
+    }
+    pg_pin (VDD) {
+      pg_type : primary_power;
+    }
+    pg_pin (VSS) {
+      pg_type : primary_ground;
+    }
+  }
+}

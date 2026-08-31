@@ -1,0 +1,6 @@
+VERSION 5.8 ;
+MACRO broken
+  PIN irq
+    DIRECTION OUTPUT ;
+    USE SIGNAL ;
+END broken

@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ajayasai/OpenCollate/schemas/report.schema.json",
+  "title": "OpenCollate report",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "tool",
+    "project",
+    "status",
+    "exit_code",
+    "summary",
+    "diagnostics"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "OpenCollate" },
+        "version": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "project": { "type": "string" },
+    "status": { "enum": ["pass", "fail"] },
+    "exit_code": { "enum": [0, 1, 2] },
+    "summary": {
+      "type": "object",
+      "required": [
+        "errors",
+        "warnings",
+        "notes",
+        "suppressed",
+        "views",
+        "components",
+        "ports"
+      ],
+      "properties": {
+        "errors": { "$ref": "#/$defs/nonNegativeInteger" },
+        "warnings": { "$ref": "#/$defs/nonNegativeInteger" },
+        "notes": { "$ref": "#/$defs/nonNegativeInteger" },
+        "suppressed": { "$ref": "#/$defs/nonNegativeInteger" },
+        "views": { "$ref": "#/$defs/nonNegativeInteger" },
+        "components": { "$ref": "#/$defs/nonNegativeInteger" },
+        "ports": { "$ref": "#/$defs/nonNegativeInteger" }
+      },
+      "additionalProperties": false
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagnostic" }
+    }
+  },
+  "$defs": {
+    "nonNegativeInteger": { "type": "integer", "minimum": 0 },
+    "location": {
+      "type": "object",
+      "required": ["path", "line", "column"],
+      "properties": {
+        "path": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 },
+        "end_line": { "type": "integer", "minimum": 1 },
+        "end_column": { "type": "integer", "minimum": 1 },
+        "view": { "type": "string" },
+        "raw_name": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["view", "value"],
+      "properties": {
+        "view": { "type": "string" },
+        "value": true,
+        "location": { "$ref": "#/$defs/location" },
+        "native_name": { "type": "string" },
+        "label": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "diagnostic": {
+      "type": "object",
+      "required": ["code", "severity", "message", "fingerprint", "waived", "evidence"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^OC[0-9]{4}$" },
+        "severity": { "enum": ["fatal", "error", "warning", "info"] },
+        "message": { "type": "string", "minLength": 1 },
+        "fingerprint": { "type": "string", "minLength": 1 },
+        "waived": { "type": "boolean" },
+        "suppressed": { "type": "boolean" },
+        "entity_id": { "type": "string" },
+        "waiver_reason": { "type": "string", "minLength": 1 },
+        "property": { "type": "string" },
+        "help": { "type": "string" },
+        "location": { "$ref": "#/$defs/location" },
+        "object": {
+          "type": "object",
+          "required": ["kind", "id", "display"],
+          "properties": {
+            "kind": { "type": "string" },
+            "id": { "type": "string" },
+            "display": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence" }
+        },
+        "metadata": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

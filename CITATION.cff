@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If OpenCollate helps your work, please cite this software."
+title: "OpenCollate: SoC design-collateral consistency checker"
+type: software
+authors:
+  - name: "ajayasai"
+version: 0.1.0
+date-released: 2026-08-31
+license: Apache-2.0
+repository-code: "https://github.com/ajayasai/OpenCollate"
+url: "https://github.com/ajayasai/OpenCollate"
+keywords:
+  - electronic design automation
+  - system-on-chip
+  - hardware verification
+  - design collateral

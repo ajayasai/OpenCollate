@@ -1,0 +1,63 @@
+name: Bug report
+description: Report a reproducible OpenCollate defect.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reducing the problem. Use only synthetic or safely redacted data.
+        Report security vulnerabilities through the private security form instead.
+  - type: input
+    id: version
+    attributes:
+      label: OpenCollate version
+      description: Paste `opencollate --version`.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Python version, and installation method.
+      placeholder: "Ubuntu 24.04, Python 3.12, Git checkout"
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and configuration
+      description: Include the exact command and a minimized TOML fragment.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Synthetic reproduction
+      description: Link a small public repository or paste minimal synthetic input.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the diagnostic code and complete error text.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Data-safety confirmation
+      options:
+        - label: I have not included proprietary or confidential design collateral.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

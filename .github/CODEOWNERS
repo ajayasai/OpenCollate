@@ -1,0 +1,6 @@
+# The project is currently maintained by one owner. Add domain reviewers as the
+# contributor base grows; do not use CODEOWNERS as a substitute for governance.
+* @ajayasai
+/.github/workflows/ @ajayasai
+/pyproject.toml @ajayasai
+/SECURITY.md @ajayasai

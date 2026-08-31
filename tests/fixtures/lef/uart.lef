@@ -1,0 +1,46 @@
+VERSION 5.8 ;
+BUSBITCHARS "<>" ;
+DIVIDERCHAR "/" ;
+
+MACRO uart
+  CLASS BLOCK ;
+  ORIGIN 0 0 ;
+  SIZE 100 BY 80 ;
+  PIN data<3>
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    PORT
+      LAYER M2 ;
+      RECT 0 0 1 1 ;
+    END
+  END data<3>
+  PIN data<2>
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+  END data<2>
+  PIN data<1>
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+  END data<1>
+  PIN data<0>
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+  END data<0>
+  PIN irq
+    DIRECTION OUTPUT ;
+    USE SIGNAL ;
+  END irq
+  PIN VDD
+    DIRECTION INOUT ;
+    USE POWER ;
+  END VDD
+  PIN VSS
+    DIRECTION INOUT ;
+    USE GROUND ;
+  END VSS
+  PIN scan_feed
+    DIRECTION FEEDTHRU ;
+    USE SIGNAL ;
+  END scan_feed
+END uart
+END LIBRARY

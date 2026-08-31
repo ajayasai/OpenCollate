@@ -1,0 +1,36 @@
+schema_version = 1
+
+[project]
+name = "synthetic-uart"
+root = "."
+
+[sources.rtl.default]
+files = ["rtl/uart.sv"]
+include_dirs = []
+defines = []
+top = "uart"
+
+[sources.liberty.tt]
+files = ["lib/uart.lib"]
+
+[sources.lef.abstract]
+files = ["lef/uart.lef"]
+
+[sources.csv.package]
+files = ["package/pins.csv"]
+profile = "package_map"
+
+[sources.csv.package.columns]
+die_pad = "Pad"
+package_ball = "Ball"
+signal = "Signal"
+component = "Component"
+
+[contract]
+baseline = "rtl.default"
+
+[policy]
+strict_inventory = false
+rtl_power_pins = "optional"
+scalar_vector_equivalent = false
+max_boolean_inputs = 12

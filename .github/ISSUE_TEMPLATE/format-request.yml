@@ -1,0 +1,39 @@
+name: Format support request
+description: Propose support for a format, revision, or syntax subset.
+title: "[Format]: "
+labels: ["format-support"]
+body:
+  - type: input
+    id: format
+    attributes:
+      label: Format and revision
+      placeholder: "IP-XACT IEEE 1685-2022"
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Cross-view failure to catch
+      description: Describe the concrete inconsistency and the views involved.
+    validations:
+      required: true
+  - type: textarea
+    id: subset
+    attributes:
+      label: Minimum useful syntax subset
+      description: Identify the objects and properties needed for a first implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: examples
+    attributes:
+      label: Redistributable examples and references
+      description: Link only material whose license permits implementation and public tests.
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I can help review format semantics.
+        - label: I can contribute synthetic conformance fixtures.
+        - label: I can help implement the parser.

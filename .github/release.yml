@@ -1,0 +1,24 @@
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+  categories:
+    - title: Breaking changes
+      labels:
+        - breaking
+    - title: New checks and formats
+      labels:
+        - feature
+        - format-support
+    - title: Fixes
+      labels:
+        - bug
+        - false-positive
+        - false-negative
+    - title: Documentation and maintenance
+      labels:
+        - documentation
+        - dependencies
+    - title: Other changes
+      labels:
+        - "*"

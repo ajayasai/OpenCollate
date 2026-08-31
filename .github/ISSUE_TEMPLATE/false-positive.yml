@@ -1,0 +1,61 @@
+name: Incorrect or missing diagnostic
+description: Report a suspected false positive or false negative.
+title: "[Result]: "
+labels: ["false-positive"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Correctness reports are especially valuable. Please provide a minimized synthetic case;
+        never attach confidential RTL, libraries, floorplans, or package maps.
+  - type: dropdown
+    id: result_kind
+    attributes:
+      label: Result kind
+      options:
+        - False positive — diagnostic should not appear
+        - False negative — expected diagnostic is missing
+        - Inconclusive or unsupported state is wrong
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: OpenCollate version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: code
+    attributes:
+      label: Diagnostic code
+      description: For a missing diagnostic, give the rule you expected.
+      placeholder: "OC4001"
+    validations:
+      required: true
+  - type: textarea
+    id: views
+    attributes:
+      label: Source views and normalized facts
+      description: State what each view says and which fact should be canonical.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Synthetic reproduction
+    validations:
+      required: true
+  - type: textarea
+    id: reasoning
+    attributes:
+      label: Why the result is incorrect
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Data-safety confirmation
+      options:
+        - label: The reproduction is synthetic and safe for permanent public redistribution.
+          required: true
