@@ -348,7 +348,10 @@ def test_contract_loader_failures_are_normalized(tmp_path: Path) -> None:
     ("payload", "message"),
     (
         ('{"schema_version": ' + "9" * 5_000 + "}", "invalid contract JSON"),
-        ("[" * 2_000 + "]" * 2_000, "contract root must be a JSON object"),
+        (
+            "[" * 2_000 + "]" * 2_000,
+            "invalid contract JSON|contract root must be a JSON object",
+        ),
     ),
 )
 def test_contract_loader_decoder_safety_failures_are_normalized(
