@@ -73,6 +73,14 @@ SCHEMA_VERSION = 1
         '''    summary["families"] = {family: _metrics(items) for family, items in sorted(by_family.items())}
 ''',
     ),
+    (
+        '''        ("OC2004",),
+        "Add a second same-name component definition with a different interface.",
+''',
+        '''        ("OC2004", "OC4001"),
+        "Add a second same-name component definition with a contradictory pin direction.",
+''',
+    ),
 )
 for old, new in replacements:
     count = text.count(old)
