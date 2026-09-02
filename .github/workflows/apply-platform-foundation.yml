@@ -3,7 +3,7 @@ name: Apply platform foundation
 on:
   push:
     branches:
-      - feat/open-platform-foundation
+      - "feat/open-platform-foundation"
 
 permissions:
   contents: write
@@ -14,7 +14,6 @@ concurrency:
 
 jobs:
   apply:
-    if: github.event.head_commit.message == 'chore: stage platform foundation'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -46,10 +45,14 @@ jobs:
         run: pytest -q
       - name: Check patch hygiene
         run: git diff --check
-      - name: Commit applied upgrade
+      - name: Remove one-shot bootstrap files
+        run: |
+          rm -f .github/workflows/apply-platform-foundation.yml
+          rm -f tools/apply_platform_upgrade.py tools/fix_plugin_cycle.py
+      - name: Commit verified upgrade
         run: |
           git config user.name "OpenCollate platform upgrade"
           git config user.email "actions@users.noreply.github.com"
-          git add README.md CHANGELOG.md docs src tests
+          git add -A
           git commit -m "feat: add fail-closed parser and checker plugin platform"
           git push origin "HEAD:${GITHUB_REF_NAME}"
