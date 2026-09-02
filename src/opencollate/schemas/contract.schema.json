@@ -2,21 +2,24 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/ajayasai/OpenCollate/schemas/contract.schema.json",
   "title": "OpenCollate canonical design contract",
-  "type": "object",
-  "required": ["schema_version", "generated_by", "components"],
-  "properties": {
-    "schema_version": { "const": 1 },
-    "generated_by": { "type": "string" },
-    "components": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/component" }
-    },
-    "registers": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/register" }
-    }
-  },
+  "oneOf": [
+    { "$ref": "#/$defs/contract_v1" },
+    { "$ref": "#/$defs/contract_v2" }
+  ],
   "$defs": {
+    "json_value": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "boolean" },
+        { "type": "number" },
+        { "type": "string" },
+        { "type": "array", "items": { "$ref": "#/$defs/json_value" } },
+        {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/json_value" }
+        }
+      ]
+    },
     "range": {
       "type": "object",
       "required": ["left", "right", "step", "width"],
@@ -118,7 +121,139 @@
         "fields": { "type": "array", "items": { "$ref": "#/$defs/register_field" } }
       },
       "additionalProperties": false
+    },
+    "snapshot_record": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/json_value" }
+    },
+    "view_snapshot": {
+      "type": "object",
+      "required": [
+        "snapshot_version",
+        "view",
+        "complete",
+        "tainted_scopes",
+        "components",
+        "pin_mappings",
+        "objects",
+        "clocks",
+        "interfaces",
+        "registers",
+        "connectivity_endpoints",
+        "connectivity_edges",
+        "connectivity_requirements",
+        "attributes",
+        "extensions",
+        "content_sha256"
+      ],
+      "properties": {
+        "snapshot_version": { "const": 1 },
+        "view": { "type": "string", "minLength": 1 },
+        "complete": { "type": "boolean" },
+        "tainted_scopes": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/snapshot_record" }
+        },
+        "pin_mappings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/snapshot_record" }
+        },
+        "objects": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/snapshot_record" }
+        },
+        "clocks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/snapshot_record" }
+        },
+        "interfaces": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/snapshot_record" }
+        },
+        "registers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/snapshot_record" }
+        },
+        "connectivity_endpoints": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/snapshot_record" }
+        },
+        "connectivity_edges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/snapshot_record" }
+        },
+        "connectivity_requirements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/snapshot_record" }
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/json_value" }
+        },
+        "extensions": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/json_value" }
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "contract_v1": {
+      "type": "object",
+      "required": ["schema_version", "generated_by", "components"],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "generated_by": { "type": "string" },
+        "components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/component" }
+        },
+        "registers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/register" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "contract_v2": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "generated_by",
+        "components",
+        "registers",
+        "views",
+        "extensions"
+      ],
+      "properties": {
+        "schema_version": { "const": 2 },
+        "generated_by": { "type": "string" },
+        "components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/component" }
+        },
+        "registers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/register" }
+        },
+        "views": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/view_snapshot" }
+        },
+        "extensions": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/json_value" }
+        }
+      },
+      "additionalProperties": false
     }
-  },
-  "additionalProperties": false
+  }
 }
