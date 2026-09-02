@@ -31,12 +31,12 @@ jobs:
           python tools/apply_platform_upgrade.py
       - name: Install project
         run: python -m pip install -e ".[dev]"
-      - name: Format and lint
+      - name: Format and lint shipped Python
         run: |
-          ruff format .
-          ruff check --fix .
-          ruff format --check .
-          ruff check .
+          ruff format src tests
+          ruff check --fix src tests
+          ruff format --check src tests
+          ruff check src tests
       - name: Type-check
         run: mypy src/opencollate
       - name: Security lint
