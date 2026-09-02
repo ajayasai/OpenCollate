@@ -8,14 +8,29 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
 
 ### Added
 
+- Canonical contract schema version 2, with deterministic per-view snapshots covering components,
+  package mappings, hierarchical objects, clocks, interfaces, registers, static connectivity, view
+  attributes, completeness, and tainted scopes. Each snapshot is protected by a verified SHA-256
+  content digest and contracts have a bounded, JSON-safe extension namespace.
+- `opencollate contract migrate` upgrades schema-version-1 contracts without inventing observation
+  families that legacy files did not persist. Version-1 contracts remain readable.
 - A versioned extension API for independently distributed parser and semantic-checker plugins,
   including Python entry-point discovery, runtime registration for embedding, provider/version
   provenance, deterministic capability inventory, and exact compatibility rejection.
 - Generic configured-source dispatch for external collateral formats, including forwarding of
   parser-specific options and the standard include/define/profile/column fields.
 
+### Changed
+
+- Newly generated contracts use schema version 2. Semantic checker plugins can inspect durable
+  frozen view snapshots through `CheckerContext.contract.views` rather than requiring source
+  collateral to be reparsed.
+
 ### Security
 
+- Contract loading recomputes every view-snapshot digest and rejects stale or modified content.
+  Snapshot attributes and extension values reject non-finite numbers, non-string object keys,
+  unsupported values, and excessive nesting.
 - External parsers cannot shadow built-in formats, aliases, or filename extensions. Parser plugin
   exceptions become fatal whole-view-tainted `OC9001` observations, and checker discovery,
   contract, or execution failures become fatal `OC9002` diagnostics.
@@ -98,51 +113,32 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
 - Static, non-executing SDC and UPF importers. Tcl-shaped collateral is tokenized and bounded
   facts are extracted without starting Tcl or running source commands.
 - Conventional C register-header import with bounded, side-effect-free integer expressions.
-- Structural CDL/SPICE import for subcircuits, explicit pin metadata, connectivity, globals,
-  models, and common M/R/C/L/X device forms without simulation or parameter evaluation.
-- Structural DEF 5.8 import for design interfaces, components, placements, nets, special nets,
-  and RTL endpoint validation while route geometry is safely skipped.
-- Experimental native GDSII import with bounded big-endian record parsing, cell structures,
-  SREF/AREF hierarchy, transforms, top-cell selection, and text labels. Geometry records are
-  skipped without polygon materialization; labels become candidate ports only through explicit
-  layer and/or text-type selectors.
-- First-class design-object references, clocks, IP-XACT interfaces, and register observations
-  with source provenance and explicit fact state.
-- SDC/RTL, UPF/RTL, IP-XACT interface, IP-XACT/C-header register, and DEF/RTL rule families,
-  expanding the runtime catalog to 65 rules.
-- A runnable eleven-view synthetic UART example covering every 0.2.0 input format.
-- Exact syntax, security, unknown-state, contract, configuration, and no-signoff documentation.
+- Parser-neutral observation families for design objects, clocks, interfaces, registers, fields,
+  and structured view attributes.
+- Cross-view checks for hierarchical references, clock targets and consistency, timing constraints,
+  power intent, IP-XACT interface maps, and register maps.
+- Strict source-option validation, configurable participation policies, authority selection, and
+  schema-validated JSON reports/contracts.
+
+### Changed
+
+- OpenCollate now treats unknown, unsupported, tainted, and not-applicable facts as distinct states
+  across the expanded model.
+- The public UART example includes IP-XACT, SDC, UPF, C header, CDL, DEF, and GDSII views.
 
 ### Security
 
-- IP-XACT rejects DTD and entity declarations and never fetches schemas or external definitions.
-- SDC and UPF do not execute Tcl; C-header and IP-XACT expressions use bounded static evaluators.
-- CDL/SPICE is never simulated, DEF/LEF geometry is not interpreted, and parser limits fail
-  closed with explicit diagnostics.
-- GDSII validates bounded record/container structure and discards geometry coordinates after
-  structural validation instead of constructing polygons.
-- Production parser invariants fail closed under optimized Python, and Bandit security lint is
-  enforced in local hooks and required CI.
+- XML entity/DTD declarations are rejected and no schema/network resolution is performed.
+- Tcl-shaped input is parsed without executing Tcl.
+- Integer expression evaluation is bounded and side-effect free.
 
-### Known limitations
-
-- GDSII support is experimental and structural only; it performs no geometry verification, DRC,
-  LVS, extraction, or implicit connectivity inference.
-- Static SDC/UPF coverage is intentionally smaller than full Tcl-based tool behavior.
-- OpenCollate does not perform signoff analysis and a clean report is not tapeout certification.
-
-## [0.1.0] - 2026-08-31
+## [0.1.0] - 2026-08-30
 
 ### Added
 
-- Initial Alpha release of the canonical SoC design-contract model.
+- Initial parser-neutral canonical model and deterministic diagnostic framework.
 - Verilog/SystemVerilog, Liberty, LEF, and CSV pin-map importers.
-- Cross-view inventory, port, bus, power/ground, and Boolean-function checks.
-- Human-readable diagnostics plus JSON, SARIF, and Markdown reporting surfaces.
-- Synthetic UART example and public parser/check conformance documentation.
-
-[Unreleased]: https://github.com/ajayasai/OpenCollate/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/ajayasai/OpenCollate/compare/v0.2.1...v0.3.0
-[0.2.1]: https://github.com/ajayasai/OpenCollate/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/ajayasai/OpenCollate/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/ajayasai/OpenCollate/releases/tag/v0.1.0
+- Component, port, shape, Boolean-function, and package-map consistency rules.
+- Text, JSON, Markdown, and SARIF reporters.
+- Multi-platform CI, branch coverage, package validation, CodeQL, dependency review, SBOMs,
+  checksums, and release provenance.
