@@ -1,4 +1,4 @@
-"""Apply exact diagnostic-run repairs to the mutation benchmark."""
+"""Apply exact final repairs to the semantic mutation benchmark."""
 
 from __future__ import annotations
 
@@ -100,3 +100,21 @@ metrics["properties"]["families"] = {
     "additionalProperties": {"$ref": "#/$defs/metrics"},
 }
 SCHEMA.write_text(json.dumps(schema, indent=2) + "\n", encoding="utf-8", newline="\n")
+
+CHANGELOG = ROOT / "CHANGELOG.md"
+changelog = CHANGELOG.read_text(encoding="utf-8")
+old = '''### Added
+
+- Canonical contract schema version 2, with deterministic per-view snapshots covering components,
+'''
+new = '''### Added
+
+- An oracle-backed semantic mutation benchmark with 34 paired mutants and clean controls across
+  inventory, interfaces, Boolean logic, package mappings, SDC, UPF, registers, DEF hierarchy, and
+  static connectivity. CI publishes exact recall, clean-control specificity, false-negative,
+  false-positive, inconclusive, overtrigger, and observation-order determinism metrics.
+- Canonical contract schema version 2, with deterministic per-view snapshots covering components,
+'''
+if changelog.count(old) != 1:
+    raise RuntimeError("changelog mutation benchmark insertion expected exactly one target")
+CHANGELOG.write_text(changelog.replace(old, new), encoding="utf-8", newline="\n")
