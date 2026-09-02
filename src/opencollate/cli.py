@@ -27,6 +27,7 @@ from opencollate.config import ConfigError, ProjectConfig, SourceConfig, load_co
 from opencollate.contracts import upgrade_contract
 from opencollate.demo import write_demo
 from opencollate.engine import ComparisonEngine, EngineResult, write_contract
+from opencollate.execution import MAX_PARSE_JOBS, ordered_parallel_map, parse_job_count
 from opencollate.model import ViewObservation
 from opencollate.parsers import parser_inventory
 from opencollate.plugins import plugin_inventory
@@ -59,6 +60,23 @@ def _config_argument(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-c", "--config", dest="config_option", help=argparse.SUPPRESS)
 
 
+def _job_count(value: str) -> int:
+    try:
+        return parse_job_count(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error)) from error
+
+
+def _jobs_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--jobs",
+        type=_job_count,
+        default=1,
+        metavar="N",
+        help=f"parse independent safe views with N workers, 1-{MAX_PARSE_JOBS} (default: 1)",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="opencollate",
@@ -69,6 +87,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     check = subparsers.add_parser("check", help="compare every configured design view")
     _config_argument(check)
+    _jobs_argument(check)
     check.add_argument(
         "--format",
         choices=("text", "json", "sarif", "markdown"),
@@ -88,6 +107,7 @@ def build_parser() -> argparse.ArgumentParser:
         "review", help="compare a live check against a committed report baseline"
     )
     _config_argument(review)
+    _jobs_argument(review)
     review.add_argument("--baseline", required=True, help="prior OpenCollate JSON report")
     review.add_argument("--write-report", help="write the complete current JSON report")
     review.add_argument(
@@ -119,6 +139,7 @@ def build_parser() -> argparse.ArgumentParser:
     report_diff.set_defaults(handler=_command_report_diff)
 
     demo = subparsers.add_parser("demo", help="run a self-contained synthetic demonstration")
+    _jobs_argument(demo)
     demo.add_argument("--output-dir", help="keep generated sources in this directory")
     demo.add_argument(
         "--format",
@@ -155,6 +176,7 @@ def build_parser() -> argparse.ArgumentParser:
     contract_subparsers = contract.add_subparsers(dest="contract_command", required=True)
     build = contract_subparsers.add_parser("build", help="build a contract from configured views")
     _config_argument(build)
+    _jobs_argument(build)
     build.add_argument("-o", "--output", default="contract.oc.json")
     build.set_defaults(handler=_command_contract_build)
     migrate = contract_subparsers.add_parser(
@@ -517,12 +539,30 @@ def _validate_csv_delimiter(source: SourceConfig, options: dict[str, Any]) -> No
         ) from error
 
 
-def _load_observations(config: ProjectConfig) -> tuple[ViewObservation, ...]:
-    return tuple(_parse_source(source) for source in config.sources)
+def _source_parallel_safe(source: SourceConfig) -> bool:
+    from opencollate.parsers import UnsupportedFormatError, get_registration
+
+    try:
+        return get_registration(source.view.kind).parallel_safe
+    except UnsupportedFormatError:
+        return False
 
 
-def _run(config: ProjectConfig) -> EngineResult:
-    return ComparisonEngine(config).run(_load_observations(config))
+def _load_observations(
+    config: ProjectConfig,
+    *,
+    jobs: int = 1,
+) -> tuple[ViewObservation, ...]:
+    return ordered_parallel_map(
+        config.sources,
+        _parse_source,
+        jobs=jobs,
+        parallel_safe=_source_parallel_safe,
+    )
+
+
+def _run(config: ProjectConfig, *, jobs: int = 1) -> EngineResult:
+    return ComparisonEngine(config).run(_load_observations(config, jobs=jobs))
 
 
 def _render(result: EngineResult, format_name: str, *, verbose: bool = False) -> str:
@@ -693,7 +733,7 @@ def _command_check(args: argparse.Namespace) -> int:
     config = load_config(_selected_config(args))
     if args.deny_warnings and not config.policy.deny_warnings:
         config = replace(config, policy=replace(config.policy, deny_warnings=True))
-    result = _run(config)
+    result = _run(config, jobs=args.jobs)
     _emit(_render(result, args.format, verbose=args.verbose), args.output)
     return result.exit_code
 
@@ -707,7 +747,7 @@ def _command_review(args: argparse.Namespace) -> int:
     config = load_config(_selected_config(args))
     if args.deny_warnings and not config.policy.deny_warnings:
         config = replace(config, policy=replace(config.policy, deny_warnings=True))
-    result = _run(config)
+    result = _run(config, jobs=args.jobs)
     current = result.to_dict()
     if args.write_report:
         _write_text_file(
@@ -758,7 +798,7 @@ def _command_demo(args: argparse.Namespace) -> int:
     except OSError as error:
         destination = Path(args.output_dir).expanduser().resolve() if args.output_dir else "demo"
         raise CliError(f"cannot write synthetic demo to {destination}: {error}") from error
-    result = _run(load_config(root / "opencollate.toml"))
+    result = _run(load_config(root / "opencollate.toml"), jobs=args.jobs)
     if args.format == "text":
         sys.stdout.write(f"Synthetic demo: {root}\n")
     _emit(_render(result, args.format))
@@ -957,7 +997,7 @@ def _command_schema(args: argparse.Namespace) -> int:
 
 def _command_contract_build(args: argparse.Namespace) -> int:
     config = load_config(_selected_config(args))
-    result = _run(config)
+    result = _run(config, jobs=args.jobs)
     if result.exit_code == 2:
         _emit(render_text(result))
         return 2

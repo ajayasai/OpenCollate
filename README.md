@@ -112,7 +112,7 @@ not-applicable diagnostic; absence of a mismatch is not proof of equivalence.
 ## Commands
 
 ```text
-opencollate check [CONFIG]                  # default: opencollate.toml
+opencollate check [CONFIG] [--jobs N]       # default: opencollate.toml, one parser worker
 opencollate review [CONFIG] --baseline REPORT
 opencollate report diff BASELINE CURRENT
 opencollate check -c path/to/config.toml

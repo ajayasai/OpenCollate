@@ -58,6 +58,7 @@ plugin = ParserPluginSpec(
     name="oasis-structural",
     aliases=("oas",),
     extensions=(".oas", ".oasis"),
+    parallel_safe=True,
 )
 ```
 
@@ -69,7 +70,11 @@ oasis = "my_opencollate_plugin:plugin"
 ```
 
 The entry point may expose a `ParserPluginSpec`, a parser instance, a parser class, or a zero-argument
-factory. A spec is preferred because it declares aliases and filename extensions.
+factory. A spec is preferred because it declares aliases, filename extensions, and whether distinct
+parser calls can safely overlap. Plugins default to `parallel_safe=False`; set it to true only when
+the parser has no shared mutable state and its dependencies explicitly support concurrent calls.
+Built-in parsers declare themselves safe. `--jobs N` never overlaps an unsafe plugin with any other
+parser work.
 
 The core rejects the complete parser registration when its canonical format, any alias, or any
 extension conflicts with an existing owner. In particular, an external package cannot shadow a
@@ -158,7 +163,8 @@ Within a major OpenCollate release:
 
 - the version-1 context fields and parser protocol will not be removed;
 - built-in format ownership remains protected;
-- plugin order is deterministic;
+- plugin order and parallel result order are deterministic;
+- plugins remain serial unless they explicitly declare `parallel_safe=True`;
 - plugin exceptions remain fatal and retain provider/version metadata;
 - capability JSON remains the authoritative runtime inventory.
 

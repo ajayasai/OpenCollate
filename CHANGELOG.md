@@ -8,6 +8,9 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
 
 ### Added
 
+- Opt-in deterministic parallel parsing through `--jobs N` for check, review, demo, and contract
+  build. Built-ins are marked parallel-safe; third-party parsers remain hard serial barriers unless
+  they explicitly declare `parallel_safe=True` in their versioned capability metadata.
 - An oracle-backed semantic mutation benchmark with 34 paired mutants and clean controls across
   inventory, interfaces, Boolean logic, package mappings, SDC, UPF, registers, DEF hierarchy, and
   static connectivity. CI publishes exact recall, clean-control specificity, false-negative,
