@@ -23,7 +23,8 @@ from opencollate.baseline import (
     diff_reports,
 )
 from opencollate.catalog import get_rule, iter_rules
-from opencollate.config import ConfigError, ProjectConfig, SourceConfig, load_config
+from opencollate.config import ConfigError, ProjectConfig, SourceConfig, load_config, load_contract
+from opencollate.contracts import upgrade_contract
 from opencollate.demo import write_demo
 from opencollate.engine import ComparisonEngine, EngineResult, write_contract
 from opencollate.model import ViewObservation
@@ -156,6 +157,13 @@ def build_parser() -> argparse.ArgumentParser:
     _config_argument(build)
     build.add_argument("-o", "--output", default="contract.oc.json")
     build.set_defaults(handler=_command_contract_build)
+    migrate = contract_subparsers.add_parser(
+        "migrate",
+        help="upgrade a v1 contract to the current schema without inventing unavailable facts",
+    )
+    migrate.add_argument("input", help="existing OpenCollate contract JSON")
+    migrate.add_argument("-o", "--output", help="destination (default: INPUT stem plus .v2)")
+    migrate.set_defaults(handler=_command_contract_migrate)
     return parser
 
 
@@ -959,6 +967,23 @@ def _command_contract_build(args: argparse.Namespace) -> int:
         destination = Path(args.output).expanduser().resolve()
         raise CliError(f"cannot write contract {destination}: {error}") from error
     print(f"Wrote {target}")
+    return 0
+
+
+def _command_contract_migrate(args: argparse.Namespace) -> int:
+    source = Path(args.input).expanduser().resolve()
+    contract = load_contract(source)
+    upgraded = upgrade_contract(contract)
+    destination = (
+        Path(args.output).expanduser().resolve()
+        if args.output
+        else source.with_name(f"{source.stem}.v2{source.suffix}")
+    )
+    try:
+        target = write_contract(upgraded, destination)
+    except OSError as error:
+        raise CliError(f"cannot write contract {destination}: {error}") from error
+    print(f"Wrote schema {upgraded.schema_version} contract to {target}")
     return 0
 
 

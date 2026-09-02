@@ -158,7 +158,9 @@ class ContractViewSnapshot:
             object.__setattr__(
                 self,
                 field_name,
-                _normalize_records(getattr(self, field_name), path=f"views.{self.view}.{field_name}"),
+                _normalize_records(
+                    getattr(self, field_name), path=f"views.{self.view}.{field_name}"
+                ),
             )
         object.__setattr__(
             self,
@@ -218,8 +220,7 @@ class ContractViewSnapshot:
         unexpected = sorted(set(data) - allowed)
         if unexpected:
             raise ValueError(
-                "contract view snapshot contains unsupported properties: "
-                + ", ".join(unexpected)
+                "contract view snapshot contains unsupported properties: " + ", ".join(unexpected)
             )
         view = data.get("view")
         if not isinstance(view, str) or not view:

@@ -133,9 +133,7 @@ def _observation() -> ViewObservation:
             ),
         ),
         connectivity_endpoints=(source, sink),
-        connectivity_edges=(
-            ConnectivityEdge(source, sink, kind="assign", inverted=False),
-        ),
+        connectivity_edges=(ConnectivityEdge(source, sink, kind="assign", inverted=False),),
         connectivity_requirements=(
             ConnectivityRequirement(
                 "REQ-1",

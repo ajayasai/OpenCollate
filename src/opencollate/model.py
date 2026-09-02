@@ -15,6 +15,12 @@ from operator import mul
 from pathlib import Path
 from typing import Any, Generic, TypeVar
 
+from opencollate.contracts import (
+    CONTRACT_SCHEMA_VERSION,
+    ContractViewSnapshot,
+    normalize_contract_extensions,
+)
+
 
 class FactState(StrEnum):
     """How confidently an observed fact can be used by a checker."""
@@ -1016,16 +1022,40 @@ class ContractRegister:
 @dataclass(frozen=True, slots=True)
 class DesignContract:
     components: tuple[ContractComponent, ...]
-    schema_version: int = 1
+    schema_version: int = CONTRACT_SCHEMA_VERSION
     generated_by: str = "OpenCollate"
     registers: tuple[ContractRegister, ...] = ()
+    views: tuple[ContractViewSnapshot, ...] = ()
+    extensions: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "components", tuple(self.components))
-        object.__setattr__(self, "registers", tuple(self.registers))
+        if type(self.schema_version) is not int:
+            raise TypeError("contract schema_version must be an integer")
+        if self.schema_version not in {1, CONTRACT_SCHEMA_VERSION}:
+            raise ValueError(
+                f"unsupported contract schema_version {self.schema_version}; "
+                f"this release supports 1 and {CONTRACT_SCHEMA_VERSION}"
+            )
+        if not isinstance(self.generated_by, str):
+            raise TypeError("contract generated_by must be a string")
+        components = tuple(self.components)
+        registers = tuple(self.registers)
+        views = tuple(self.views)
+        if not all(isinstance(item, ContractViewSnapshot) for item in views):
+            raise TypeError("contract views must contain ContractViewSnapshot values")
+        view_names = [item.view for item in views]
+        if len(view_names) != len(set(view_names)):
+            raise ValueError("contract views must have unique view identities")
+        extensions = normalize_contract_extensions(self.extensions)
+        if self.schema_version == 1 and (views or extensions):
+            raise ValueError("contract schema_version 1 cannot contain views or extensions")
+        object.__setattr__(self, "components", components)
+        object.__setattr__(self, "registers", registers)
+        object.__setattr__(self, "views", tuple(sorted(views, key=lambda item: item.view)))
+        object.__setattr__(self, "extensions", extensions)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result: dict[str, Any] = {
             "schema_version": self.schema_version,
             "generated_by": self.generated_by,
             "components": [
@@ -1045,15 +1075,20 @@ class DesignContract:
                 )
             ],
         }
+        if self.schema_version >= CONTRACT_SCHEMA_VERSION:
+            result["views"] = [item.to_dict() for item in self.views]
+            result["extensions"] = dict(self.extensions)
+        return result
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> DesignContract:
         schema_version = data.get("schema_version", 1)
         if type(schema_version) is not int:
             raise TypeError("schema_version must be an integer")
-        if schema_version != 1:
+        if schema_version not in {1, CONTRACT_SCHEMA_VERSION}:
             raise ValueError(
-                f"unsupported schema_version {schema_version}; this release supports 1"
+                f"unsupported schema_version {schema_version}; "
+                f"this release supports 1 and {CONTRACT_SCHEMA_VERSION}"
             )
         generated_by = data.get("generated_by", "OpenCollate")
         if not isinstance(generated_by, str):
@@ -1249,12 +1284,41 @@ class DesignContract:
                     fields=tuple(register_fields),
                 )
             )
+        if schema_version == 1:
+            if "views" in data or "extensions" in data:
+                raise ValueError("contract schema_version 1 cannot contain views or extensions")
+            views: tuple[ContractViewSnapshot, ...] = ()
+            extensions: dict[str, Any] = {}
+        else:
+            if "views" not in data:
+                raise TypeError("views must be an array for contract schema_version 2")
+            raw_views = data.get("views")
+            if not isinstance(raw_views, (list, tuple)):
+                raise TypeError("views must be an array")
+            views = tuple(
+                ContractViewSnapshot.from_dict(item)
+                if isinstance(item, Mapping)
+                else _raise_contract_view_type(index)
+                for index, item in enumerate(raw_views)
+            )
+            if "extensions" not in data:
+                raise TypeError("extensions must be an object for contract schema_version 2")
+            raw_extensions = data.get("extensions")
+            if not isinstance(raw_extensions, Mapping):
+                raise TypeError("extensions must be an object")
+            extensions = normalize_contract_extensions(raw_extensions)
         return cls(
             tuple(components),
             schema_version=schema_version,
             generated_by=generated_by,
             registers=tuple(registers),
+            views=views,
+            extensions=extensions,
         )
+
+
+def _raise_contract_view_type(index: int) -> ContractViewSnapshot:
+    raise TypeError(f"views[{index}] must be an object")
 
 
 def decoded_identifier(name: str) -> str:
