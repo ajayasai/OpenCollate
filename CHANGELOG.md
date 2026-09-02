@@ -6,6 +6,22 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- A versioned extension API for independently distributed parser and semantic-checker plugins,
+  including Python entry-point discovery, runtime registration for embedding, provider/version
+  provenance, deterministic capability inventory, and exact compatibility rejection.
+- Generic configured-source dispatch for external collateral formats, including forwarding of
+  parser-specific options and the standard include/define/profile/column fields.
+
+### Security
+
+- External parsers cannot shadow built-in formats, aliases, or filename extensions. Parser plugin
+  exceptions become fatal whole-view-tainted `OC9001` observations, and checker discovery,
+  contract, or execution failures become fatal `OC9002` diagnostics.
+- Package plugin discovery can be disabled for hermetic execution with
+  `OPENCOLLATE_DISABLE_PLUGINS=1`.
+
 ## [0.3.0] - 2026-08-31
 
 ### Added

@@ -164,6 +164,22 @@ hierarchical objects, constraints, and mappings remain first-class run observati
 all frozen-contract fields in schema version 1. Read the [architecture](docs/architecture.md),
 [canonical contract](docs/canonical-contract.md), and [diagnostic model](docs/diagnostics.md).
 
+## Versioned extension platform
+
+Installed packages can add collateral parsers through the `opencollate.parsers` entry-point group
+and semantic checks through `opencollate.checkers`. Registrations declare extension API version 1,
+provider/version provenance, aliases, and filename suffixes. They cannot silently shadow built-in
+formats. Parser crashes become fatal, whole-view-tainted `OC9001` observations; checker discovery
+or execution crashes become fatal `OC9002` diagnostics.
+
+```console
+opencollate capabilities --json  # exact built-in/plugin ownership and failures
+```
+
+See the [extension API](docs/extension-api.md) for packaging, runtime registration, compatibility,
+configuration forwarding, deterministic conflict handling, and the plugin trust boundary. Set
+`OPENCOLLATE_DISABLE_PLUGINS=1` when a hermetic run must ignore installed entry points.
+
 ## Security and privacy
 
 OpenCollate treats configuration and collateral as untrusted input. SDC and UPF are tokenized as

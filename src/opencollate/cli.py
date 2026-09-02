@@ -27,6 +27,8 @@ from opencollate.config import ConfigError, ProjectConfig, SourceConfig, load_co
 from opencollate.demo import write_demo
 from opencollate.engine import ComparisonEngine, EngineResult, write_contract
 from opencollate.model import ViewObservation
+from opencollate.parsers import parser_inventory
+from opencollate.plugins import plugin_inventory
 from opencollate.reporters import (
     render_diff_json,
     render_diff_markdown,
@@ -190,6 +192,17 @@ def _parse_source(source: SourceConfig) -> ViewObservation:
     paths = source.expand_files()
     kind = source.view.kind.lower()
     options = dict(source.options)
+    from opencollate.parsers import UnsupportedFormatError, get_registration
+
+    try:
+        registration = get_registration(kind)
+    except UnsupportedFormatError:
+        registration = None
+    plugin_generic_fields = (
+        frozenset(("include_dirs", "defines", "profile", "columns"))
+        if registration is not None and not registration.builtin
+        else frozenset()
+    )
     generic_fields = (
         frozenset(("include_dirs", "defines"))
         if kind in {"rtl", "sv", "systemverilog", "verilog"}
@@ -199,7 +212,7 @@ def _parse_source(source: SourceConfig) -> ViewObservation:
         if kind in {"csv", "pinmap", "pin_map"}
         else frozenset(("columns",))
         if kind in {"connectivity", "connectivity_spec", "connectivity-spec", "conn"}
-        else frozenset()
+        else plugin_generic_fields
     )
     _reject_inapplicable_source_fields(source, allowed=generic_fields)
     if kind in {"rtl", "sv", "systemverilog", "verilog"}:
@@ -324,10 +337,29 @@ def _parse_source(source: SourceConfig) -> ViewObservation:
         from opencollate.parsers.gds import parse_gds
 
         return parse_gds(paths, view_id=source.view, **options)
-    raise CliError(
-        f"no parser is registered for source view {source.view}",
-        code="OC1001",
-    )
+    from opencollate.parsers import parse as parse_collateral
+
+    plugin_options = dict(options)
+    if source.include_dirs:
+        plugin_options["include_dirs"] = source.include_dirs
+    if source.defines:
+        plugin_options["defines"] = dict(source.defines)
+    if source.profile is not None:
+        plugin_options["profile"] = source.profile
+    if source.columns:
+        plugin_options["columns"] = dict(source.columns)
+    try:
+        return parse_collateral(
+            kind,
+            paths,
+            view_id=source.view,
+            **plugin_options,
+        )
+    except UnsupportedFormatError as error:
+        raise CliError(
+            f"no parser is registered for source view {source.view}: {error}",
+            code="OC1001",
+        ) from error
 
 
 def _reject_unknown_source_options(
@@ -855,6 +887,8 @@ def _capability_data() -> dict[str, Any]:
             "report-diff-json",
         ],
         "rules": len(list(iter_rules())),
+        "parser_registry": parser_inventory(),
+        "plugins": plugin_inventory(),
     }
 
 
@@ -868,7 +902,23 @@ def _command_capabilities(args: argparse.Namespace) -> int:
     for name, details in data["formats"].items():
         backend = f" ({details['backend']})" if "backend" in details else ""
         print(f"  {name.replace('_', '/'):24} {details['status']}{backend}")
+    registry = data["parser_registry"]
+    external = [item for item in registry["registrations"] if not item["builtin"]]
     print(f"\nBuilt-in rules: {data['rules']}")
+    print(f"External parsers: {len(external)}")
+    print(f"External checkers: {len(data['plugins']['checkers'])}")
+    if registry["failures"] or data["plugins"]["failures"]:
+        failures = {
+            (
+                item["group"],
+                item["name"],
+                item.get("provider"),
+                item["error_type"],
+                item["message"],
+            )
+            for item in [*registry["failures"], *data["plugins"]["failures"]]
+        }
+        print(f"Plugin failures: {len(failures)}")
     print("Outputs: " + ", ".join(data["outputs"]))
     return 0
 
