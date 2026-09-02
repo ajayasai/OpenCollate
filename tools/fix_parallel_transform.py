@@ -1,4 +1,4 @@
-"""Tighten the ParserPluginSpec anchor in the one-shot transformation."""
+"""Tighten and normalize anchors in the one-shot parallel transformation."""
 
 from pathlib import Path
 
@@ -56,5 +56,19 @@ new = '''    ''' + "'''" + '''class ParserPluginSpec:
 ''' + "'''" + ''',
 '''
 if text.count(old) != 1:
-    raise RuntimeError(f"expected one transform anchor, found {text.count(old)}")
-PATH.write_text(text.replace(old, new), encoding="utf-8", newline="\n")
+    raise RuntimeError(f"expected one ParserPluginSpec transform anchor, found {text.count(old)}")
+text = text.replace(old, new)
+
+obsolete = '''replace_once(
+    "README.md",
+    ''' + "'''" + '''- **CI native:** deterministic text, JSON, Markdown, SARIF, report-diff, and contract artifacts.
+''' + "'''" + ''',
+    ''' + "'''" + '''- **CI native:** deterministic text, JSON, Markdown, SARIF, report-diff, and contract artifacts.
+- **Bounded parallel parsing:** opt-in workers preserve configuration order and isolate unsafe plugins.
+''' + "'''" + ''',
+)
+
+'''
+if text.count(obsolete) != 1:
+    raise RuntimeError(f"expected one obsolete README transform, found {text.count(obsolete)}")
+PATH.write_text(text.replace(obsolete, ""), encoding="utf-8", newline="\n")
