@@ -159,7 +159,9 @@ def _builtin_registration(format_name: str, parser: ViewParser) -> ParserRegistr
         sorted(alias for alias, owner in _BUILTIN_ALIASES.items() if owner == format_name)
     )
     extensions = tuple(
-        sorted(extension for extension, owner in _BUILTIN_EXTENSIONS.items() if owner == format_name)
+        sorted(
+            extension for extension, owner in _BUILTIN_EXTENSIONS.items() if owner == format_name
+        )
     )
     return ParserRegistration(
         format_name=format_name,
@@ -205,24 +207,22 @@ def _registry_snapshot() -> _RegistrySnapshot:
         format_name = spec.format_name
         conflicts: list[str] = []
         if format_name in registrations:
-            owner = registrations[format_name]
-            conflicts.append(f"format {format_name!r} is already owned by {owner.provider}")
+            format_owner = registrations[format_name]
+            conflicts.append(f"format {format_name!r} is already owned by {format_owner.provider}")
         alias_owner = aliases.get(format_name)
         if alias_owner is not None and alias_owner != format_name:
-            conflicts.append(
-                f"format {format_name!r} conflicts with an alias for {alias_owner!r}"
-            )
+            conflicts.append(f"format {format_name!r} conflicts with an alias for {alias_owner!r}")
         for alias in spec.aliases:
             token = _format_token(alias)
             if token in registrations and token != format_name:
                 conflicts.append(f"alias {alias!r} conflicts with registered format {token!r}")
-            owner = aliases.get(token)
-            if owner is not None and owner != format_name:
-                conflicts.append(f"alias {alias!r} is already owned by {owner!r}")
+            token_owner = aliases.get(token)
+            if token_owner is not None and token_owner != format_name:
+                conflicts.append(f"alias {alias!r} is already owned by {token_owner!r}")
         for extension in spec.extensions:
-            owner = extensions.get(extension)
-            if owner is not None and owner != format_name:
-                conflicts.append(f"extension {extension!r} is already owned by {owner!r}")
+            extension_owner = extensions.get(extension)
+            if extension_owner is not None and extension_owner != format_name:
+                conflicts.append(f"extension {extension!r} is already owned by {extension_owner!r}")
         if conflicts:
             failures.append(_conflict_failure(spec, tuple(sorted(set(conflicts)))))
             continue

@@ -22,9 +22,9 @@ from opencollate.parsers import (
 )
 from opencollate.parsers.base import Pathish, coerce_view
 from opencollate.plugins import (
+    PLUGIN_API_VERSION,
     CheckerContext,
     CheckerPluginSpec,
-    PLUGIN_API_VERSION,
     PluginContractError,
     plugin_inventory,
     register_checker_plugin,
@@ -123,9 +123,7 @@ def test_parser_plugin_cannot_shadow_a_builtin_format() -> None:
     register_parser_plugin(spec)
     try:
         inventory = parser_inventory()
-        failure = next(
-            item for item in inventory["failures"] if item["name"] == "shadow_verilog"
-        )
+        failure = next(item for item in inventory["failures"] if item["name"] == "shadow_verilog")
         assert failure["error_type"] == "PluginConflictError"
         assert "already owned by OpenCollate" in failure["message"]
         assert get_parser("verilog").__class__.__name__ == "VerilogParser"

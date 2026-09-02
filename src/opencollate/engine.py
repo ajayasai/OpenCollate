@@ -72,6 +72,7 @@ from opencollate.model import (
     ViewObservation,
     decoded_identifier,
 )
+from opencollate.plugins import CheckerContext, run_checker_plugins
 
 _VIEW_KIND_ALIASES = {
     "sv": "rtl",
@@ -440,10 +441,23 @@ class ComparisonEngine:
         diagnostics.extend(self._check_interfaces(reconciliation.design, observed, resolver))
         diagnostics.extend(self._check_registers(observed, contract))
         diagnostics.extend(self._check_connectivity(observed))
-        diagnostics = self._apply_severity_overrides(diagnostics)
-        diagnostics = self._apply_waivers(diagnostics, today=today or date.today())
-        ordered = sort_diagnostics(diagnostics)
+        analysis_date = today or date.today()
         generated = self.build_contract(reconciliation.design, observed)
+        diagnostics.extend(
+            run_checker_plugins(
+                CheckerContext(
+                    config=self.config,
+                    observations=observed,
+                    design=reconciliation.design,
+                    contract=contract,
+                    generated_contract=generated,
+                    today=analysis_date,
+                )
+            )
+        )
+        diagnostics = self._apply_severity_overrides(diagnostics)
+        diagnostics = self._apply_waivers(diagnostics, today=analysis_date)
+        ordered = sort_diagnostics(diagnostics)
         return EngineResult(
             project=self.config.name,
             design=reconciliation.design,

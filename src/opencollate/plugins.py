@@ -18,10 +18,10 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from opencollate.diagnostics import Diagnostic
 from opencollate.model import CanonicalDesign, DesignContract, ViewObservation
-from opencollate.parsers.base import ViewParser
 
 if TYPE_CHECKING:
     from opencollate.config import ProjectConfig
+    from opencollate.parsers.base import ViewParser
 
 PLUGIN_API_VERSION = 1
 PARSER_ENTRY_POINT_GROUP = "opencollate.parsers"
@@ -51,6 +51,12 @@ class CheckerPlugin(Protocol):
 
 
 CheckerCallable = Callable[["CheckerContext"], Iterable[Diagnostic]]
+
+
+def _is_parser(value: Any) -> bool:
+    return isinstance(getattr(value, "format_name", None), str) and callable(
+        getattr(value, "parse", None)
+    )
 
 
 def _normalized_name(value: str, *, what: str) -> str:
@@ -104,14 +110,12 @@ class ParserPluginSpec:
                 f"parser plugin API {self.api_version!r} is unsupported; "
                 f"this release supports {PLUGIN_API_VERSION}"
             )
-        if not isinstance(self.parser, ViewParser):
+        if not _is_parser(self.parser):
             raise PluginContractError(
                 "parser plugin must expose format_name and parse(paths, *, view_id, **options)"
             )
         format_name = _normalized_name(self.parser.format_name, what="parser format name")
-        normalized_aliases = {
-            _normalized_name(item, what="parser alias") for item in self.aliases
-        }
+        normalized_aliases = {_normalized_name(item, what="parser alias") for item in self.aliases}
         aliases = tuple(sorted(normalized_aliases - {format_name}))
         extensions = tuple(sorted({_normalized_extension(item) for item in self.extensions}))
         name = _normalized_name(self.name or format_name, what="parser plugin name")
@@ -200,8 +204,7 @@ class CheckerPluginSpec:
         invalid = next((item for item in diagnostics if not isinstance(item, Diagnostic)), None)
         if invalid is not None:
             raise PluginContractError(
-                f"checker plugin {self.name!r} returned {type(invalid).__name__}, "
-                "not a Diagnostic"
+                f"checker plugin {self.name!r} returned {type(invalid).__name__}, not a Diagnostic"
             )
         return diagnostics
 
@@ -297,7 +300,11 @@ def _materialize_parser(
     candidate = loaded
     if isinstance(candidate, type):
         candidate = candidate()
-    elif not isinstance(candidate, (ParserPluginSpec, ViewParser)) and callable(candidate):
+    elif (
+        not isinstance(candidate, ParserPluginSpec)
+        and not _is_parser(candidate)
+        and callable(candidate)
+    ):
         candidate = candidate()
     spec = (
         candidate
