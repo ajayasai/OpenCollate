@@ -14,30 +14,60 @@
     "result_sha256"
   ],
   "properties": {
-    "schema_version": { "const": 1 },
-    "suite": { "const": "opencollate-semantic-mutations" },
-    "opencollate_version": { "type": "string", "minLength": 1 },
-    "status": { "enum": ["pass", "fail"] },
+    "schema_version": {
+      "const": 1
+    },
+    "suite": {
+      "const": "opencollate-semantic-mutations"
+    },
+    "opencollate_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail"
+      ]
+    },
     "oracle": {
       "type": "object",
-      "required": ["kind", "manifest_sha256", "selection", "policy"],
+      "required": [
+        "kind",
+        "manifest_sha256",
+        "selection",
+        "policy"
+      ],
       "properties": {
-        "kind": { "const": "paired-semantic-mutation" },
-        "manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "kind": {
+          "const": "paired-semantic-mutation"
+        },
+        "manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
         "selection": {
           "type": "object",
-          "required": ["cases", "families"],
+          "required": [
+            "cases",
+            "families"
+          ],
           "properties": {
             "cases": {
               "type": "array",
               "minItems": 1,
-              "items": { "type": "string", "minLength": 1 },
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
               "uniqueItems": true
             },
             "families": {
               "type": "array",
               "minItems": 1,
-              "items": { "type": "string", "minLength": 1 },
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
               "uniqueItems": true
             }
           },
@@ -45,24 +75,43 @@
         },
         "policy": {
           "type": "object",
-          "required": ["mutant", "control", "determinism"],
+          "required": [
+            "mutant",
+            "control",
+            "determinism"
+          ],
           "properties": {
-            "mutant": { "type": "string", "minLength": 1 },
-            "control": { "type": "string", "minLength": 1 },
-            "determinism": { "type": "string", "minLength": 1 }
+            "mutant": {
+              "type": "string",
+              "minLength": 1
+            },
+            "control": {
+              "type": "string",
+              "minLength": 1
+            },
+            "determinism": {
+              "type": "string",
+              "minLength": 1
+            }
           },
           "additionalProperties": false
         }
       },
       "additionalProperties": false
     },
-    "summary": { "$ref": "#/$defs/metrics_with_families" },
+    "summary": {
+      "$ref": "#/$defs/metrics_with_families"
+    },
     "cases": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/case" }
+      "items": {
+        "$ref": "#/$defs/case"
+      }
     },
-    "result_sha256": { "$ref": "#/$defs/sha256" }
+    "result_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
   },
   "additionalProperties": false,
   "$defs": {
@@ -94,34 +143,86 @@
         "exact_pair_accuracy"
       ],
       "properties": {
-        "mutation_cases": { "type": "integer", "minimum": 0 },
-        "clean_controls": { "type": "integer", "minimum": 0 },
-        "target_detections": { "type": "integer", "minimum": 0 },
-        "exact_mutation_detections": { "type": "integer", "minimum": 0 },
-        "false_negatives": { "type": "integer", "minimum": 0 },
-        "overtriggered_mutations": { "type": "integer", "minimum": 0 },
-        "inconclusive_mutations": { "type": "integer", "minimum": 0 },
-        "true_negative_controls": { "type": "integer", "minimum": 0 },
-        "false_positive_controls": { "type": "integer", "minimum": 0 },
-        "deterministic_pairs": { "type": "integer", "minimum": 0 },
-        "passed_pairs": { "type": "integer", "minimum": 0 },
-        "recall": { "$ref": "#/$defs/rate" },
-        "clean_control_specificity": { "$ref": "#/$defs/rate" },
-        "exact_pair_accuracy": { "$ref": "#/$defs/rate" }
+        "mutation_cases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "clean_controls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target_detections": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exact_mutation_detections": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_negatives": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "overtriggered_mutations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "inconclusive_mutations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "true_negative_controls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_positive_controls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deterministic_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "recall": {
+          "$ref": "#/$defs/rate"
+        },
+        "clean_control_specificity": {
+          "$ref": "#/$defs/rate"
+        },
+        "exact_pair_accuracy": {
+          "$ref": "#/$defs/rate"
+        },
+        "families": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/metrics"
+          }
+        }
       },
       "additionalProperties": false
     },
     "metrics_with_families": {
       "allOf": [
-        { "$ref": "#/$defs/metrics" },
+        {
+          "$ref": "#/$defs/metrics"
+        },
         {
           "type": "object",
-          "required": ["families"],
+          "required": [
+            "families"
+          ],
           "properties": {
             "families": {
               "type": "object",
               "minProperties": 1,
-              "additionalProperties": { "$ref": "#/$defs/metrics" }
+              "additionalProperties": {
+                "$ref": "#/$defs/metrics"
+              }
             }
           }
         }
@@ -130,16 +231,48 @@
     },
     "diagnostic": {
       "type": "object",
-      "required": ["code", "severity", "fingerprint", "object", "property", "views"],
+      "required": [
+        "code",
+        "severity",
+        "fingerprint",
+        "object",
+        "property",
+        "views"
+      ],
       "properties": {
-        "code": { "type": "string", "pattern": "^OC[0-9]{4}$" },
-        "severity": { "enum": ["fatal", "error", "warning"] },
-        "fingerprint": { "type": "string", "pattern": "^[0-9a-f]{24}$" },
-        "object": { "type": ["string", "null"] },
-        "property": { "type": ["string", "null"] },
+        "code": {
+          "type": "string",
+          "pattern": "^OC[0-9]{4}$"
+        },
+        "severity": {
+          "enum": [
+            "fatal",
+            "error",
+            "warning"
+          ]
+        },
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{24}$"
+        },
+        "object": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "property": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "views": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
           "uniqueItems": true
         }
       },
@@ -147,7 +280,11 @@
     },
     "evaluation": {
       "type": "object",
-      "required": ["status", "actionable_codes", "diagnostics"],
+      "required": [
+        "status",
+        "actionable_codes",
+        "diagnostics"
+      ],
       "properties": {
         "status": {
           "enum": [
@@ -159,22 +296,35 @@
             "false_positive"
           ]
         },
-        "target_detected": { "type": "boolean" },
+        "target_detected": {
+          "type": "boolean"
+        },
         "actionable_codes": {
           "type": "array",
-          "items": { "type": "string", "pattern": "^OC[0-9]{4}$" }
+          "items": {
+            "type": "string",
+            "pattern": "^OC[0-9]{4}$"
+          }
         },
         "missing_codes": {
           "type": "array",
-          "items": { "type": "string", "pattern": "^OC[0-9]{4}$" }
+          "items": {
+            "type": "string",
+            "pattern": "^OC[0-9]{4}$"
+          }
         },
         "unexpected_codes": {
           "type": "array",
-          "items": { "type": "string", "pattern": "^OC[0-9]{4}$" }
+          "items": {
+            "type": "string",
+            "pattern": "^OC[0-9]{4}$"
+          }
         },
         "diagnostics": {
           "type": "array",
-          "items": { "$ref": "#/$defs/diagnostic" }
+          "items": {
+            "$ref": "#/$defs/diagnostic"
+          }
         }
       },
       "additionalProperties": false
@@ -192,18 +342,41 @@
         "control"
       ],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "family": { "type": "string", "minLength": 1 },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "family": {
+          "type": "string",
+          "minLength": 1
+        },
         "target_codes": {
           "type": "array",
           "minItems": 1,
-          "items": { "type": "string", "pattern": "^OC[0-9]{4}$" }
+          "items": {
+            "type": "string",
+            "pattern": "^OC[0-9]{4}$"
+          }
         },
-        "mutation": { "type": "string", "minLength": 1 },
-        "status": { "enum": ["pass", "fail"] },
-        "deterministic": { "type": "boolean" },
-        "mutant": { "$ref": "#/$defs/evaluation" },
-        "control": { "$ref": "#/$defs/evaluation" }
+        "mutation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail"
+          ]
+        },
+        "deterministic": {
+          "type": "boolean"
+        },
+        "mutant": {
+          "$ref": "#/$defs/evaluation"
+        },
+        "control": {
+          "$ref": "#/$defs/evaluation"
+        }
       },
       "additionalProperties": false
     }

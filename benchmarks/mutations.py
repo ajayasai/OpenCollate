@@ -24,10 +24,6 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT / "src") not in sys.path:
-    sys.path.insert(0, str(ROOT / "src"))
-
 from opencollate import __version__
 from opencollate.config import (
     ContractSettings,
@@ -62,6 +58,7 @@ from opencollate.model import (
     ViewObservation,
 )
 
+ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_VERSION = 1
 ANALYSIS_DATE = date(2026, 9, 2)
 INCONCLUSIVE_CODES = frozenset({"OC1102", "OC1103", "OC1104", "OC1105", "OC6505"})
@@ -289,9 +286,7 @@ def _range_order_mismatch(mutated: bool) -> Scenario:
         right=_port(
             "liberty.default",
             "data",
-            shape=BusShape(
-                packed=(IndexRange(0, 7),) if mutated else (IndexRange(7, 0),)
-            ),
+            shape=BusShape(packed=(IndexRange(0, 7),) if mutated else (IndexRange(7, 0),)),
         ),
     )
 
@@ -752,8 +747,10 @@ def _connectivity_scenario(
 
 
 def _required_connectivity_missing(mutated: bool) -> Scenario:
-    source, middle, sink = _endpoint("top/a"), _endpoint("top/n", line=2), _endpoint(
-        "top/y", line=3
+    source, middle, sink = (
+        _endpoint("top/a"),
+        _endpoint("top/n", line=2),
+        _endpoint("top/y", line=3),
     )
     edges = [ConnectivityEdge(source, middle)]
     if not mutated:
@@ -831,8 +828,8 @@ CASES: tuple[MutationCase, ...] = (
     MutationCase(
         "component-conflicting-duplicate",
         "inventory",
-        ("OC2004",),
-        "Add a second same-name component definition with a different interface.",
+        ("OC2004", "OC4001"),
+        "Add a second same-name component definition with a contradictory pin direction.",
         _conflicting_duplicate_component,
     ),
     MutationCase(
@@ -1062,9 +1059,7 @@ def _diagnostic_record(diagnostic: Diagnostic) -> dict[str, Any]:
 
 def _actionable(result: EngineResult) -> tuple[Diagnostic, ...]:
     return tuple(
-        item
-        for item in result.diagnostics
-        if not item.waived and item.severity != Severity.INFO
+        item for item in result.diagnostics if not item.waived and item.severity != Severity.INFO
     )
 
 
@@ -1193,9 +1188,7 @@ def run_suite(
         by_family[str(item["family"])].append(item)
     manifest = [item.manifest() for item in selected]
     summary = _metrics(evaluated)
-    summary["families"] = {
-        family: _metrics(items) for family, items in sorted(by_family.items())
-    }
+    summary["families"] = {family: _metrics(items) for family, items in sorted(by_family.items())}
     report: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "suite": "opencollate-semantic-mutations",
