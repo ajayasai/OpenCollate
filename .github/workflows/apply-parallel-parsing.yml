@@ -30,7 +30,9 @@ jobs:
         with:
           python-version: "3.11"
       - name: Apply exact integration
-        run: python tools/apply_parallel_parsing.py
+        run: |
+          python tools/fix_parallel_transform.py
+          python tools/apply_parallel_parsing.py
       - name: Install project
         run: python -m pip install -e ".[dev]"
       - name: Format shipped Python
@@ -79,7 +81,7 @@ jobs:
       - name: Remove one-shot files
         run: |
           rm -f .github/workflows/apply-parallel-parsing.yml
-          rm -f tools/apply_parallel_parsing.py
+          rm -f tools/apply_parallel_parsing.py tools/fix_parallel_transform.py
           rm -f mutation-results.json benchmark-results.json
           rm -f parallel-parsing-tests.log parallel-parsing-tests.status
       - name: Commit verified implementation
