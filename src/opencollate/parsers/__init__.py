@@ -17,11 +17,17 @@ from opencollate.parsers.connectivity import ConnectivityCsvParser, parse_connec
 from opencollate.parsers.csvpins import CsvPinMapParser, parse_pin_csv
 from opencollate.parsers.defparser import DefLimits, DefParser, parse_def
 from opencollate.parsers.dispatch import (
+    ParserRegistration,
     get_parser,
+    get_registration,
     infer_format,
     normalize_format,
     parse,
+    parser_inventory,
+    register_parser_plugin,
     registered_formats,
+    reload_parser_plugins,
+    unregister_parser_plugin,
 )
 from opencollate.parsers.gds import (
     GDSIIParser,
@@ -43,6 +49,7 @@ from opencollate.parsers.sdc import SdcParser, TimingConstraintObservation, pars
 from opencollate.parsers.systemrdl import SystemRDLParser, SystemRdlParser, parse_systemrdl
 from opencollate.parsers.upf import UpfParser, parse_upf
 from opencollate.parsers.verilog import VerilogParser, parse_verilog
+from opencollate.plugins import ParserPluginSpec
 
 __all__ = [
     "CHeaderParser",
@@ -61,6 +68,8 @@ __all__ = [
     "LefParser",
     "LibertyParser",
     "ParserDependencyError",
+    "ParserPluginSpec",
+    "ParserRegistration",
     "SdcParser",
     "SystemRDLParser",
     "SystemRdlParser",
@@ -71,6 +80,7 @@ __all__ = [
     "VerilogParser",
     "ViewParser",
     "get_parser",
+    "get_registration",
     "infer_format",
     "normalize_format",
     "parse",
@@ -90,5 +100,9 @@ __all__ = [
     "parse_spice",
     "parse_upf",
     "parse_verilog",
+    "parser_inventory",
+    "register_parser_plugin",
     "registered_formats",
+    "reload_parser_plugins",
+    "unregister_parser_plugin",
 ]
