@@ -133,6 +133,7 @@ class ParserRegistration:
     version: str | None = None
     plugin_name: str | None = None
     builtin: bool = False
+    parallel_safe: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -143,6 +144,7 @@ class ParserRegistration:
             "version": self.version,
             "plugin": self.plugin_name,
             "builtin": self.builtin,
+            "parallel_safe": self.parallel_safe,
         }
 
 
@@ -170,6 +172,7 @@ def _builtin_registration(format_name: str, parser: ViewParser) -> ParserRegistr
         extensions=extensions,
         provider="OpenCollate",
         builtin=True,
+        parallel_safe=True,
     )
 
 
@@ -236,6 +239,7 @@ def _registry_snapshot() -> _RegistrySnapshot:
             version=spec.version,
             plugin_name=spec.name,
             builtin=False,
+            parallel_safe=spec.parallel_safe,
         )
         registrations[format_name] = registration
         for alias in spec.aliases:

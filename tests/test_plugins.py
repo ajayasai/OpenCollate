@@ -86,6 +86,7 @@ def test_runtime_parser_plugin_supports_alias_extension_and_dispatch(tmp_path: P
         name="toy-parser",
         provider="test-suite",
         version="1.0",
+        parallel_safe=True,
     )
     register_parser_plugin(spec)
     try:
@@ -109,6 +110,7 @@ def test_runtime_parser_plugin_supports_alias_extension_and_dispatch(tmp_path: P
             "version": "1.0",
             "plugin": "toy_parser",
             "builtin": False,
+            "parallel_safe": True,
         }
     finally:
         unregister_parser_plugin("toy-parser")
@@ -155,6 +157,8 @@ def test_parser_plugin_crash_is_a_fatal_tainted_observation(tmp_path: Path) -> N
 def test_plugin_api_version_is_explicitly_rejected() -> None:
     with pytest.raises(PluginContractError, match="unsupported"):
         ParserPluginSpec(parser=_ToyParser(), api_version=PLUGIN_API_VERSION + 1)
+    with pytest.raises(PluginContractError, match="parallel_safe"):
+        ParserPluginSpec(parser=_ToyParser(), parallel_safe=1)  # type: ignore[arg-type]
 
 
 def test_checker_plugin_receives_context_and_contributes_diagnostics(tmp_path: Path) -> None:

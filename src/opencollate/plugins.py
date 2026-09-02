@@ -103,6 +103,7 @@ class ParserPluginSpec:
     name: str | None = None
     provider: str | None = None
     version: str | None = None
+    parallel_safe: bool = False
 
     def __post_init__(self) -> None:
         if type(self.api_version) is not int or self.api_version != PLUGIN_API_VERSION:
@@ -123,6 +124,8 @@ class ParserPluginSpec:
             raise PluginContractError("parser plugin provider must not be empty")
         if self.version is not None and not self.version.strip():
             raise PluginContractError("parser plugin version must not be empty")
+        if type(self.parallel_safe) is not bool:
+            raise PluginContractError("parser plugin parallel_safe must be a boolean")
         object.__setattr__(self, "aliases", aliases)
         object.__setattr__(self, "extensions", extensions)
         object.__setattr__(self, "name", name)
@@ -140,6 +143,7 @@ class ParserPluginSpec:
             "api_version": self.api_version,
             "provider": self.provider,
             "version": self.version,
+            "parallel_safe": self.parallel_safe,
         }
 
 
