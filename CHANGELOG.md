@@ -8,6 +8,10 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
 
 ### Added
 
+- An oracle-backed semantic mutation benchmark with 34 paired mutants and clean controls across
+  inventory, interfaces, Boolean logic, package mappings, SDC, UPF, registers, DEF hierarchy, and
+  static connectivity. CI publishes exact recall, clean-control specificity, false-negative,
+  false-positive, inconclusive, overtrigger, and observation-order determinism metrics.
 - Canonical contract schema version 2, with deterministic per-view snapshots covering components,
   package mappings, hierarchical objects, clocks, interfaces, registers, static connectivity, view
   attributes, completeness, and tainted scopes. Each snapshot is protected by a verified SHA-256

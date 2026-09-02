@@ -1,7 +1,12 @@
 # Public benchmark and conformance suite
 
-This suite measures real, redistributable OpenCollate workflows without any
-proprietary tools or datasets:
+The public benchmark surface contains two complementary suites. Both use only
+redistributable OpenCollate inputs and publish schema-validated deterministic
+JSON artifacts.
+
+## Parser and end-to-end conformance
+
+`run.py` measures real parser and complete-project workflows:
 
 - `report-diff` compares large diagnostic multisets containing duplicate
   fingerprints, additions, removals, semantic changes, unchanged findings,
@@ -41,14 +46,64 @@ and `--warmup` control scale and sampling. The four case-specific
 `--*-budget-seconds` options set median regression ceilings; budgets are
 informational unless `--enforce-budgets` is present.
 
-JSON is emitted with sorted keys, no timestamp, normalized repository-relative
-paths, deterministic result SHA-256 digests, and explicit conformance oracles.
-Every emitted report validates against the bundled Draft 2020-12
-[`benchmark-results.schema.json`](benchmark-results.schema.json).
-Elapsed samples necessarily depend on the host, Python build, filesystem, and
-system load. The default 30-second ceilings are deliberately generous guards
-against pathological regressions, not performance promises.
+## Semantic mutation recall and clean controls
 
-These results compare OpenCollate releases on equivalent public hardware and
-inputs. They do not establish feature or performance superiority over a
-commercial product, and they are not a substitute for signoff qualification.
+`mutations.py` evaluates comparison semantics independently of parser fixture
+coverage. Its checked-in manifest contains 34 paired cases across inventory,
+interfaces, Boolean logic, package mapping, SDC, UPF, registers, DEF hierarchy,
+and bounded static connectivity.
+
+Every pair contains:
+
+1. A clean control expected to produce no unwaived warning, error, or fatal
+   diagnostic.
+2. A minimally changed mutant with an explicit expected actionable diagnostic
+   multiset.
+3. A second execution with reversed observation order; the complete
+   `EngineResult` must remain byte-equivalent after canonical serialization.
+
+Run and enforce the full oracle:
+
+```console
+python benchmarks/mutations.py \
+  --enforce-perfect \
+  --json-output mutation-results.json
+```
+
+Selection is available through repeatable `--case` and `--family` options. Use
+`--list` to print the immutable mutation manifest. The report publishes:
+
+- target-code recall and false-negative count;
+- exact detections and legitimate additional-diagnostic detection;
+- inconclusive mutations;
+- true-negative and false-positive clean controls;
+- clean-control specificity;
+- observation-order determinism;
+- exact pair accuracy;
+- per-family metrics;
+- a manifest SHA-256 and full result SHA-256.
+
+A passing result requires every mutant to match its exact oracle, every control
+to remain clean, and every pair to be deterministic. The suite therefore fails
+when a target is missed, an unrelated diagnostic appears, a clean control
+fires, or input ordering changes the result.
+
+## Reproducibility and interpretation
+
+JSON is emitted with sorted keys, no timestamp, normalized repository-relative
+paths, deterministic SHA-256 digests, and explicit conformance oracles. Reports
+validate against the bundled Draft 2020-12 schemas:
+
+- [`benchmark-results.schema.json`](benchmark-results.schema.json)
+- [`mutation-results.schema.json`](mutation-results.schema.json)
+
+Elapsed samples in `run.py` necessarily depend on the host, Python build,
+filesystem, and system load. Its default 30-second ceilings are deliberately
+generous guards against pathological regressions, not performance promises.
+The mutation suite deliberately contains no timing field, so repeated results
+are content-identical on equivalent OpenCollate versions.
+
+These results compare OpenCollate releases and establish behavior only for the
+published oracle corpus. They do not establish universal feature or performance
+superiority over a commercial product, replace independent production-design
+validation, or constitute signoff qualification.
