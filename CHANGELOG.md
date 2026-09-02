@@ -8,13 +8,29 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
 
 ### Added
 
+- Canonical contract schema version 2, with deterministic per-view snapshots covering components,
+  package mappings, hierarchical objects, clocks, interfaces, registers, static connectivity, view
+  attributes, completeness, and tainted scopes. Each snapshot is protected by a verified SHA-256
+  content digest and contracts have a bounded, JSON-safe extension namespace.
+- `opencollate contract migrate` upgrades schema-version-1 contracts without inventing observation
+  families that legacy files did not persist. Version-1 contracts remain readable.
 - A versioned extension API for independently distributed parser and semantic-checker plugins,
   including Python entry-point discovery, runtime registration for embedding, provider/version
   provenance, deterministic capability inventory, and exact compatibility rejection.
 - Generic configured-source dispatch for external collateral formats, including forwarding of
   parser-specific options and the standard include/define/profile/column fields.
 
+### Changed
+
+- Newly generated contracts use schema version 2. Semantic checker plugins can inspect durable
+  frozen view snapshots through `CheckerContext.contract.views` rather than requiring source
+  collateral to be reparsed.
+
 ### Security
+
+- Contract loading recomputes every view-snapshot digest and rejects stale or modified content.
+  Snapshot attributes and extension values reject non-finite numbers, non-string object keys,
+  unsupported values, and excessive nesting.
 
 - External parsers cannot shadow built-in formats, aliases, or filename extensions. Parser plugin
   exceptions become fatal whole-view-tainted `OC9001` observations, and checker discovery,

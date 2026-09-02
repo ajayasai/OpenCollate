@@ -122,6 +122,7 @@ opencollate capabilities [--json]
 opencollate explain CODE
 opencollate schema [report|contract|diff] [--output PATH]
 opencollate contract build [CONFIG] --output contract.oc.json
+opencollate contract migrate LEGACY --output contract.v2.oc.json
 ```
 
 | Status | Meaning |
@@ -159,9 +160,11 @@ Inspect the exact contract being checked:
 opencollate contract build examples/uart/opencollate.toml --output contract.oc.json
 ```
 
-The frozen contract currently persists components, ports, and register maps. Clocks, interfaces,
-hierarchical objects, constraints, and mappings remain first-class run observations but are not
-all frozen-contract fields in schema version 1. Read the [architecture](docs/architecture.md),
+Newly generated schema-version-2 contracts persist canonical components, ports, and registers plus
+integrity-checked snapshots of every parser-neutral observation family: clocks, interfaces,
+hierarchy and references, package mappings, constraint/power metadata, registers, connectivity,
+view attributes, completeness, and tainted scopes. Version-1 contracts remain readable and can be
+migrated without inventing facts they never stored. Read the [architecture](docs/architecture.md),
 [canonical contract](docs/canonical-contract.md), and [diagnostic model](docs/diagnostics.md).
 
 ## Versioned extension platform
@@ -189,8 +192,9 @@ schema. SystemRDL Perl tags/includes are rejected before compilation, and connec
 bounded declarative data rather than a property language. CDL/SPICE is never simulated; DEF/LEF geometry is skipped structurally; and GDSII
 geometry records are bounded and discarded without polygon construction.
 
-OpenCollate has no telemetry, account, upload, or network-reporting feature. Reports still contain
-design names, paths, connectivity, and expressions and must be protected like source collateral.
+OpenCollate has no telemetry, account, upload, or network-reporting feature. Reports and contracts
+still contain design names, paths, connectivity, expressions, and normalized parser metadata and
+must be protected like source collateral.
 Read the [security model](docs/security-model.md) and [privacy statement](docs/privacy.md).
 
 ## No-signoff positioning

@@ -228,10 +228,10 @@ class Diagnostic:
 def json_safe(value: Any) -> Any:
     """Convert model and enum values into deterministic JSON-compatible data."""
 
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
     if isinstance(value, StrEnum):
         return value.value
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
     if isinstance(value, (Provenance, SourceSpan)):
         return value.to_dict()
     if hasattr(value, "to_dict"):

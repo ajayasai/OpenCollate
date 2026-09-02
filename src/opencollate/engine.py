@@ -32,6 +32,7 @@ from opencollate.boolean import (
 )
 from opencollate.catalog import RULES
 from opencollate.config import AliasRule, ProjectConfig, Waiver
+from opencollate.contracts import CONTRACT_SCHEMA_VERSION, snapshots_from_observations
 from opencollate.diagnostics import (
     Diagnostic,
     DiagnosticEvidence,
@@ -4074,7 +4075,9 @@ class ComparisonEngine:
             )
         return DesignContract(
             tuple(components),
+            schema_version=CONTRACT_SCHEMA_VERSION,
             registers=self._build_contract_registers(observations),
+            views=snapshots_from_observations(observations),
         )
 
     def _build_contract_registers(

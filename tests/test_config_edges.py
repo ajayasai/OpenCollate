@@ -330,7 +330,7 @@ def test_contract_loader_failures_are_normalized(tmp_path: Path) -> None:
     cases: tuple[tuple[str, str], ...] = (
         ("{", "invalid contract JSON"),
         ("[]", "contract root must be a JSON object"),
-        ('{"schema_version": 2, "components": []}', "schema_version"),
+        ('{"schema_version": 3, "components": []}', "schema_version"),
         ('{"schema_version": 1, "components": [42]}', r"components\[0\]"),
         (
             '{"schema_version": 1, "components": [{"canonical_name": "x", "ports": [4]}]}',
