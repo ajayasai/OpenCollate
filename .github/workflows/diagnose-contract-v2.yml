@@ -1,0 +1,56 @@
+name: Diagnose contract v2
+
+on:
+  push:
+    branches:
+      - "feat/contract-v2"
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install project
+        run: python -m pip install -e ".[dev]"
+      - name: Capture UART benchmark report
+        run: |
+          python - <<'PY' > uart-contract-v2.json
+          import json
+          from benchmarks.run import run_suite
+
+          report = run_suite(
+              cases=("uart-check",),
+              repeat=1,
+              warmup=0,
+              diff_groups=4,
+          )
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+      - name: Run tests with explicit exit capture
+        run: |
+          set +e
+          pytest -x -vv > pytest-contract-v2.log 2>&1
+          status=$?
+          printf '%s\n' "$status" > pytest-contract-v2.status
+          exit 0
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: contract-v2-diagnostics
+          path: |
+            uart-contract-v2.json
+            pytest-contract-v2.log
+            pytest-contract-v2.status
+          retention-days: 1
+      - name: Enforce test result
+        run: test "$(cat pytest-contract-v2.status)" -eq 0
