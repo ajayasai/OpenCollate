@@ -83,10 +83,29 @@ from opencollate.reporters import (
 
 replace_once(
     "src/opencollate/cli.py",
+    '''    generic_fields = (
+''',
+    '''    from opencollate.parsers import UnsupportedFormatError, get_registration
+
+    try:
+        registration = get_registration(kind)
+    except UnsupportedFormatError:
+        registration = None
+    plugin_generic_fields = (
+        frozenset(("include_dirs", "defines", "profile", "columns"))
+        if registration is not None and not registration.builtin
+        else frozenset()
+    )
+    generic_fields = (
+''',
+)
+
+replace_once(
+    "src/opencollate/cli.py",
     '''        else frozenset()
     )
 ''',
-    '''        else frozenset(("include_dirs", "defines", "profile", "columns"))
+    '''        else plugin_generic_fields
     )
 ''',
 )
@@ -101,7 +120,7 @@ replace_once(
 
 def _reject_unknown_source_options(
 ''',
-    '''    from opencollate.parsers import UnsupportedFormatError, parse as parse_collateral
+    '''    from opencollate.parsers import parse as parse_collateral
 
     plugin_options = dict(options)
     if source.include_dirs:
