@@ -430,7 +430,11 @@ def test_contract_export_is_deterministic_and_round_trips(tmp_path: Path) -> Non
     engine = ComparisonEngine(_project(("rtl", "liberty")))
     result = engine.run((liberty, rtl))
 
-    output = engine.export_contract(result.design, tmp_path / "nested" / "contract.json")
+    output = engine.export_contract(
+        result.design,
+        tmp_path / "nested" / "contract.json",
+        observations=(liberty, rtl),
+    )
     raw = output.read_text(encoding="utf-8")
     payload = json.loads(raw)
 

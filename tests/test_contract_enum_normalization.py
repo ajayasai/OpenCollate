@@ -33,6 +33,4 @@ def test_contract_snapshot_normalizes_enum_valued_field_states() -> None:
     )
 
     snapshot = ContractViewSnapshot.from_observation(observation).to_dict()
-    assert snapshot["components"][0]["ports"][0]["field_states"] == {
-        "direction": "known"
-    }
+    assert snapshot["components"][0]["ports"][0]["field_states"] == {"direction": "known"}
