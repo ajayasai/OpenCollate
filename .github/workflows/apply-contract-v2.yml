@@ -40,13 +40,26 @@ jobs:
       - name: Security lint
         run: python -m bandit -q -r src/opencollate
       - name: Run complete test suite
-        run: pytest -q
+        id: tests
+        continue-on-error: true
+        run: pytest -x -vv 2>&1 | tee pytest-contract-v2.log
+      - name: Upload test transcript
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: contract-v2-test-transcript
+          path: pytest-contract-v2.log
+          retention-days: 1
+      - name: Fail after retaining transcript
+        if: steps.tests.outcome == 'failure'
+        run: exit 1
       - name: Check patch hygiene
         run: git diff --check
       - name: Remove one-shot bootstrap files
         run: |
           rm -f .github/workflows/apply-contract-v2.yml
           rm -f tools/apply_contract_v2.py
+          rm -f pytest-contract-v2.log
       - name: Commit verified upgrade
         run: |
           git config user.name "OpenCollate contract upgrade"
