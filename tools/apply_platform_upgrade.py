@@ -84,6 +84,17 @@ from opencollate.reporters import (
 replace_once(
     "src/opencollate/cli.py",
     '''    generic_fields = (
+        frozenset(("include_dirs", "defines"))
+        if kind in {"rtl", "sv", "systemverilog", "verilog"}
+        else frozenset(("defines",))
+        if kind in {"systemrdl", "system_rdl", "system-rdl", "rdl"}
+        else frozenset(("profile", "columns"))
+        if kind in {"csv", "pinmap", "pin_map"}
+        else frozenset(("columns",))
+        if kind in {"connectivity", "connectivity_spec", "connectivity-spec", "conn"}
+        else frozenset()
+    )
+    _reject_inapplicable_source_fields(source, allowed=generic_fields)
 ''',
     '''    from opencollate.parsers import UnsupportedFormatError, get_registration
 
@@ -97,16 +108,17 @@ replace_once(
         else frozenset()
     )
     generic_fields = (
-''',
-)
-
-replace_once(
-    "src/opencollate/cli.py",
-    '''        else frozenset()
+        frozenset(("include_dirs", "defines"))
+        if kind in {"rtl", "sv", "systemverilog", "verilog"}
+        else frozenset(("defines",))
+        if kind in {"systemrdl", "system_rdl", "system-rdl", "rdl"}
+        else frozenset(("profile", "columns"))
+        if kind in {"csv", "pinmap", "pin_map"}
+        else frozenset(("columns",))
+        if kind in {"connectivity", "connectivity_spec", "connectivity-spec", "conn"}
+        else plugin_generic_fields
     )
-''',
-    '''        else plugin_generic_fields
-    )
+    _reject_inapplicable_source_fields(source, allowed=generic_fields)
 ''',
 )
 
