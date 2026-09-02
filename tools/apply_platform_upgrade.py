@@ -144,11 +144,11 @@ replace_once(
 
 replace_once(
     "src/opencollate/cli.py",
-    '''    print(f"\nBuilt-in rules: {data['rules']}")
+    r'''    print(f"\nBuilt-in rules: {data['rules']}")
     print("Outputs: " + ", ".join(data["outputs"]))
     return 0
 ''',
-    '''    registry = data["parser_registry"]
+    r'''    registry = data["parser_registry"]
     external = [item for item in registry["registrations"] if not item["builtin"]]
     print(f"\nBuilt-in rules: {data['rules']}")
     print(f"External parsers: {len(external)}")
