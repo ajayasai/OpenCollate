@@ -1,0 +1,284 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opencollate.dev/schemas/formal-receipt.schema.json",
+  "title": "formal-receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "semantics": {
+      "const": "two-valued-combinational"
+    },
+    "request_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail",
+        "inconclusive"
+      ]
+    },
+    "exit_code": {
+      "type": "integer",
+      "enum": [
+        0,
+        1,
+        2
+      ]
+    },
+    "results": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "equivalent",
+              "different",
+              "vacuous",
+              "inconclusive"
+            ]
+          },
+          "variables": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "maxItems": 4096
+          },
+          "counterexample": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "boolean"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "backend": {
+            "const": "z3"
+          },
+          "backend_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "query_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 8192
+          },
+          "ir_nodes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "obligation_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "semantics": {
+            "const": "two-valued-combinational"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "variables",
+          "counterexample",
+          "reason",
+          "backend",
+          "backend_version",
+          "query_count",
+          "ir_nodes",
+          "obligation_sha256",
+          "semantics"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "different"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "counterexample": {
+                  "type": "object"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "counterexample": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "semantics",
+    "request_sha256",
+    "receipt_sha256",
+    "status",
+    "exit_code",
+    "results"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "exit_code": {
+            "const": 0
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "pass"
+          },
+          "results": {
+            "items": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "equivalent"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "exit_code": {
+            "const": 1
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "fail"
+          },
+          "results": {
+            "items": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "equivalent",
+                    "different"
+                  ]
+                }
+              }
+            },
+            "contains": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "different"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "exit_code": {
+            "const": 2
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "inconclusive"
+          },
+          "results": {
+            "items": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "equivalent",
+                    "different",
+                    "vacuous",
+                    "inconclusive"
+                  ]
+                }
+              }
+            },
+            "contains": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "vacuous",
+                    "inconclusive"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opencollate.dev/schemas/contract-diff.schema.json",
+  "title": "contract-diff",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "kind": {
+      "const": "opencollate-contract-diff"
+    },
+    "baseline_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "current_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "snapshot_coverage": {
+      "enum": [
+        "incomplete",
+        "complete"
+      ]
+    },
+    "status": {
+      "enum": [
+        "incomplete",
+        "changed",
+        "unchanged"
+      ]
+    },
+    "exit_code": {
+      "type": "integer",
+      "enum": [
+        0,
+        1,
+        2
+      ]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "changes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "added": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "removed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "changed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "changes",
+        "added",
+        "removed",
+        "changed"
+      ]
+    },
+    "changes": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "scope": {
+            "type": "string"
+          },
+          "family": {
+            "type": "string"
+          },
+          "identity": {
+            "type": "array"
+          },
+          "state": {
+            "enum": [
+              "added",
+              "removed",
+              "changed"
+            ]
+          },
+          "before": {},
+          "after": {}
+        },
+        "required": [
+          "scope",
+          "family",
+          "identity",
+          "state",
+          "before",
+          "after"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "kind",
+    "baseline_sha256",
+    "current_sha256",
+    "snapshot_coverage",
+    "status",
+    "exit_code",
+    "summary",
+    "changes"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "exit_code": {
+            "const": 0
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "unchanged"
+          },
+          "snapshot_coverage": {
+            "const": "complete"
+          },
+          "changes": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "exit_code": {
+            "const": 1
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "changed"
+          },
+          "snapshot_coverage": {
+            "const": "complete"
+          },
+          "changes": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "exit_code": {
+            "const": 2
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "incomplete"
+          },
+          "snapshot_coverage": {
+            "const": "incomplete"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -308,7 +308,7 @@ def test_saved_report_recursion_error_is_converted_to_cli_status_two(
     _write(baseline, _report())
     _write(current, _report())
 
-    def fail_decode(_: str) -> object:
+    def fail_decode(_: str, **_kwargs: object) -> object:
         raise RecursionError("decoder recursion")
 
     monkeypatch.setattr(cli_module.json, "loads", fail_decode)

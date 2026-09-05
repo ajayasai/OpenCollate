@@ -36,6 +36,7 @@ from opencollate.reporters import (
     render_diff_markdown,
     render_diff_sarif,
     render_diff_text,
+    render_html,
     render_json,
     render_markdown,
     render_sarif,
@@ -90,7 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
     _jobs_argument(check)
     check.add_argument(
         "--format",
-        choices=("text", "json", "sarif", "markdown"),
+        choices=("text", "json", "sarif", "markdown", "html"),
         default="text",
         help="report format (default: text)",
     )
@@ -116,7 +117,9 @@ def build_parser() -> argparse.ArgumentParser:
         default="changed",
         help="gate new; new-or-changed; all current; or no findings (default: changed)",
     )
-    review.add_argument("--format", choices=("text", "json", "sarif", "markdown"), default="text")
+    review.add_argument(
+        "--format", choices=("text", "json", "sarif", "markdown", "html"), default="text"
+    )
     review.add_argument("-o", "--output", help="write the diff artifact instead of stdout")
     review.add_argument("--include-unchanged", action="store_true")
     review.add_argument("--deny-warnings", action="store_true")
@@ -130,7 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
     report_diff.add_argument("baseline", help="prior OpenCollate JSON report")
     report_diff.add_argument("current", help="current OpenCollate JSON report")
     report_diff.add_argument(
-        "--format", choices=("text", "json", "sarif", "markdown"), default="text"
+        "--format", choices=("text", "json", "sarif", "markdown", "html"), default="text"
     )
     report_diff.add_argument("-o", "--output")
     report_diff.add_argument("--include-unchanged", action="store_true")
@@ -143,7 +146,7 @@ def build_parser() -> argparse.ArgumentParser:
     demo.add_argument("--output-dir", help="keep generated sources in this directory")
     demo.add_argument(
         "--format",
-        choices=("text", "json", "sarif", "markdown"),
+        choices=("text", "json", "sarif", "markdown", "html"),
         default="text",
     )
     demo.add_argument(
@@ -168,7 +171,12 @@ def build_parser() -> argparse.ArgumentParser:
     explain.set_defaults(handler=_command_explain)
 
     schema = subparsers.add_parser("schema", help="print a bundled JSON Schema")
-    schema.add_argument("kind", nargs="?", choices=("report", "contract", "diff"), default="report")
+    schema.add_argument(
+        "kind",
+        nargs="?",
+        choices=("report", "contract", "diff", "contract-diff", "formal-request", "formal-receipt"),
+        default="report",
+    )
     schema.add_argument("-o", "--output")
     schema.set_defaults(handler=_command_schema)
 
@@ -186,6 +194,26 @@ def build_parser() -> argparse.ArgumentParser:
     migrate.add_argument("input", help="existing OpenCollate contract JSON")
     migrate.add_argument("-o", "--output", help="destination (default: INPUT stem plus .v2)")
     migrate.set_defaults(handler=_command_contract_migrate)
+    contract_diff = contract_subparsers.add_parser(
+        "diff", help="review all frozen observation families"
+    )
+    contract_diff.add_argument("baseline")
+    contract_diff.add_argument("current")
+    contract_diff.add_argument("-o", "--output")
+    contract_diff.set_defaults(handler=_command_contract_diff)
+
+    formal = subparsers.add_parser("formal", help="check explicit two-valued Boolean obligations")
+    formal_commands = formal.add_subparsers(dest="formal_command", required=True)
+    for command in ("check", "replay"):
+        sub = formal_commands.add_parser(command)
+        sub.add_argument("request")
+        if command == "replay":
+            sub.add_argument("receipt")
+        sub.add_argument("-o", "--output")
+        sub.add_argument("--max-variables", type=int, default=512)
+        sub.add_argument("--timeout-ms", type=int, default=5000)
+        sub.add_argument("--resource-limit", type=int, default=1000000)
+        sub.set_defaults(handler=_command_formal)
     return parser
 
 
@@ -566,6 +594,8 @@ def _run(config: ProjectConfig, *, jobs: int = 1) -> EngineResult:
 
 
 def _render(result: EngineResult, format_name: str, *, verbose: bool = False) -> str:
+    if format_name == "html":
+        return render_html(result)
     if format_name == "json":
         return render_json(result)
     if format_name == "sarif":
@@ -622,6 +652,15 @@ def _json_nesting_overflow(text: str) -> tuple[int, int] | None:
     return None
 
 
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key!r}")
+        result[key] = value
+    return result
+
+
 def _read_json_report(path: str | Path, *, label: str) -> dict[str, Any]:
     source = Path(path).expanduser().resolve()
     try:
@@ -647,7 +686,7 @@ def _read_json_report(path: str | Path, *, label: str) -> dict[str, Any]:
             f"JSON nesting exceeds the limit of {MAX_REPORT_JSON_NESTING}"
         )
     try:
-        value = json.loads(text)
+        value = json.loads(text, object_pairs_hook=_unique_json_object)
     except json.JSONDecodeError as error:
         raise CliError(
             f"cannot parse {label} report {source}: line {error.lineno}, column {error.colno}: "
@@ -695,6 +734,13 @@ def _saved_report_exit_code(report: Mapping[str, Any], *, label: str) -> int:
 
 
 def _render_diff(diff: ReportDiff, format_name: str, *, include_unchanged: bool = False) -> str:
+    if format_name == "html":
+        payload = diff.to_dict()
+        if not include_unchanged:
+            payload["findings"] = [
+                row for row in payload["findings"] if row["state"] != "unchanged"
+            ]
+        return render_html(payload)
     if format_name == "json":
         return render_diff_json(diff)
     if format_name == "sarif":
@@ -872,6 +918,10 @@ baseline = "rtl.default"
 [policy]
 rtl_power_pins = "optional"
 max_boolean_inputs = 12
+# Optional exact SMT backend: install opencollate[formal] first.
+# boolean_backend = "z3"
+# max_symbolic_inputs = 512
+# symbolic_timeout_ms = 5000
 """
 
 
@@ -895,8 +945,18 @@ def _capability_data() -> dict[str, Any]:
         systemrdl_version = metadata.version("systemrdl-compiler")
     except metadata.PackageNotFoundError:  # pragma: no cover - required package metadata
         systemrdl_version = None
+    try:
+        z3_version = metadata.version("z3-solver")
+    except metadata.PackageNotFoundError:
+        z3_version = None
     return {
         "tool": {"name": "OpenCollate", "version": __version__},
+        "symbolic_boolean": {
+            "backend": "z3",
+            "installed_version": z3_version,
+            "semantics": "two-valued-combinational",
+            "opt_in": True,
+        },
         "formats": {
             "verilog_systemverilog": {
                 "status": "supported",
@@ -927,6 +987,9 @@ def _capability_data() -> dict[str, Any]:
             },
         },
         "outputs": [
+            "html",
+            "formal-receipt-json",
+            "contract-diff-json",
             "text",
             "json",
             "sarif",
@@ -1025,6 +1088,45 @@ def _command_contract_migrate(args: argparse.Namespace) -> int:
         raise CliError(f"cannot write contract {destination}: {error}") from error
     print(f"Wrote schema {upgraded.schema_version} contract to {target}")
     return 0
+
+
+def _command_contract_diff(args: argparse.Namespace) -> int:
+    from opencollate.contract_review import diff_contracts
+
+    _reject_path_alias(args.baseline, "baseline contract", args.output, "diff output")
+    _reject_path_alias(args.current, "current contract", args.output, "diff output")
+    try:
+        result = diff_contracts(load_contract(args.baseline), load_contract(args.current))
+    except (ValueError, TypeError) as error:
+        raise CliError(str(error)) from error
+    _emit(json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n", args.output)
+    return int(result["exit_code"])
+
+
+def _command_formal(args: argparse.Namespace) -> int:
+    from opencollate.formal import replay_receipt, run_obligations
+    from opencollate.symbolic import SymbolicLimits
+
+    _reject_path_alias(args.request, "obligation request", args.output, "formal output")
+    if args.formal_command == "replay":
+        _reject_path_alias(args.receipt, "prior receipt", args.output, "formal output")
+    request = _read_json_report(args.request, label="obligation")
+    try:
+        limits = SymbolicLimits(
+            max_variables=args.max_variables,
+            timeout_ms=args.timeout_ms,
+            resource_limit=args.resource_limit,
+            max_queries=args.max_variables + 2,
+        )
+        result = (
+            replay_receipt(request, _read_json_report(args.receipt, label="receipt"), limits=limits)
+            if args.formal_command == "replay"
+            else run_obligations(request, limits=limits)
+        )
+    except (ValueError, TypeError) as error:
+        raise CliError(str(error)) from error
+    _emit(json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n", args.output)
+    return int(result["exit_code"])
 
 
 def main(argv: list[str] | None = None) -> int:

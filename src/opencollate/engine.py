@@ -1429,11 +1429,34 @@ class ComparisonEngine:
             indeterminate_reason: str | None = None
             counterexample: Mapping[str, bool] | None = None
             for _item, expression in parsed[1:]:
-                result = check_equivalence(
-                    reference_expression,
-                    expression,
-                    max_variables=self.config.policy.max_boolean_inputs,
-                )
+                if self.config.policy.boolean_backend == "z3":
+                    from opencollate.symbolic import SymbolicLimits, check_symbolic_equivalence
+
+                    symbolic = check_symbolic_equivalence(
+                        reference_expression,
+                        expression,
+                        limits=SymbolicLimits(
+                            max_variables=self.config.policy.max_symbolic_inputs,
+                            timeout_ms=self.config.policy.symbolic_timeout_ms,
+                            resource_limit=self.config.policy.symbolic_resource_limit,
+                            max_queries=self.config.policy.max_symbolic_inputs + 2,
+                        ),
+                    )
+                    from opencollate.boolean import EquivalenceResult
+
+                    result = EquivalenceResult(
+                        equivalent=symbolic.equivalent,
+                        variables=symbolic.variables,
+                        checked_assignments=1 if symbolic.counterexample is not None else 0,
+                        counterexample=symbolic.counterexample,
+                        reason=symbolic.reason,
+                    )
+                else:
+                    result = check_equivalence(
+                        reference_expression,
+                        expression,
+                        max_variables=self.config.policy.max_boolean_inputs,
+                    )
                 if result.equivalent is None:
                     indeterminate_reason = result.reason
                     break
@@ -1447,6 +1470,9 @@ class ComparisonEngine:
                         "OC4302",
                         f"{display} Boolean functions cannot be checked exactly: "
                         f"{indeterminate_reason}.",
+                        severity=Severity.FATAL
+                        if self.config.policy.boolean_backend == "z3"
+                        else None,
                         object=entity,
                         property_name="boolean_function",
                         evidence=tuple(item.diagnostic_evidence() for item, _ in parsed),

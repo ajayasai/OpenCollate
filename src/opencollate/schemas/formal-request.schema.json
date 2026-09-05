@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opencollate.dev/schemas/formal-request.schema.json",
+  "title": "formal-request",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "type": "integer"
+    },
+    "semantics": {
+      "const": "two-valued-combinational"
+    },
+    "obligations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "left": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          },
+          "right": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          },
+          "assume": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          }
+        },
+        "required": [
+          "id",
+          "left",
+          "right"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "semantics",
+    "obligations"
+  ]
+}

@@ -22,6 +22,27 @@ ERROR OC4001  uart/irq_o has conflicting directions: RTL, CDL, DEF, IP-XACT, LEF
 > not a signoff tool and does not replace simulation, formal verification, STA, CDC/RDC, DRC,
 > LVS, extraction, or implementation-tool validation.
 
+## Development improvements after v0.3.0
+
+A current checkout additionally provides optional bounded Z3 Boolean checks beyond the default
+truth-table input limit; guarded Boolean obligations with replayable, content-bound receipts;
+complete frozen-snapshot drift review; and self-contained interactive HTML reports. These are
+not included in the older v0.3.0 release tag shown below.
+
+```console
+python -m pip install -e ".[formal]"
+opencollate formal check examples/formal/obligations.json --output receipt.json
+opencollate formal replay examples/formal/obligations.json receipt.json
+opencollate check --format html --output review.html
+opencollate contract diff baseline.oc.json current.oc.json --output drift.json
+```
+
+See [symbolic verification](docs/symbolic-verification.md) for enabling the optional backend on
+RTL/Liberty checks and its exact two-valued scope. See [contract and HTML review](docs/contract-review.md)
+for full snapshot coverage, incomplete-analysis exit statuses, and offline report controls. Public
+synthetic benchmarks and real-file regression tests document tested capability, not superiority
+over all proprietary tools or signoff qualification.
+
 ## Install
 
 OpenCollate requires Python 3.11 or newer.

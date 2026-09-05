@@ -107,3 +107,23 @@ These results compare OpenCollate releases and establish behavior only for the
 published oracle corpus. They do not establish universal feature or performance
 superiority over a commercial product, replace independent production-design
 validation, or constitute signoff qualification.
+
+## Symbolic Boolean conformance
+
+Install a current checkout with `python -m pip install -e ".[formal]"`, then run:
+
+```console
+python benchmarks/symbolic.py --repeat 3 --json-output symbolic-results.json
+```
+
+The suite checks six control/mutant formulas at 12, 64, and 128 inputs plus a guarded multiplexer
+and a contradictory guard. Independent Boolean identities determine expected equivalence and
+exact mismatch assignments. Repeated results must be deterministic; host-dependent timing samples
+are excluded from the evidence digest. A correct contradictory-guard outcome is `vacuous`, never a
+proof. All eight expected outcomes are regression gates, not a production-accuracy percentage.
+
+The legacy truth-table backend is measured at its 12-variable cap and explicitly declines larger
+inputs. A declined comparison's runtime is not meaningful speedup evidence. Measurements compare
+OpenCollate backends on synthetic formulas, not licensed commercial products or industrial SoCs.
+Actual parser-to-engine 64-input RTL/Liberty control/mutant coverage is separately exercised by
+`tests/test_symbolic_integration.py`. See [the exact semantics and limits](../docs/symbolic-verification.md).

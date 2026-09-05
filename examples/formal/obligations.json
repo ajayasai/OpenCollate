@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "semantics": "two-valued-combinational",
+  "obligations": [
+    {
+      "id": "selected-route",
+      "left": "(S & A) | (!S & B)",
+      "right": "A",
+      "assume": "S"
+    },
+    {
+      "id": "demorgan",
+      "left": "A & B",
+      "right": "!(!A | !B)"
+    }
+  ]
+}
