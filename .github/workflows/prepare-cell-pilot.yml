@@ -1,0 +1,42 @@
+name: Prepare pinned cell pilot
+on:
+  push:
+    branches: [feat/source-bound-certificates]
+    paths: [.github/workflows/prepare-cell-pilot.yml]
+permissions:
+  contents: read
+jobs:
+  fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+      - name: Retrieve exact public upstream revision
+        shell: python
+        run: |
+          import hashlib, json, pathlib, urllib.request
+          root = pathlib.Path('cell-pilot'); root.mkdir()
+          revision = 'ac7fb61f06e6470b94e8afdf7c25268f62fbd7b1'
+          repo = 'google/skywater-pdk-libs-sky130_fd_sc_hd'
+          paths = ['LICENSE']
+          for cell in ('and2', 'a21oi', 'xnor2'):
+              paths += [f'cells/{cell}/sky130_fd_sc_hd__{cell}.functional.v', f'cells/{cell}/sky130_fd_sc_hd__{cell}_1__tt_025C_1v80.lib.json']
+          files = []
+          for path in paths:
+              url = f'https://raw.githubusercontent.com/{repo}/{revision}/{path}'
+              with urllib.request.urlopen(url, timeout=30) as response:
+                  data = response.read(2000001)
+              if len(data) > 2000000: raise RuntimeError('fixture size budget')
+              target = root / path
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(data)
+              files.append({'path': path, 'sha256': hashlib.sha256(data).hexdigest(), 'git_blob': hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()})
+          (root / 'manifest.json').write_text(json.dumps({'repository': repo, 'revision': revision, 'files': files}, indent=2) + '\n')
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pinned-cell-pilot
+          path: cell-pilot
+          if-no-files-found: error
+          retention-days: 7
