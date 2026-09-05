@@ -1,0 +1,26 @@
+name: Prepare local validation
+on:
+  push:
+    branches: ["feat/symbolic-proof-and-review"]
+    paths: [".github/workflows/prepare-local-validation.yml"]
+permissions:
+  contents: read
+jobs:
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Capture wheels for offline tests
+        run: >-
+          python -m pip download --only-binary=:all: --dest wheelhouse
+          'pyslang>=11,<12' 'systemrdl-compiler>=1.32,<1.33'
+          'z3-solver>=4.13,<5' ruff mypy hypothesis bandit pytest-cov build hatchling
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: local-validation-wheels
+          path: wheelhouse
+          retention-days: 1
+          if-no-files-found: error
