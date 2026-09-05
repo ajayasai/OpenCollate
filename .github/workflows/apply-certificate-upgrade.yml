@@ -1,0 +1,81 @@
+name: Validate source-bound certificates
+on:
+  push:
+    branches: [feat/source-bound-certificates]
+    paths:
+      - tools/certificate-upgrade/**
+      - tools/apply_certificate_upgrade.py
+      - .github/workflows/apply-certificate-upgrade.yml
+permissions:
+  contents: write
+concurrency:
+  group: apply-source-bound-certificates
+  cancel-in-progress: true
+env:
+  PYTHONHASHSEED: '0'
+  OPENCOLLATE_DISABLE_PLUGINS: '1'
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+      - name: Apply hash-checked source and pinned original fixtures
+        run: python tools/apply_certificate_upgrade.py
+      - name: Install test environment
+        run: python -m pip install -e '.[dev]'
+      - name: Quality gates
+        run: |
+          ruff format --check src tests benchmarks/certificates.py
+          ruff check src tests benchmarks/certificates.py
+          mypy src/opencollate
+          python -m bandit -q -r src/opencollate
+      - name: Regression and coverage gates
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/certificate-evidence"
+          pytest -q --cov=opencollate --cov-branch --cov-report=term --cov-fail-under=85 | tee "$RUNNER_TEMP/certificate-evidence/tests.log"
+          python -O -m pytest -q | tee "$RUNNER_TEMP/certificate-evidence/optimized.log"
+      - name: Public evidence gates
+        run: |
+          python benchmarks/mutations.py --enforce-perfect --json-output "$RUNNER_TEMP/certificate-evidence/mutations.json"
+          python benchmarks/run.py --repeat 2 --warmup 1 --diff-groups 1000 --enforce-budgets --json-output "$RUNNER_TEMP/certificate-evidence/conformance.json"
+          python benchmarks/symbolic.py --json-output "$RUNNER_TEMP/certificate-evidence/symbolic.json"
+          python benchmarks/certificates.py --json-output "$RUNNER_TEMP/certificate-evidence/certificates.json"
+          python -m build
+          python -m twine check dist/*
+      - name: Retain verification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: source-bound-certificate-verification
+          path: ${{ runner.temp }}/certificate-evidence
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Remove transport and check exact tested file contents
+        run: |
+          test "$GITHUB_REF_NAME" = 'feat/source-bound-certificates'
+          rm -rf tools/certificate-upgrade
+          rm -f tools/apply_certificate_upgrade.py
+          rm -f .github/workflows/apply-certificate-upgrade.yml .github/workflows/prepare-cell-pilot.yml
+          git add -A
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, subprocess
+          files = subprocess.check_output(['git','diff','--cached','--name-only','2445ef5cfad3d8019f01e686513684ef2243e165'], text=True).splitlines()
+          entries = ''.join(f'{path}\t{hashlib.sha256(Path(path).read_bytes()).hexdigest()}\n' for path in sorted(files))
+          actual = hashlib.sha256(entries.encode()).hexdigest()
+          if len(files) != 32 or actual != '671c0a3a9eec62d6704049ca910f4ff58594abdd3f01fadf0d473da419abb56b':
+              raise RuntimeError(f'final source file set differs from locally tested contents: {len(files)} {actual}')
+          print('All 32 changed files match the exact locally tested byte contents.')
+          PY
+          git diff --cached --check
+          git config user.name 'OpenCollate verified implementation'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'feat: add source-bound independently checkable Boolean certificates'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
