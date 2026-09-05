@@ -1,0 +1,76 @@
+name: Verify symbolic and review upgrade
+on:
+  push:
+    branches: ["feat/symbolic-proof-and-review"]
+    paths:
+      - ".github/workflows/apply-verified-upgrade.yml"
+      - "tools/apply_verified_upgrade.py"
+      - "tools/verified-upgrade/**"
+permissions:
+  contents: write
+concurrency:
+  group: apply-symbolic-review-upgrade
+  cancel-in-progress: true
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONHASHSEED: "0"
+      OPENCOLLATE_DISABLE_PLUGINS: "1"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Apply exact verified source
+        run: python tools/apply_verified_upgrade.py
+      - name: Install development environment
+        run: python -m pip install -e '.[dev]'
+      - name: Check static quality and security
+        run: |
+          ruff format --check src tests benchmarks/symbolic.py
+          ruff check src tests benchmarks/symbolic.py
+          mypy src/opencollate
+          python -m bandit -q -r src/opencollate
+      - name: Run complete tests with coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/opencollate-evidence"
+          pytest -q --cov=opencollate --cov-branch --cov-report=term --cov-fail-under=85 | tee "$RUNNER_TEMP/opencollate-evidence/tests.log"
+          python -O -m pytest -q | tee "$RUNNER_TEMP/opencollate-evidence/optimized.log"
+      - name: Verify conformance and mutation oracles
+        run: |
+          python benchmarks/mutations.py --enforce-perfect --json-output "$RUNNER_TEMP/opencollate-evidence/mutations.json"
+          python benchmarks/run.py --repeat 2 --warmup 1 --diff-groups 1000 --enforce-budgets --json-output "$RUNNER_TEMP/opencollate-evidence/conformance.json"
+          python benchmarks/symbolic.py --json-output "$RUNNER_TEMP/opencollate-evidence/symbolic.json"
+          opencollate formal check examples/formal/obligations.json --output "$RUNNER_TEMP/opencollate-evidence/receipt.json"
+          opencollate formal replay examples/formal/obligations.json "$RUNNER_TEMP/opencollate-evidence/receipt.json" --output "$RUNNER_TEMP/opencollate-evidence/replayed.json"
+      - name: Verify build
+        run: |
+          python -m build
+          python -m twine check dist/*
+      - name: Retain verification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: symbolic-review-verification
+          path: ${{ runner.temp }}/opencollate-evidence
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Remove temporary transport and publish verified source
+        run: |
+          test "$GITHUB_REF_NAME" = "feat/symbolic-proof-and-review"
+          rm -rf tools/verified-upgrade
+          rm -f tools/apply_verified_upgrade.py
+          rm -f .github/workflows/prepare-local-validation.yml .github/workflows/apply-verified-upgrade.yml
+          git diff --check
+          git add -A
+          git diff --cached --stat
+          git config user.name "OpenCollate verified upgrade"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "feat: add bounded symbolic verification and offline evidence review"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
