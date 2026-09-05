@@ -92,8 +92,25 @@ class PolicySettings:
     report_unmatched_waivers: bool = True
     allow_multi_bond: bool = False
     severity_overrides: Mapping[str, Severity] = field(default_factory=dict)
+    boolean_backend: str = "truth_table"
+    max_symbolic_inputs: int = 512
+    symbolic_timeout_ms: int = 5_000
+    symbolic_resource_limit: int = 1_000_000
 
     def __post_init__(self) -> None:
+        if not isinstance(self.boolean_backend, str) or self.boolean_backend not in {
+            "truth_table",
+            "z3",
+        }:
+            raise ConfigError("policy.boolean_backend must be truth_table or z3")
+        for name, maximum in (
+            ("max_symbolic_inputs", 4096),
+            ("symbolic_timeout_ms", 300_000),
+            ("symbolic_resource_limit", 100_000_000),
+        ):
+            value = getattr(self, name)
+            if type(value) is not int or not 1 <= value <= maximum:
+                raise ConfigError(f"policy.{name} must be an integer between 1 and {maximum}")
         boolean_fields = (
             "strict_inventory",
             "scalar_vector_equivalent",
@@ -495,6 +512,10 @@ def _parse_policy(raw: Any) -> PolicySettings:
             default=False,
         ),
         max_boolean_inputs=maximum,
+        boolean_backend=table.get("boolean_backend", "truth_table"),
+        max_symbolic_inputs=table.get("max_symbolic_inputs", 512),
+        symbolic_timeout_ms=table.get("symbolic_timeout_ms", 5_000),
+        symbolic_resource_limit=table.get("symbolic_resource_limit", 1_000_000),
         compare_functions=_as_bool(
             table.get("compare_functions"), "policy.compare_functions", default=True
         ),
@@ -575,12 +596,51 @@ def load_config(path: str | Path = "opencollate.toml") -> ProjectConfig:
     )
 
 
+MAX_CONTRACT_JSON_BYTES = 32 * 1024 * 1024
+MAX_CONTRACT_JSON_NESTING = 128
+
+
+def _contract_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate contract JSON key: {key!r}")
+        result[key] = value
+    return result
+
+
+def _check_contract_nesting(text: str) -> None:
+    depth, quoted, escaped = 0, False, False
+    for character in text:
+        if quoted:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                quoted = False
+        elif character == '"':
+            quoted = True
+        elif character in "[{":
+            depth += 1
+            if depth > MAX_CONTRACT_JSON_NESTING:
+                raise ValueError(f"contract JSON nesting exceeds {MAX_CONTRACT_JSON_NESTING}")
+        elif character in "]}":
+            depth -= 1
+
+
 def load_contract(path: str | Path) -> DesignContract:
     contract_path = Path(path).expanduser().resolve()
     if not contract_path.is_file():
         raise ConfigError(f"contract file does not exist: {contract_path}", code="OC1002")
     try:
-        data = json.loads(contract_path.read_text(encoding="utf-8"))
+        with contract_path.open("rb") as stream:
+            raw = stream.read(MAX_CONTRACT_JSON_BYTES + 1)
+        if len(raw) > MAX_CONTRACT_JSON_BYTES:
+            raise ValueError(f"contract JSON exceeds {MAX_CONTRACT_JSON_BYTES} byte limit")
+        text = raw.decode("utf-8")
+        _check_contract_nesting(text)
+        data = json.loads(text, object_pairs_hook=_contract_object)
     except (OSError, UnicodeError, ValueError, RecursionError) as exc:
         raise ConfigError(f"invalid contract JSON in {contract_path}: {exc}") from exc
     if not isinstance(data, Mapping):

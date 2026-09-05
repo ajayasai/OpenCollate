@@ -222,6 +222,9 @@ class ContractViewSnapshot:
             raise ValueError(
                 "contract view snapshot contains unsupported properties: " + ", ".join(unexpected)
             )
+        supplied_digest = data.get("content_sha256")
+        if not isinstance(supplied_digest, str) or _SHA256.fullmatch(supplied_digest) is None:
+            raise ValueError("serialized view snapshots require a valid content_sha256")
         view = data.get("view")
         if not isinstance(view, str) or not view:
             raise TypeError("contract view snapshot view must be a nonempty string")

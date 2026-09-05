@@ -6,6 +6,24 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
 
 ## [Unreleased]
 
+### Symbolic verification and review
+
+- Optional bounded Z3 reasoning for the supported two-valued Boolean IR, including explicit
+  satisfiable guards, deterministic counterexamples, independent Python witness replay, fresh
+  solver contexts, and conservative missing-backend/resource-exhaustion handling. Legacy
+  truth-table behavior remains the default; selected SMT incompleteness is fatal.
+- `formal check` and `formal replay` for versioned Boolean obligations and content-bound receipts.
+  Replay reruns solving; receipts are not authenticated or independently checked UNSAT certificates.
+- `contract diff` reviews all canonical and per-view snapshot families using duplicate-preserving
+  multiset matching, with incomplete snapshot coverage never reported as a complete pass.
+- Offline HTML output for checks and baseline reviews, with searchable/filterable/paginated
+  evidence, hash-based CSP, escaped collateral, and JavaScript-disabled access.
+- Public 12/64/128-input synthetic conformance, actual 64-input RTL/Liberty regression fixtures,
+  property-based differential tests, and a dedicated browser verification workflow.
+- Hardened contract loading with bounded bytes/nesting, duplicate-key rejection, and mandatory
+  serialized snapshot checksums. Saved reports and obligation requests also reject duplicate keys.
+
+
 ### Added
 
 - Opt-in deterministic parallel parsing through `--jobs N` for check, review, demo, and contract
