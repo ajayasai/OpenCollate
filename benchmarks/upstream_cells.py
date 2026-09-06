@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import tempfile
 from pathlib import Path
@@ -50,13 +51,39 @@ SHA256 = {
 
 
 def _normalize(value: Any, root: Path) -> Any:
-    if isinstance(value, str):
-        return value.replace(str(root), "$CASE").replace(root.as_posix(), "$CASE")
-    if isinstance(value, dict):
-        return {key: _normalize(item, root) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_normalize(item, root) for item in value]
-    return value
+    # Native frontends may canonicalize Windows 8.3 names or symlink aliases,
+    # while Python-based parsers retain the spelling supplied by the caller.
+    # Some frontends also return paths relative to the working directory.
+    # Normalize separators only inside matching paths, leaving HDL text intact.
+    roots = [root, root.resolve()]
+    for path in tuple(roots):
+        try:
+            roots.append(Path(os.path.relpath(path)))
+        except ValueError:
+            # Windows paths on different drives have no relative spelling.
+            continue
+    spellings = {
+        spelling
+        for path in roots
+        for spelling in (str(path), path.as_posix(), path.as_posix().replace("/", "\\"))
+    }
+    prefixes = sorted(spellings, key=lambda item: (-len(item), item))
+
+    def visit(item: Any) -> Any:
+        if isinstance(item, str):
+            for prefix in prefixes:
+                if item == prefix:
+                    return "$CASE"
+                if item.startswith((prefix + "/", prefix + "\\")):
+                    return "$CASE/" + item[len(prefix) + 1 :].replace("\\", "/")
+            return item
+        if isinstance(item, dict):
+            return {key: visit(child) for key, child in item.items()}
+        if isinstance(item, list):
+            return [visit(child) for child in item]
+        return item
+
+    return visit(value)
 
 
 def verify_fixtures(root: Path = FIXTURES) -> dict[str, Any]:
@@ -163,7 +190,7 @@ def run_suite() -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="opencollate-upstream-") as directory:
         for cell in SIGNALS:
             for mutation in ("control", "direction", "width", "missing-pin"):
-                cases.append(_case(cell, mutation, Path(directory)))
+                cases.append(_case(cell, mutation, Path(directory).resolve()))
     return {
         "schema_version": 1,
         "suite": "opencollate-pinned-upstream-cell-interfaces",
