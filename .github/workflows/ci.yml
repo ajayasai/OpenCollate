@@ -70,7 +70,15 @@ jobs:
       - name: Install project
         run: python -m pip install -e ".[dev]"
       - name: Test
-        run: pytest -q
+        run: pytest -q --junitxml=test-results.xml
+      - name: Preserve platform test evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tests-${{ matrix.os }}-python-${{ matrix.python }}
+          path: test-results.xml
+          if-no-files-found: warn
+          retention-days: 7
 
   coverage:
     name: Coverage

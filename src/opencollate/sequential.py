@@ -171,6 +171,9 @@ def add_commands(subparsers: Any) -> None:
         sub.add_argument("--resource-limit", type=int, default=1000000)
         sub.add_argument("-o", "--output", type=Path)
         sub.set_defaults(handler=command_handler)
+    from opencollate.sequential_certificate import add_commands as add_certificates
+
+    add_certificates(commands)
 
 
 def command_handler(args: argparse.Namespace) -> int:

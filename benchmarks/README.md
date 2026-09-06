@@ -157,3 +157,18 @@ Neither benchmark runs or claims a win against a proprietary product. See
 missing guard coverage and unsupported clocks. Scale tiers extend to 256-bit, 16-stage pipelines,
 not arbitrary production SoCs. Stable outcome digests are separate from measured elapsed samples.
 See [methodology and trust boundaries](../docs/source-bound-sequential.md).
+
+
+## Independently checked source certificates (development)
+
+```console
+python -m pip install -e ".[dev]"
+python -m benchmarks.certificates --repeat 3 --json-output certificate-results.json
+```
+
+The 12 source cases preserve four valid pipeline tiers (8x1, 64x2, 256x8 and 256x16) and eight
+specific rejection expectations. Each positive result must pass regenerated-CNF RUP checking
+and guard-witness replay; an arbitrary exception does not satisfy a negative expectation.
+All timings, dependency versions, certificate sizes and input digests are retained. This corpus
+is regular synthetic RTL, not a proprietary-tool comparison or general state-machine scaling
+result. See [proof certificates](../docs/proof-certificates.md) for semantics and trust boundaries.

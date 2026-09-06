@@ -47,8 +47,10 @@ commercial importance of the workflow; it does not constitute a benchmark result
 
 ## Claims OpenCollate does not make
 
-OpenCollate does not currently claim formal exhaustiveness, temporal or conditional connectivity,
-full SystemVerilog/UPF/SDC interpretation, design generation, million-register scale, functional
+OpenCollate does not claim general formal exhaustiveness or unrestricted temporal/conditional
+connectivity. Development commands cover a strict source-bound, flat, single-clock two-valued
+subset; [proof certificates](proof-certificates.md) add independently checked RUP evidence for
+that subset, not full SystemVerilog/UPF/SDC interpretation, design generation, million-register scale, functional
 safety certification, or tapeout signoff. Cadence, Siemens, Synopsys, Defacto, Arteris, and
 Agnisys publicly offer capabilities outside this project's scope.
 
@@ -71,3 +73,16 @@ A release may describe a capability as shipped only when all applicable gates pa
 
 Open issues and contributed minimized fixtures are welcome. A concrete missed contradiction or
 false positive is more useful than an unmeasurable request to "beat" another tool.
+
+## Development evidence update — 2026-09-06
+
+`sequential certify` / `sequential verify-certificate` now separate proof generation from a
+solver-free receiver. The receiver regenerates source-bound base/induction CNF, checks each RUP
+addition, and validates guard reachability with the integer interpreter. The public certificate
+benchmark includes four positive pipeline tiers and eight explicit negative/incomplete cases;
+the tests include altered RTL with recomputed metadata and blocked solver imports.
+
+This is an implemented auditability capability, not a claim that proprietary tools lack proof
+export, that the Python kernel is mechanically verified, or that all formal/SoC flows are covered.
+The existing `check` and Z3 receipt paths are not silently upgraded to certified results. Consult
+the dedicated [scope and validation record](proof-certificates.md) before making comparisons.
