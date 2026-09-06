@@ -31,19 +31,9 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install validation dependencies
-        run: python -m pip install -e ".[dev]" "python-sat==1.9.dev15"
-      - name: Record a reproducible offline validation environment
         run: |
+          python -m pip install -e ".[dev]"
           python -m pip freeze --exclude-editable > proof-requirements.txt
-          python -m pip download -r proof-requirements.txt --dest proof-wheelhouse
-      - name: Preserve the offline environment
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: proof-validation-environment
-          path: |
-            proof-requirements.txt
-            proof-wheelhouse/
-          retention-days: 7
       - name: Run the complete regression suite
         shell: bash
         run: |
@@ -54,13 +44,26 @@ jobs:
           ruff check .
           ruff format --check .
           mypy
+      - name: Measure source-bound certificates and explicit negative cases
+        run: python -m benchmarks.certificates --repeat 3 --json-output certificate-results.json
+      - name: Verify in an independent solver-free installation
+        run: |
+          opencollate sequential certify examples/sequential/request.json --output example-certificate.json
+          python -m venv /tmp/opencollate-proof-receiver
+          /tmp/opencollate-proof-receiver/bin/python -m pip install .
+          /tmp/opencollate-proof-receiver/bin/python -I -c "import importlib.util; assert importlib.util.find_spec('pysat') is None; assert importlib.util.find_spec('z3') is None"
+          /tmp/opencollate-proof-receiver/bin/opencollate sequential verify-certificate examples/sequential/request.json example-certificate.json --output example-verified.json
       - name: Preserve validation evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: proof-certificate-validation
           path: |
+            proof-requirements.txt
             proof-tests.xml
             proof-tests.log
+            certificate-results.json
+            example-certificate.json
+            example-verified.json
           if-no-files-found: warn
           retention-days: 14

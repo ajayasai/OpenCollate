@@ -1,0 +1,197 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index efbc63489a64d8a11f4849c047480a93f114f78d..049679bf0cd8e8d78b954b2c82fdb3058bdf8d22 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -6,6 +6,18 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
+ 
+ ## [Unreleased]
+ 
++### Independently checkable sequential certificates
++
++- `sequential certify` and `sequential verify-certificate` generate and check source-bound
++  base/induction RUP refutations plus replayed reachable-guard witnesses. Verification neither
++  imports nor calls a SAT/SMT solver; optional PySAT/Glucose3 is an untrusted producer only.
++- Independent typed-IR bit blasting, exact equation substitution, a bounded watched-literal
++  RUP kernel, strict all-property/induction coverage, regenerated source/CNF bindings, atomic
++  output protection, machine schemas and explicit capability reporting.
++- Public truth-table, arithmetic, propagation, tampering and solver-free receiver tests;
++  12-case source certificate benchmark with positive scale tiers and explicit rejection reasons.
++  This does not expand the HDL subset or establish commercial-tool superiority/signoff.
++
+ ### Symbolic verification and review
+ 
+ - Optional bounded Z3 reasoning for the supported two-valued Boolean IR, including explicit
+ diff --git a/README.md b/README.md
+index 0d715dd2df1be50db315d2dc85f1a70bd14f6c44..8a3ddf26682e4e9817f388033ca9099d073959f9 100644
+--- a/README.md
++++ b/README.md
+@@ -146,6 +146,23 @@ opencollate sequential check examples/sequential/request.json --output receipt.j
+ See [exact semantics, source subset, proof boundaries and test evidence](docs/source-bound-sequential.md).
+ This is not full SystemVerilog, SVA, multi-clock verification or tapeout signoff.
+ 
++## Independently checkable proof certificates (development)
++
++Generate source-bound safety evidence whose receiver does not need a SAT/SMT solver:
++
++```console
++python -m pip install -e ".[certificates]"
++opencollate sequential certify examples/sequential/request.json --output proof.json
++opencollate sequential verify-certificate examples/sequential/request.json proof.json
++```
++
++The receiver re-reads current RTL, rebuilds separate bit-blasted base/induction obligations,
++checks every RUP proof addition, and replays reachable guard witnesses. Solver-returned `UNSAT`
++and recomputed hashes are not accepted as proof. Ordinary Z3 receipts remain unchanged; use
++these commands explicitly. The trusted frontend, encoding and Python kernel are not formally
++verified, and the same flat, single-clock, two-valued RTL subset still applies.
++See [proof certificates, exact trust boundary and reproducible tests](docs/proof-certificates.md).
++
+ ## Commands
+ 
+ ```text
+diff --git a/benchmarks/README.md b/benchmarks/README.md
+index 0c4eb223d80ec908b02badd47b82e0737c27b09f..da00808f42e236c6128e66659eeb2a8128ee6110 100644
+--- a/benchmarks/README.md
++++ b/benchmarks/README.md
+@@ -157,3 +157,18 @@ Neither benchmark runs or claims a win against a proprietary product. See
+ missing guard coverage and unsupported clocks. Scale tiers extend to 256-bit, 16-stage pipelines,
+ not arbitrary production SoCs. Stable outcome digests are separate from measured elapsed samples.
+ See [methodology and trust boundaries](../docs/source-bound-sequential.md).
++
++
++## Independently checked source certificates (development)
++
++```console
++python -m pip install -e ".[dev]"
++python -m benchmarks.certificates --repeat 3 --json-output certificate-results.json
++```
++
++The 12 source cases preserve four valid pipeline tiers (8x1, 64x2, 256x8 and 256x16) and eight
++specific rejection expectations. Each positive result must pass regenerated-CNF RUP checking
++and guard-witness replay; an arbitrary exception does not satisfy a negative expectation.
++All timings, dependency versions, certificate sizes and input digests are retained. This corpus
++is regular synthetic RTL, not a proprietary-tool comparison or general state-machine scaling
++result. See [proof certificates](../docs/proof-certificates.md) for semantics and trust boundaries.
+diff --git a/docs/competitive-scorecard.md b/docs/competitive-scorecard.md
+index 3eeff2dd4404bb97fb498df287253c0bbc8325e3..58fef74feff1eade0879c66b0287ece3d37a1dcc 100644
+--- a/docs/competitive-scorecard.md
++++ b/docs/competitive-scorecard.md
+@@ -47,8 +47,10 @@ commercial importance of the workflow; it does not constitute a benchmark result
+ 
+ ## Claims OpenCollate does not make
+ 
+-OpenCollate does not currently claim formal exhaustiveness, temporal or conditional connectivity,
+-full SystemVerilog/UPF/SDC interpretation, design generation, million-register scale, functional
++OpenCollate does not claim general formal exhaustiveness or unrestricted temporal/conditional
++connectivity. Development commands cover a strict source-bound, flat, single-clock two-valued
++subset; [proof certificates](proof-certificates.md) add independently checked RUP evidence for
++that subset, not full SystemVerilog/UPF/SDC interpretation, design generation, million-register scale, functional
+ safety certification, or tapeout signoff. Cadence, Siemens, Synopsys, Defacto, Arteris, and
+ Agnisys publicly offer capabilities outside this project's scope.
+ 
+@@ -71,3 +73,16 @@ A release may describe a capability as shipped only when all applicable gates pa
+ 
+ Open issues and contributed minimized fixtures are welcome. A concrete missed contradiction or
+ false positive is more useful than an unmeasurable request to "beat" another tool.
++
++## Development evidence update — 2026-09-06
++
++`sequential certify` / `sequential verify-certificate` now separate proof generation from a
++solver-free receiver. The receiver regenerates source-bound base/induction CNF, checks each RUP
++addition, and validates guard reachability with the integer interpreter. The public certificate
++benchmark includes four positive pipeline tiers and eight explicit negative/incomplete cases;
++the tests include altered RTL with recomputed metadata and blocked solver imports.
++
++This is an implemented auditability capability, not a claim that proprietary tools lack proof
++export, that the Python kernel is mechanically verified, or that all formal/SoC flows are covered.
++The existing `check` and Z3 receipt paths are not silently upgraded to certified results. Consult
++the dedicated [scope and validation record](proof-certificates.md) before making comparisons.
+diff --git a/docs/source-bound-sequential.md b/docs/source-bound-sequential.md
+index 05311f9e715c6c31a892620961365cb21fb7c25b..09d2cd647ed6ab88c068b8dd548023043706985c 100644
+--- a/docs/source-bound-sequential.md
++++ b/docs/source-bound-sequential.md
+@@ -101,8 +101,11 @@ changing assumptions, or changing an outcome and recomputing a receipt checksum
+ make replay accept the result. Input/output path aliases and hard links are protected.
+ 
+ Hashes are **not signatures** or supplier authentication. UNSAT/proven results trust pyslang,
+-the lowering, Z3 and the induction implementation; no independent UNSAT certificate checker is
+-provided. Re-solving with the same implementation is not independent proof-certificate validation.
++the lowering, Z3 and the induction implementation. Re-solving with the same implementation is
++not independent proof-certificate validation. The separate development commands `sequential certify`
++and `sequential verify-certificate` now offer source-bound RUP certificates with a solver-free
++receiver; ordinary receipts do not contain those proofs. See [proof certificates](proof-certificates.md)
++for the independent encoding, proof kernel, tests and remaining frontend/kernel trust boundary.
+ Counterexample replay independently evaluates the IR, not every SystemVerilog construct. Native
+ slang constant evaluation and optional Icarus simulation are separate test oracles.
+ 
+diff --git a/pyproject.toml b/pyproject.toml
+index 8d48416ddfeb8e3d1bcbbaf989849763b3b7505d..e562b28ea6d6aa217aac53243a9778e401d67e39 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -47,7 +47,9 @@ dependencies = [
+ 
+ [project.optional-dependencies]
+ formal = ["z3-solver>=4.13,<5"]
++certificates = ["python-sat>=1.9.dev15,<2"]
+ dev = [
++  "python-sat>=1.9.dev15,<2",
+   "z3-solver>=4.13,<5",
+   "bandit>=1.8",
+   "build>=1.2",
+diff --git a/src/opencollate/cli.py b/src/opencollate/cli.py
+index ba6e476689413ef51e08090027039daddc5509a3..5d8f61ae330da682d543684eea4546d885e03082 100644
+--- a/src/opencollate/cli.py
++++ b/src/opencollate/cli.py
+@@ -191,6 +191,8 @@ def build_parser() -> argparse.ArgumentParser:
+             "guard-status",
+             "sequential-request",
+             "sequential-receipt",
++            "sequential-certificate",
++            "certificate-verification",
+         ),
+         default="report",
+     )
+@@ -1026,6 +1028,20 @@ def _capability_data() -> dict[str, Any]:
+             "full_systemverilog": False,
+             "independent_unsat_certificate_checking": False,
+         },
++        "proof_certificates": {
++            "create_command": "sequential certify",
++            "verify_command": "sequential verify-certificate",
++            "status": "experimental",
++            "source_bound": True,
++            "independent_unsat_certificate_checking": True,
++            "verification_requires_solver": False,
++            "proof_format": "RUP-additions-v1",
++            "proof_method": "bounded-base-plus-k-induction",
++            "encoding": "opencollate-bitblast-rup-v1",
++            "requires_guard_coverage": True,
++            "producer_extra": "certificates",
++            "mechanically_verified_kernel": False,
++        },
+         "symbolic_boolean": {
+             "backend": "z3",
+             "installed_version": z3_version,
+@@ -1065,6 +1081,8 @@ def _capability_data() -> dict[str, Any]:
+             "html",
+             "formal-receipt-json",
+             "sequential-receipt-json",
++            "sequential-certificate-json",
++            "certificate-verification-json",
+             "contract-diff-json",
+             "text",
+             "json",
+diff --git a/src/opencollate/sequential.py b/src/opencollate/sequential.py
+index a8668e7020f735ef55262f4354fd64529a713131..a2db449a6740a14845f44b58763f133d6f3775db 100644
+--- a/src/opencollate/sequential.py
++++ b/src/opencollate/sequential.py
+@@ -171,6 +171,9 @@ def add_commands(subparsers: Any) -> None:
+         sub.add_argument("--resource-limit", type=int, default=1000000)
+         sub.add_argument("-o", "--output", type=Path)
+         sub.set_defaults(handler=command_handler)
++    from opencollate.sequential_certificate import add_commands as add_certificates
++
++    add_certificates(commands)
+ 
+ 
+ def command_handler(args: argparse.Namespace) -> int:
