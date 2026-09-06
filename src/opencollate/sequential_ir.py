@@ -6,6 +6,7 @@ SMT lowering; counterexamples must replay every combinational and state update.
 
 from __future__ import annotations
 
+import heapq
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -89,6 +90,8 @@ class Circuit:
         if sum(self.signals[s][0] for s in self.next_state) > 16384:
             raise SequentialError("state exceeds 16384 bits")
         dependencies: dict[str, set[str]] = {}
+        comb_names = set(self.combinational)
+        work = 0
         for name, root in self.combinational.items():
             todo, seen, refs = [root], set(), set()
             while todo:
@@ -96,21 +99,32 @@ class Circuit:
                 if i in seen:
                     continue
                 seen.add(i)
+                work += 1
+                if work > 1000000:
+                    raise SequentialError("combinational dependency work limit exceeded")
                 node = self.nodes[i]
                 if node.op == "ref":
                     refs.add(str(node.value))
                 todo.extend(node.args)
-            dependencies[name] = refs & set(self.combinational)
-        # Kahn ordering; a cycle is unsupported, never an unconstrained wire.
-        while dependencies:
-            ready = sorted(name for name, deps in dependencies.items() if not deps)
-            if not ready:
-                raise SequentialError("combinational cycle detected")
-            self.comb_order.extend(ready)
-            for name in ready:
-                del dependencies[name]
-            for deps in dependencies.values():
-                deps.difference_update(ready)
+            dependencies[name] = refs & comb_names
+        # Indexed Kahn traversal avoids repeatedly scanning the entire graph.
+        users: dict[str, list[str]] = {n: [] for n in self.combinational}
+        degree = {n: len(deps) for n, deps in dependencies.items()}
+        for n, deps in dependencies.items():
+            for dep in deps:
+                users[dep].append(n)
+        ready = [n for n, size in degree.items() if not size]
+        heapq.heapify(ready)
+        self.comb_order.clear()
+        while ready:
+            n = heapq.heappop(ready)
+            self.comb_order.append(n)
+            for user in users[n]:
+                degree[user] -= 1
+                if degree[user] == 0:
+                    heapq.heappush(ready, user)
+        if len(self.comb_order) != len(dependencies):
+            raise SequentialError("combinational cycle detected")
 
 
 def signed_value(value: int, width: int) -> int:

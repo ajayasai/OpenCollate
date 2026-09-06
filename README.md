@@ -237,6 +237,22 @@ feature is an authentication mechanism or an OS security sandbox.
 See [incremental and guarded checks](docs/incremental-and-guarded-checks.md) for
 POSIX resource limits, Windows restrictions, cache trust, and reproducible benchmarks.
 
+## Hierarchical sequential checking
+
+Source-bound checking now elaborates named child modules and active generate scopes, preserves
+parameterized port conversions, and verifies properties on top-relative hierarchical signal paths.
+A dependency-closed cone is built for each property only after the full design passes validation.
+Counterexamples are reconstructed and replayed on the full model, not left as partial traces.
+
+```console
+opencollate sequential check examples/hierarchy/request.json --output receipt.json
+opencollate sequential check examples/hierarchy/request.json --no-cone-reduction
+```
+
+See [hierarchical verification](docs/hierarchical-verification.md) for exact supported semantics,
+receipt-v2 compatibility, independent simulator tests, and the matched full/cone benchmark.
+This remains a documented single-clock, two-valued subset, not full SystemVerilog or signoff.
+
 ## Security and privacy
 
 OpenCollate treats configuration and collateral as untrusted input. SDC and UPF are tokenized as

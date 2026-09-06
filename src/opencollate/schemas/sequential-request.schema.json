@@ -100,13 +100,13 @@
           },
           "sink": {
             "type": "string",
-            "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
-            "maxLength": 256
+            "pattern": "^[A-Za-z_][A-Za-z0-9_$]*(?:\\[-?[0-9]+\\])?(?:\\.[A-Za-z_][A-Za-z0-9_$]*(?:\\[-?[0-9]+\\])?)*$",
+            "maxLength": 1024
           },
           "source": {
             "type": "string",
-            "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
-            "maxLength": 256
+            "pattern": "^[A-Za-z_][A-Za-z0-9_$]*(?:\\[-?[0-9]+\\])?(?:\\.[A-Za-z_][A-Za-z0-9_$]*(?:\\[-?[0-9]+\\])?)*$",
+            "maxLength": 1024
           },
           "equals": {
             "type": "integer",
@@ -125,8 +125,8 @@
               "properties": {
                 "signal": {
                   "type": "string",
-                  "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
-                  "maxLength": 256
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_$]*(?:\\[-?[0-9]+\\])?(?:\\.[A-Za-z_][A-Za-z0-9_$]*(?:\\[-?[0-9]+\\])?)*$",
+                  "maxLength": 1024
                 },
                 "equals": {
                   "type": "integer",

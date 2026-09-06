@@ -26,6 +26,11 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
 
 ### Added
 
+- Native sequential hierarchy lowering with parameterized port conversions, independent instance
+  state, active generate scopes, top-relative property paths and direct scalar clock forwarding.
+- Dependency-closed per-property reduction, full-model counterexample lifting, an unreduced audit
+  path, sequential receipt v2, and matched hierarchy proof/trace benchmarks with independent oracles.
+
 - Source-bound synchronous RTL verification through `sequential check` and `sequential replay`,
   with finite-width BMC, conservative k-induction, explicit reset/assumptions/history, non-vacuous
   guard coverage, canonical counterexamples, independent integer replay, schemas and native oracles.

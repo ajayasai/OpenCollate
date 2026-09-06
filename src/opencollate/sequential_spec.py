@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from opencollate.sequential_hierarchy import SIGNAL_PATH
 from opencollate.sequential_ir import Circuit, SequentialError
 from opencollate.sequential_rtl import IDENTIFIER
 
@@ -21,6 +22,12 @@ def integer(value: Any, lo: int, hi: int, label: str) -> int:
 def name(value: Any, label: str) -> str:
     if not isinstance(value, str) or len(value) > 256 or not IDENTIFIER.fullmatch(value):
         raise SequentialError(f"{label} must be a simple ASCII identifier")
+    return value
+
+
+def signal_path(value: Any, label: str) -> str:
+    if not isinstance(value, str) or len(value) > 1024 or not SIGNAL_PATH.fullmatch(value):
+        raise SequentialError(f"{label} must be a resolved ASCII signal path")
     return value
 
 
@@ -133,11 +140,11 @@ def normalize(value: Any) -> dict[str, Any]:
             raise SequentialError("property requires exactly one of source or equals")
         prop: dict[str, Any] = {
             "id": identity,
-            "sink": name(q["sink"], "sink"),
+            "sink": signal_path(q["sink"], "sink"),
             "latency": integer(q.get("latency", 0), 0, 16, "latency"),
         }
         if "source" in q:
-            prop["source"] = name(q["source"], "source")
+            prop["source"] = signal_path(q["source"], "source")
         else:
             prop["equals"] = integer(q["equals"], 0, (1 << 256) - 1, "equals")
             if prop["latency"]:
@@ -150,7 +157,7 @@ def normalize(value: Any) -> dict[str, Any]:
             g = obj(g, {"signal", "equals"}, {"lag"})
             guards.append(
                 {
-                    "signal": name(g["signal"], "guard signal"),
+                    "signal": signal_path(g["signal"], "guard signal"),
                     "equals": integer(g["equals"], 0, (1 << 256) - 1, "guard equals"),
                     "lag": integer(g.get("lag", 0), 0, 16, "guard lag"),
                 }

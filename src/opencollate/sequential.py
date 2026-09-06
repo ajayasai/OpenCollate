@@ -13,12 +13,14 @@ from pathlib import Path
 from typing import Any
 
 from opencollate.atomic_output import atomic_write_text
+from opencollate.sequential_coi import cone_summary, lift_trace, select_cone
 from opencollate.sequential_ir import SequentialError
 from opencollate.sequential_rtl import load_circuit
 from opencollate.sequential_smt import Budget, verify_property
 from opencollate.sequential_spec import SEMANTICS, integer, normalize, read_json, validate_signals
 
-ALGORITHM = "source-bound-k-induction-v1"
+ALGORITHM = "source-bound-hierarchical-k-induction-v2"
+RECEIPT_VERSION = 2
 
 
 def digest(value: Any) -> str:
@@ -40,8 +42,15 @@ def implementation_digest() -> str:
 
 
 def run_request(
-    request: dict[str, Any], *, root: Path, timeout_ms: int = 10000, resource_limit: int = 1000000
+    request: dict[str, Any],
+    *,
+    root: Path,
+    timeout_ms: int = 10000,
+    resource_limit: int = 1000000,
+    cone_reduction: bool = True,
 ) -> dict[str, Any]:
+    if type(cone_reduction) is not bool:
+        raise SequentialError("cone_reduction must be a boolean")
     spec = normalize(request)
     integer(timeout_ms, 1, 120000, "timeout_ms")
     integer(resource_limit, 1, 100000000, "resource_limit")
@@ -56,13 +65,26 @@ def run_request(
         "frontend": c.frontend,
         "algorithm": ALGORITHM,
     }
+    selected = {
+        p["id"]: select_cone(c, spec, p) if cone_reduction else c for p in spec["properties"]
+    }
+    cones = {
+        identity: {**cone_summary(model), "ir_sha256": digest(model.serialized())}
+        for identity, model in selected.items()
+    }
     results: list[dict[str, Any]] = []
     backend = None
     try:
         b = Budget(timeout_ms, resource_limit)
         backend = b.z3.get_version_string()
         for prop in spec["properties"]:
-            results.append(verify_property(c, spec, prop, b))
+            model = selected[prop["id"]]
+            result = verify_property(model, spec, prop, b)
+            if cone_reduction and result["status"] == "counterexample":
+                result["trace"] = lift_trace(
+                    c, model, spec, prop, result["trace"], checkpoint=b.remaining
+                )
+            results.append(result)
     except Exception as exc:
         # Includes native/backend import failures. User interrupts still propagate.
         for prop in spec["properties"][len(results) :]:
@@ -82,12 +104,16 @@ def run_request(
         2 if statuses - {"proven", "counterexample"} else 1 if "counterexample" in statuses else 0
     )
     receipt = {
-        "schema_version": 1,
+        "schema_version": RECEIPT_VERSION,
         "semantics": SEMANTICS,
         "binding": binding,
         "status": ("proven", "counterexample", "inconclusive")[code],
         "exit_code": code,
-        "limits": {"timeout_ms": timeout_ms, "resource_limit": resource_limit},
+        "limits": {
+            "timeout_ms": timeout_ms,
+            "resource_limit": resource_limit,
+            "cone_reduction": cone_reduction,
+        },
         "backend": {"name": "z3", "version": backend},
         "model": {
             "signals": len(c.signals) - 1,
@@ -96,6 +122,7 @@ def run_request(
             "inputs": sorted(c.inputs),
             "ir_nodes": len(c.nodes),
             "locations": c.locations,
+            "property_cones": cones,
         },
         "results": results,
     }
@@ -110,6 +137,7 @@ def replay(
     root: Path,
     timeout_ms: int = 10000,
     resource_limit: int = 1000000,
+    cone_reduction: bool | None = None,
 ) -> dict[str, Any]:
     required = {
         "schema_version",
@@ -126,7 +154,7 @@ def replay(
     if (
         set(receipt) != required
         or type(receipt["schema_version"]) is not int
-        or receipt["schema_version"] != 1
+        or receipt["schema_version"] != RECEIPT_VERSION
         or receipt["semantics"] != SEMANTICS
     ):
         raise SequentialError("invalid sequential receipt fields/version/semantics")
@@ -134,7 +162,23 @@ def replay(
         {k: v for k, v in receipt.items() if k != "receipt_sha256"}
     ):
         raise SequentialError("sequential receipt content digest mismatch")
-    fresh = run_request(request, root=root, timeout_ms=timeout_ms, resource_limit=resource_limit)
+    recorded_limits = receipt["limits"]
+    if (
+        not isinstance(recorded_limits, dict)
+        or set(recorded_limits) != {"timeout_ms", "resource_limit", "cone_reduction"}
+        or type(recorded_limits["cone_reduction"]) is not bool
+    ):
+        raise SequentialError("invalid sequential receipt limits")
+    integer(recorded_limits["timeout_ms"], 1, 120000, "receipt timeout_ms")
+    integer(recorded_limits["resource_limit"], 1, 100000000, "receipt resource_limit")
+    mode = recorded_limits["cone_reduction"] if cone_reduction is None else cone_reduction
+    fresh = run_request(
+        request,
+        root=root,
+        timeout_ms=timeout_ms,
+        resource_limit=resource_limit,
+        cone_reduction=mode,
+    )
     if digest(fresh["binding"]) != digest(receipt["binding"]):
         raise SequentialError(
             "source, request, frontend, IR, or implementation changed since verification"
@@ -170,6 +214,13 @@ def add_commands(subparsers: Any) -> None:
         sub.add_argument("--timeout-ms", type=int, default=10000)
         sub.add_argument("--resource-limit", type=int, default=1000000)
         sub.add_argument("-o", "--output", type=Path)
+        sub.add_argument(
+            "--no-cone-reduction",
+            dest="cone_reduction",
+            action="store_false",
+            default=None,
+            help="use the full model as an audit/reference path (replay otherwise follows receipt)",
+        )
         sub.set_defaults(handler=command_handler)
 
 
@@ -194,6 +245,8 @@ def command_handler(args: argparse.Namespace) -> int:
             "timeout_ms": args.timeout_ms,
             "resource_limit": args.resource_limit,
         }
+        if args.cone_reduction is not None:
+            options["cone_reduction"] = args.cone_reduction
         result = (
             replay(request, read_json(args.receipt), **options)
             if args.sequential_command == "replay"
@@ -201,7 +254,7 @@ def command_handler(args: argparse.Namespace) -> int:
         )
     except Exception as error:
         result = {
-            "schema_version": 1,
+            "schema_version": RECEIPT_VERSION,
             "semantics": SEMANTICS,
             "status": "invalid-or-unsupported",
             "exit_code": 2,
@@ -220,7 +273,7 @@ def command_handler(args: argparse.Namespace) -> int:
         print(
             json.dumps(
                 {
-                    "schema_version": 1,
+                    "schema_version": RECEIPT_VERSION,
                     "semantics": SEMANTICS,
                     "status": "invalid-or-unsupported",
                     "exit_code": 2,

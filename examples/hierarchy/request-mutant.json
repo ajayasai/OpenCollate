@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "semantics": "two-valued-synchronous",
+  "files": [
+    "top-mutant.sv",
+    "cells.sv"
+  ],
+  "top": "top",
+  "clock": "clk",
+  "reset": {
+    "signal": "rst_n",
+    "active": 0
+  },
+  "depth": 8,
+  "induction": 4,
+  "properties": [
+    {
+      "id": "pipeline",
+      "source": "d",
+      "sink": "q",
+      "latency": 2,
+      "when": [
+        {
+          "signal": "en",
+          "equals": 1,
+          "lag": 1
+        },
+        {
+          "signal": "en",
+          "equals": 1,
+          "lag": 2
+        }
+      ]
+    }
+  ]
+}

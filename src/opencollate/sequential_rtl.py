@@ -1,4 +1,4 @@
-"""Fail-closed lowering of a documented single-clock RTL subset via pyslang.
+"""Fail-closed lowering of a documented single-clock hierarchical RTL subset via pyslang.
 
 No regular-expression RTL interpretation or user-supplied transition equations.
 Source bytes are read once, hashed, then passed to the elaborating frontend.
@@ -69,6 +69,22 @@ class _Lowerer:
         self.c = circuit
         self.sm = source_manager
         self.work = 0
+        self.clock_aliases = {circuit.clock}
+        self.input_ports: set[str] = set()
+        self.port_value: int | None = None
+
+    def signal_name(self, symbol: Any) -> str:
+        path = str(symbol.hierarchicalPath)
+        prefix = self.c.top + "."
+        if not path.startswith(prefix):
+            raise SequentialError("reference escapes the selected design: " + path)
+        return path[len(prefix) :]
+
+    def reference(self, symbol: Any) -> int:
+        name = self.signal_name(symbol)
+        if name in self.clock_aliases:
+            raise SequentialError("clock-as-data is unsupported: " + name)
+        return self.c.ref(name)
 
     def bounded(self, depth: int) -> None:
         self.work += 1
@@ -101,12 +117,17 @@ class _Lowerer:
         kind = e.kind.name
         if kind in {"IntegerLiteral", "UnbasedUnsizedIntegerLiteral"}:
             return self.c.add("const", width, signed, value=_integer(e.value) & ((1 << width) - 1))
-        if kind == "NamedValue":
+        if kind in {"NamedValue", "HierarchicalValue"}:
             if e.symbol.kind.name in {"Parameter", "EnumValue"}:
                 return self.c.add(
                     "const", width, signed, value=_integer(e.symbol.value) & ((1 << width) - 1)
                 )
-            return self.c.ref(e.symbol.name)
+            return self.reference(e.symbol)
+        if kind == "EmptyArgument" and self.port_value is not None:
+            node = self.c.nodes[self.port_value]
+            if (node.width, node.signed) != (width, signed):
+                raise SequentialError("port placeholder shape disagrees with child output")
+            return self.port_value
         if kind == "Conversion":
             return self.c.add("cast", width, signed, (self.expression(e.operand, depth + 1),))
         if kind == "UnaryOp" and e.op.name in UNARY:
@@ -161,8 +182,13 @@ class _Lowerer:
             raise SequentialError(
                 "clocked assignments must be nonblocking and target a whole signal"
             )
-        name = str(e.left.symbol.name)
-        if name in self.c.inputs or name == self.c.clock or name not in self.c.signals:
+        name = self.signal_name(e.left.symbol)
+        if (
+            name in self.c.inputs
+            or name in self.input_ports
+            or name in self.clock_aliases
+            or name not in self.c.signals
+        ):
             raise SequentialError(f"invalid driven signal: {name}")
         root = self.expression(e.right)
         if self.c.nodes[root].width != self.c.signals[name][0]:
@@ -219,12 +245,15 @@ class _Lowerer:
 
 
 def load_circuit(files: list[str], *, root: Path, top: str, clock: str) -> Circuit:
-    """Load exact source bytes and lower the selected flat module, or fail."""
+    """Load exact source bytes and lower the selected elaborated design, or fail."""
     s = importlib.import_module("pyslang")
     circuit = Circuit(top, clock, frontend=str(s.__version__))
     manager = s.SourceManager()
     options = s.ast.CompilationOptions()
     options.topModules = {top}
+    options.maxInstanceDepth = 32
+    options.maxGenerateSteps = 4096
+    options.maxInstanceArray = 1024
     compilation = s.ast.Compilation(s.Bag([options]))
     total = 0
     resolved: set[Path] = set()
@@ -258,73 +287,7 @@ def load_circuit(files: list[str], *, root: Path, top: str, clock: str) -> Circu
         )
     if len(design.topInstances) != 1 or design.topInstances[0].name != top:
         raise SequentialError("selected top must elaborate to exactly one module")
-    body = design.topInstances[0].body
-    lower = _Lowerer(circuit, manager)
-    members = list(body)
-    if len(members) > 4096:
-        raise SequentialError("top module exceeds 4096 members")
-    for m in members:
-        kind = m.kind.name
-        if kind in {"Variable", "Net"}:
-            if not IDENTIFIER.fullmatch(m.name):
-                raise SequentialError("escaped/non-ASCII signal names are unsupported")
-            circuit.signals[m.name] = lower.shape(m.type, declaration=True)
-            circuit.locations[m.name] = lower.location(m)
-            if m.initializer is not None:
-                raise SequentialError(
-                    "declaration initializers are unsupported; use explicit assignments/reset"
-                )
-            if kind == "Net" and (
-                m.netType.netKind.name != "Wire"
-                or m.delay is not None
-                or any(x is not None for x in m.driveStrength)
-            ):
-                raise SequentialError("only undelayed unstrengthened wire nets are supported")
-        elif kind not in {
-            "Port",
-            "Parameter",
-            "ContinuousAssign",
-            "ProceduralBlock",
-            "EmptyMember",
-        }:
-            raise SequentialError(f"unsupported module member: {kind}; flatten hierarchy first")
-    for port in body.portList:
-        if port.internalSymbol is None or port.name != port.internalSymbol.name:
-            raise SequentialError("complex port expressions are unsupported")
-        if port.direction.name == "In":
-            circuit.inputs.append(port.name)
-        elif port.direction.name == "Out":
-            circuit.outputs.append(port.name)
-        else:
-            raise SequentialError("inout/ref ports are unsupported")
-    if clock not in circuit.inputs or circuit.signals[clock][0] != 1:
-        raise SequentialError("clock must be a scalar input")
-    circuit.inputs.remove(clock)
-    for m in members:
-        if m.kind.name == "ContinuousAssign":
-            if m.delay is not None or any(x is not None for x in m.driveStrength):
-                raise SequentialError("continuous assignment delays/strengths are unsupported")
-            name, expr = lower.assignment(m.assignment, sequential=False)
-            lower.add_driver(name, expr, sequential=False)
-        if m.kind.name == "ProceduralBlock":
-            if m.procedureKind.name not in {"AlwaysFF", "Always"} or m.body.kind.name != "Timed":
-                raise SequentialError(
-                    "only positive-edge clocked always/always_ff blocks are supported"
-                )
-            event = m.body.timing
-            if (
-                event.kind.name != "SignalEvent"
-                or event.edge.name != "PosEdge"
-                or event.iffCondition is not None
-                or event.expr.kind.name != "NamedValue"
-                or event.expr.symbol.name != clock
-            ):
-                raise SequentialError(
-                    "multiple clocks, asynchronous resets, gated clocks, "
-                    "and event qualifiers are unsupported"
-                )
-            pending = lower.statement(m.body.stmt, {})
-            for name, expr in sorted(pending.items()):
-                lower.add_driver(name, expr, sequential=True)
-    circuit.finalize()
+    from opencollate.sequential_hierarchy import lower_design
+
+    lower_design(circuit, design.topInstances[0], manager)
     return circuit

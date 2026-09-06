@@ -157,3 +157,10 @@ Neither benchmark runs or claims a win against a proprietary product. See
 missing guard coverage and unsupported clocks. Scale tiers extend to 256-bit, 16-stage pipelines,
 not arbitrary production SoCs. Stable outcome digests are separate from measured elapsed samples.
 See [methodology and trust boundaries](../docs/source-bound-sequential.md).
+
+## Hierarchy and closed-cone benchmark
+
+`python benchmarks/hierarchy.py --repeat 3 --json-output hierarchy-results.json` compares the
+new full-model and reduced-model paths on the same actual hierarchical RTL. Both must prove
+the target and return identical full-design mutant counterexamples. Budgets, all timing samples,
+counts and scope qualifications are retained. See `docs/hierarchical-verification.md`.

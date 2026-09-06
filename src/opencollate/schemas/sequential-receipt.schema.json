@@ -7,7 +7,7 @@
       "properties": {
         "schema_version": {
           "type": "integer",
-          "const": 1
+          "const": 2
         },
         "semantics": {
           "const": "two-valued-synchronous"
@@ -58,7 +58,7 @@
               "type": "string"
             },
             "algorithm": {
-              "const": "source-bound-k-induction-v1"
+              "const": "source-bound-hierarchical-k-induction-v2"
             }
           },
           "required": [
@@ -98,11 +98,15 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 100000000
+            },
+            "cone_reduction": {
+              "type": "boolean"
             }
           },
           "required": [
             "timeout_ms",
-            "resource_limit"
+            "resource_limit",
+            "cone_reduction"
           ],
           "additionalProperties": false
         },
@@ -141,8 +145,8 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
-                "maxLength": 256
+                "pattern": "^[A-Za-z_][A-Za-z0-9_$]*(?:\\[-?[0-9]+\\])?(?:\\.[A-Za-z_][A-Za-z0-9_$]*(?:\\[-?[0-9]+\\])?)*$",
+                "maxLength": 1024
               },
               "minItems": 0
             },
@@ -184,6 +188,44 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "property_cones": {
+              "type": "object",
+              "maxProperties": 32,
+              "minProperties": 1,
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "signals": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "state_bits": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "inputs": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "ir_nodes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "ir_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                },
+                "required": [
+                  "signals",
+                  "state_bits",
+                  "inputs",
+                  "ir_nodes",
+                  "ir_sha256"
+                ],
+                "additionalProperties": false
+              }
             }
           },
           "required": [
@@ -192,7 +234,8 @@
             "states",
             "inputs",
             "ir_nodes",
-            "locations"
+            "locations",
+            "property_cones"
           ],
           "additionalProperties": false
         },
@@ -448,7 +491,7 @@
       "properties": {
         "schema_version": {
           "type": "integer",
-          "const": 1
+          "const": 2
         },
         "semantics": {
           "const": "two-valued-synchronous"
