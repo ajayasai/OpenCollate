@@ -7,8 +7,8 @@ from hypothesis import given, settings
 from pysat.solvers import Glucose3
 
 from opencollate.boolean import BoolAnd, BoolConst, BoolNot, BoolOr, BoolVar, BoolXor, parse_boolean
+from opencollate.boolean_proof_kernel import ProofError, ProofLimits
 from opencollate.proof_cnf import Encoder, compile_boolean
-from opencollate.proof_kernel import ProofError, ProofLimits
 from tests.test_symbolic import expr
 
 

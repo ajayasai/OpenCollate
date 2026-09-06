@@ -101,8 +101,11 @@ changing assumptions, or changing an outcome and recomputing a receipt checksum 
 make replay accept the result. Input/output path aliases and hard links are protected.
 
 Hashes are **not signatures** or supplier authentication. UNSAT/proven results trust pyslang,
-the lowering, Z3 and the induction implementation; no independent UNSAT certificate checker is
-provided. Re-solving with the same implementation is not independent proof-certificate validation.
+the lowering, Z3 and the induction implementation. Re-solving with the same implementation is
+not independent proof-certificate validation. The separate development commands `sequential certify`
+and `sequential verify-certificate` now offer source-bound RUP certificates with a solver-free
+receiver; ordinary receipts do not contain those proofs. See [proof certificates](proof-certificates.md)
+for the independent encoding, proof kernel, tests and remaining frontend/kernel trust boundary.
 Counterexample replay independently evaluates the IR, not every SystemVerilog construct. Native
 slang constant evaluation and optional Icarus simulation are separate test oracles.
 

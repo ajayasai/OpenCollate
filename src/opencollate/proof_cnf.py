@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from opencollate.boolean import BoolAnd, BoolConst, BoolExpr, BoolNot, BoolOr, BoolVar
+from opencollate.boolean_proof_kernel import ProofError, ProofLimits
 from opencollate.formal import _digest
-from opencollate.proof_kernel import ProofError, ProofLimits
 from opencollate.symbolic import SymbolicLimits, _BudgetExceeded, _children, _evaluate, _prepare
 
 ENCODING = "opencollate-tseitin-rup-v1"

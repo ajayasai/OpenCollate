@@ -20,9 +20,9 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any
 
+from opencollate.boolean_proof_kernel import ProofError, ProofLimits, clause
 from opencollate.certificate_process import read_message, write_message
 from opencollate.certificates import _solve_native
-from opencollate.proof_kernel import ProofError, ProofLimits, clause
 
 
 def _windows_flush() -> Callable[[], None]:

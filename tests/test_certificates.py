@@ -16,6 +16,7 @@ from hypothesis import given, settings
 
 from opencollate import certificates
 from opencollate.boolean import BoolVar, parse_boolean
+from opencollate.boolean_proof_kernel import ProofError, ProofLimits
 from opencollate.certificates import (
     _proof_lines,
     certify_boolean,
@@ -23,7 +24,6 @@ from opencollate.certificates import (
     verify_certificate,
 )
 from opencollate.formal import _digest
-from opencollate.proof_kernel import ProofError, ProofLimits
 from tests.test_formal import request
 from tests.test_symbolic import expr
 

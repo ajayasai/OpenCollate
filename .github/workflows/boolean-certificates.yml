@@ -32,8 +32,8 @@ jobs:
       - name: Install and test certificate support
         run: |
           python -m pip install -e ".[dev]"
-          pytest -q tests/test_proof_kernel.py tests/test_proof_cnf.py tests/test_certificates.py tests/test_certificate_integration.py tests/test_certificate_benchmarks.py
-          python -m benchmarks.certificates --repeat 5 --json-output certificates.json --export-dir certificate-evidence
+          pytest -q tests/test_boolean_proof_kernel.py tests/test_proof_cnf.py tests/test_certificates.py tests/test_certificate_integration.py tests/test_certificate_benchmarks.py
+          python -m benchmarks.boolean_certificates --repeat 5 --json-output certificates.json --export-dir certificate-evidence
       - name: Check every exported UNSAT proof with independent native code
         run: |
           make -C .external-drat-trim drat-trim

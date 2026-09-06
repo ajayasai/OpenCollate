@@ -192,6 +192,8 @@ def build_parser() -> argparse.ArgumentParser:
             "guard-status",
             "sequential-request",
             "sequential-receipt",
+            "sequential-certificate",
+            "certificate-verification",
         ),
         default="report",
     )
@@ -1043,6 +1045,20 @@ def _capability_data() -> dict[str, Any]:
             "mechanically_verified_checker": False,
             "standalone_source_bound": False,
         },
+        "proof_certificates": {
+            "create_command": "sequential certify",
+            "verify_command": "sequential verify-certificate",
+            "status": "experimental",
+            "source_bound": True,
+            "independent_unsat_certificate_checking": True,
+            "verification_requires_solver": False,
+            "proof_format": "RUP-additions-v1",
+            "proof_method": "bounded-base-plus-k-induction",
+            "encoding": "opencollate-bitblast-rup-v1",
+            "requires_guard_coverage": True,
+            "producer_extra": "certificates",
+            "mechanically_verified_kernel": False,
+        },
         "symbolic_boolean": {
             "backend": "z3",
             "installed_version": z3_version,
@@ -1083,6 +1099,8 @@ def _capability_data() -> dict[str, Any]:
             "formal-receipt-json",
             "formal-certificate-json",
             "sequential-receipt-json",
+            "sequential-certificate-json",
+            "certificate-verification-json",
             "contract-diff-json",
             "text",
             "json",
@@ -1232,8 +1250,8 @@ def _command_guard(args: argparse.Namespace) -> int:
 
 
 def _command_certificate(args: argparse.Namespace) -> int:
+    from opencollate.boolean_proof_kernel import ProofLimits
     from opencollate.certificates import certify_obligations, verify_certificate
-    from opencollate.proof_kernel import ProofLimits
 
     _reject_path_alias(args.request, "obligation request", args.output, "certificate output")
     if args.formal_command == "verify-certificate":

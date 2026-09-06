@@ -165,6 +165,23 @@ opencollate sequential check examples/sequential/request.json --output receipt.j
 See [exact semantics, source subset, proof boundaries and test evidence](docs/source-bound-sequential.md).
 This is not full SystemVerilog, SVA, multi-clock verification or tapeout signoff.
 
+## Independently checkable proof certificates (development)
+
+Generate source-bound safety evidence whose receiver does not need a SAT/SMT solver:
+
+```console
+python -m pip install -e ".[certificates]"
+opencollate sequential certify examples/sequential/request.json --output proof.json
+opencollate sequential verify-certificate examples/sequential/request.json proof.json
+```
+
+The receiver re-reads current RTL, rebuilds separate bit-blasted base/induction obligations,
+checks every RUP proof addition, and replays reachable guard witnesses. Solver-returned `UNSAT`
+and recomputed hashes are not accepted as proof. Ordinary Z3 receipts remain unchanged; use
+these commands explicitly. The trusted frontend, encoding and Python kernel are not formally
+verified, and the same flat, single-clock, two-valued RTL subset still applies.
+See [proof certificates, exact trust boundary and reproducible tests](docs/proof-certificates.md).
+
 ## Commands
 
 ```text

@@ -18,7 +18,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from opencollate.proof_kernel import ProofError, ProofLimits
+from opencollate.boolean_proof_kernel import ProofError, ProofLimits
 
 # Additional transport ceiling, independent of proof/IR limits. A request that
 # does not fit is incomplete, not silently truncated. Native memory/disk use is

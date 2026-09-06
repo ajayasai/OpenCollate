@@ -21,6 +21,18 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
   installed-wheel checks, 15 synthetic outcome cases, eight forged-certificate controls and a
   revision-pinned external DRAT-trim cross-check. No full-SystemVerilog or signoff claim is made.
 
+### Independently checkable sequential certificates
+
+- `sequential certify` and `sequential verify-certificate` generate and check source-bound
+  base/induction RUP refutations plus replayed reachable-guard witnesses. Verification neither
+  imports nor calls a SAT/SMT solver; optional PySAT/Glucose3 is an untrusted producer only.
+- Independent typed-IR bit blasting, exact equation substitution, a bounded watched-literal
+  RUP kernel, strict all-property/induction coverage, regenerated source/CNF bindings, atomic
+  output protection, machine schemas and explicit capability reporting.
+- Public truth-table, arithmetic, propagation, tampering and solver-free receiver tests;
+  12-case source certificate benchmark with positive scale tiers and explicit rejection reasons.
+  This does not expand the HDL subset or establish commercial-tool superiority/signoff.
+
 ### Symbolic verification and review
 
 - Optional bounded Z3 reasoning for the supported two-valued Boolean IR, including explicit

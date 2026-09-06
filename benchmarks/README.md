@@ -160,7 +160,7 @@ See [methodology and trust boundaries](../docs/source-bound-sequential.md).
 
 ## Independent Boolean certificate corpus
 
-Run `python -m benchmarks.certificates --repeat 5 --json-output certificates.json
+Run `python -m benchmarks.boolean_certificates --repeat 5 --json-output certificates.json
 --export-dir certificate-evidence` (on one command line). Fifteen expected outcome cases cover
 12/64/128/512-input equivalent and faulty formulas, guards, parity, unsupported syntax and work
 exhaustion; eight recomputed-checksum forgeries must be rejected. Output retains raw generation
@@ -168,3 +168,18 @@ and solver-free verification timings, input and implementation digests, certific
 producer version. The export contains seven DIMACS/RUP pairs for independent DRAT-trim checking.
 See [exact semantics and trust boundaries](../docs/independent-boolean-certificates.md). Neither
 local timing nor this finite synthetic corpus establishes commercial superiority or production scale.
+
+
+## Independently checked source certificates (development)
+
+```console
+python -m pip install -e ".[dev]"
+python -m benchmarks.certificates --repeat 3 --json-output certificate-results.json
+```
+
+The 12 source cases preserve four valid pipeline tiers (8x1, 64x2, 256x8 and 256x16) and eight
+specific rejection expectations. Each positive result must pass regenerated-CNF RUP checking
+and guard-witness replay; an arbitrary exception does not satisfy a negative expectation.
+All timings, dependency versions, certificate sizes and input digests are retained. This corpus
+is regular synthetic RTL, not a proprietary-tool comparison or general state-machine scaling
+result. See [proof certificates](../docs/proof-certificates.md) for semantics and trust boundaries.

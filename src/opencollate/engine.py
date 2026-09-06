@@ -1445,8 +1445,8 @@ class ComparisonEngine:
             for _item, expression in parsed[1:]:
                 if self.config.policy.boolean_backend == "certified":
                     from opencollate.boolean import EquivalenceResult
+                    from opencollate.boolean_proof_kernel import ProofLimits
                     from opencollate.certificates import certify_boolean
-                    from opencollate.proof_kernel import ProofLimits
 
                     certified = certify_boolean(
                         reference_expression,

@@ -80,7 +80,7 @@ without solver assumptions attached to that query. Complete SAT models must sati
 CNF before they can become source witnesses. Native errors, `SystemExit`, missing models,
 contradictory literals, unknown statuses and invalid traces cannot establish a pass.
 
-`proof_kernel.py` checks an addition-only **reverse-unit-propagation (RUP)** proof. For each added
+`boolean_proof_kernel.py` checks an addition-only **reverse-unit-propagation (RUP)** proof. For each added
 clause, it temporarily negates every literal and requires unit propagation against the actual
 base formula and previously checked clauses to reach a contradiction. The final clause must be
 explicitly empty, with no trailing steps. Every nonempty addition is checked too; a matching
@@ -133,8 +133,8 @@ source collateral.
 
 ```console
 python -m pip install -e ".[dev]"
-pytest -q tests/test_proof_kernel.py tests/test_proof_cnf.py tests/test_certificates.py tests/test_certificate_integration.py tests/test_certificate_benchmarks.py
-python -m benchmarks.certificates --repeat 5 --json-output certificates.json --export-dir certificate-evidence
+pytest -q tests/test_boolean_proof_kernel.py tests/test_proof_cnf.py tests/test_certificates.py tests/test_certificate_integration.py tests/test_certificate_benchmarks.py
+python -m benchmarks.boolean_certificates --repeat 5 --json-output certificates.json --export-dir certificate-evidence
 ```
 
 The public corpus has 15 expected outcomes: paired De Morgan controls/mutants at 12, 64, 128 and

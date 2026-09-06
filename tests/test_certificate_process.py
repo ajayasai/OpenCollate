@@ -16,8 +16,8 @@ import pytest
 from opencollate import _certificate_worker as worker
 from opencollate import certificate_process as transport
 from opencollate import certificates
+from opencollate.boolean_proof_kernel import ProofError, ProofLimits, verify_rup
 from opencollate.proof_cnf import compile_boolean
-from opencollate.proof_kernel import ProofError, ProofLimits, verify_rup
 from tests.test_certificates import FakeSolver
 
 

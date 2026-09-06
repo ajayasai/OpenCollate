@@ -17,9 +17,9 @@ from threading import Timer
 from typing import Any
 
 from opencollate.boolean import BoolExpr
+from opencollate.boolean_proof_kernel import ProofError, ProofLimits, clause, verify_rup
 from opencollate.formal import SEMANTICS, _digest, validate_obligations
 from opencollate.proof_cnf import ENCODING, CompiledBoolean, compile_boolean
-from opencollate.proof_kernel import ProofError, ProofLimits, clause, verify_rup
 
 ROW_FIELDS = {
     "status",

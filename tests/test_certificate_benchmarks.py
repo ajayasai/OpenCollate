@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
-from benchmarks.certificates import main, run_suite
+from benchmarks.boolean_certificates import main, run_suite
 
 
 def test_public_certificate_corpus_and_export(tmp_path: Path) -> None:
