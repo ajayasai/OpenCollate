@@ -13,9 +13,10 @@ from pathlib import Path
 from typing import Any
 
 from opencollate.atomic_output import atomic_write_text
+from opencollate.sequential_cone import verify_cone_property as verify_property
 from opencollate.sequential_ir import SequentialError
 from opencollate.sequential_rtl import load_circuit
-from opencollate.sequential_smt import Budget, verify_property
+from opencollate.sequential_smt import Budget
 from opencollate.sequential_spec import SEMANTICS, integer, normalize, read_json, validate_signals
 
 ALGORITHM = "source-bound-k-induction-v1"
