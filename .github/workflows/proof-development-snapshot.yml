@@ -13,19 +13,16 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
-          fetch-depth: 2
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.13'
-      - name: Package source and public development dependencies
+      - name: Package optional public proof dependencies
         run: |
-          mkdir -p snapshot/wheels
-          git archive --format=tar.gz --output=snapshot/source.tar.gz c62507c5b7f30a3c0388c2ce4089618931613aab
-          python -m pip download --only-binary=:all: --dest snapshot/wheels '.[dev,formal]' hatchling
-          git rev-parse HEAD > snapshot/transport-commit.txt
+          mkdir -p wheels
+          python -m pip download --only-binary=:all: --dest wheels 'python-sat>=1.8.dev13,<2' editables
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: proof-development-baseline
-          path: snapshot/
+          name: proof-optional-dependencies
+          path: wheels/
           retention-days: 2
           if-no-files-found: error
