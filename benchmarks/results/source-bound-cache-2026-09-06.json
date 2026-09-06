@@ -1,0 +1,67 @@
+{
+  "environment": {
+    "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+    "processor": "x86_64",
+    "python": "3.13.15"
+  },
+  "incremental_cache_stats": {
+    "bypassed_codec": 0,
+    "bypassed_dependencies": 0,
+    "bypassed_limits": 0,
+    "bypassed_plugins": 0,
+    "evictions": 0,
+    "hits": 1,
+    "invalid_entries": 0,
+    "misses": 1,
+    "stores": 1,
+    "write_errors": 0
+  },
+  "result_sha256": "6c480df937956f97da9c01216a36ba62fad4f2b2699c4c4d932f0213a78164ab",
+  "schema_version": 1,
+  "scope": "synthetic Liberty/LEF corpus with skipped characterization tables; in-process full-check timings, not commercial or production-SoC comparison",
+  "seconds": {
+    "medians": {
+      "cold_cache": 5.201869558999988,
+      "uncached": 4.6265026060000025,
+      "warm_cache": 0.810805361000007
+    },
+    "one_file_changed": 5.145488271000005,
+    "samples": {
+      "cold_cache": [
+        5.201869558999988,
+        5.221213909999989,
+        5.192416707000007
+      ],
+      "uncached": [
+        4.632258816999979,
+        4.620792876999985,
+        4.6265026060000025
+      ],
+      "warm_cache": [
+        0.7716308300000208,
+        0.810805361000007,
+        0.8154177199999992
+      ]
+    }
+  },
+  "status": "pass",
+  "suite": "opencollate-incremental-full-check",
+  "verification": {
+    "all_reports_identical": true,
+    "all_warm_views_reused": true,
+    "baseline_report_sha256": "f4a2d5778d3ff4be94655d7b7c118c2dd5b1bd63a1fa07e7d94a455e151b2376",
+    "cells": 512,
+    "mutant_matches_fresh_check": true,
+    "mutant_report_sha256": "915f2fb2e9ee2825b7e0774b4cff1858fbb01767c04f5f43a9e3663830f65afb",
+    "pins": 1024,
+    "single_file_mutation_detected": true,
+    "views": 2
+  },
+  "warm_vs_uncached_speedup": 5.706058233623301,
+  "workload": {
+    "cells": 512,
+    "repeat": 3,
+    "source_bytes": 26891279,
+    "table_rows_per_cell": 512
+  }
+}
