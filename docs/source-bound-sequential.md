@@ -76,7 +76,9 @@ failure must match. The trace includes source locations and can be independently
 
 ## Supported HDL and deliberate rejection
 
-The selected top must be a **flat, single-clock module**. Parameter defaults, scalar or simple
+The selected design must be a **single-clock module hierarchy**. See
+[hierarchical verification](hierarchical-verification.md) for port/generate support,
+property-specific reduction, receipt version 2 and full-trace replay. Parameter defaults, scalar or simple
 packed 1..256-bit values, signed/unsigned arithmetic, comparisons, shifts, reductions, ternaries,
 concatenations, constant bit/part selects, continuous assignments and positive-edge
 `always`/`always_ff` blocks with nonblocking whole-signal assignments and ordinary `if/else` are
@@ -84,7 +86,7 @@ supported. Declared packed vectors must use descending `[width-1:0]` indices. Sy
 enables, pipelines, counters, wrapping arithmetic and assignment priority are modeled.
 
 Unsupported constructs cause an explicit refusal of the analysis, not a black-box proof:
-hierarchy/generate blocks (flatten first), multiple or gated clocks, asynchronous resets,
+interfaces and instance arrays, multiple or gated clocks, asynchronous resets,
 X/Z literals, inout/ref ports, special net resolution/strengths, declaration initializers,
 initial/final blocks, procedural blocking/combinational/latch blocks, loops/case, dynamic selects,
 partial left-hand-side assignments, function calls, division/modulus, real/array/struct data,
@@ -114,8 +116,8 @@ command deliberately for the properties and models it supports.
 ## Bounds and reproducible evidence
 
 Inputs are limited to 32 source files, 1 MiB/file, 4 MiB total; request/receipt JSON to 8 MiB and
-64 nesting levels. Paths remain inside the request directory. Models are bounded to 4096 top
-members, 16384 state bits, 32768 IR nodes and bounded lowering work/depth. Up to 32 properties,
+64 nesting levels. Paths remain inside the request directory. Full models are bounded to 16384 active hierarchy members, 1024 child instances,
+32 scope levels, 16384 state bits, 32768 IR nodes and bounded lowering work/depth. Up to 32 properties,
 128 BMC steps, induction depth 16 and history length 16 are supported. The shared solving deadline
 defaults to 10 seconds, with 8192 queries and a per-query Z3 resource limit of 1000000. Runtime
 limits are cooperative; the external `guard` command is needed for a process-level wall deadline.

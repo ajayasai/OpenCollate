@@ -228,7 +228,7 @@ def test_receipt_tampering(tmp_path: Path, change: str) -> None:
         PIPE.replace("input logic [W-1:0] d", "inout wire [W-1:0] d"),
         '`include "missing.svh"\n' + PIPE,
         PIPE.replace("q <= d", "q <= ghost"),
-        PIPE.replace("endmodule", "leaf u(); endmodule module leaf; endmodule"),
+        PIPE.replace("endmodule", "leaf u(); endmodule module leaf; initial $finish; endmodule"),
         "module pipe(input logic clk,rst_n,en,d,output wire q); "
         "wire a,b; assign a=b; assign b=a; assign q=b; endmodule",
         "module pipe(input logic clk,rst_n,en,d,output wire q); endmodule",

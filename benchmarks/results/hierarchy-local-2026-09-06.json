@@ -1,0 +1,153 @@
+{
+  "cases": [
+    {
+      "background_instances": 0,
+      "cone_ir_nodes": 25,
+      "cone_state_bits": 16,
+      "exact_lifted_counterexample_trace_matches": true,
+      "exact_proof_results_and_bindings_match": true,
+      "full_ir_nodes": 25,
+      "full_over_cone_speedup": 0.86012722528697,
+      "full_state_bits": 16,
+      "median_seconds": {
+        "cone": 0.02805039800000486,
+        "full": 0.024126910999939355
+      },
+      "module_instances": 2,
+      "mutant_failure_cycle": 3,
+      "mutant_results_sha256": "859534f3fccc7dfa21db647db38fbbd2854b05f09e1ea5fceced388cda54eb7e",
+      "mutant_status": "counterexample",
+      "pass": true,
+      "proof_results_sha256": "b014472e290be82e2809ba6f006a2b41b02f652d89962d0806aca5d4c3117e4e",
+      "proof_status": "proven",
+      "samples_seconds": {
+        "cone": [
+          0.03201963399988017,
+          0.02805039800000486,
+          0.02284173800012468
+        ],
+        "full": [
+          0.1021356899998409,
+          0.024126910999939355,
+          0.022969445000171618
+        ]
+      },
+      "source_bytes": 727
+    },
+    {
+      "background_instances": 16,
+      "cone_ir_nodes": 25,
+      "cone_state_bits": 16,
+      "exact_lifted_counterexample_trace_matches": true,
+      "exact_proof_results_and_bindings_match": true,
+      "full_ir_nodes": 142,
+      "full_over_cone_speedup": 3.9511337214804434,
+      "full_state_bits": 528,
+      "median_seconds": {
+        "cone": 0.052729573000078744,
+        "full": 0.20834159399987584
+      },
+      "module_instances": 18,
+      "mutant_failure_cycle": 3,
+      "mutant_results_sha256": "08a547ef289caf559b57a077531d475cfe5e52db2dbb71afd2d89b8cc89210a8",
+      "mutant_status": "counterexample",
+      "pass": true,
+      "proof_results_sha256": "b014472e290be82e2809ba6f006a2b41b02f652d89962d0806aca5d4c3117e4e",
+      "proof_status": "proven",
+      "samples_seconds": {
+        "cone": [
+          0.052729573000078744,
+          0.05403386300008606,
+          0.04720189199997549
+        ],
+        "full": [
+          0.2234090770000421,
+          0.20773982599985175,
+          0.20834159399987584
+        ]
+      },
+      "source_bytes": 728
+    },
+    {
+      "background_instances": 64,
+      "cone_ir_nodes": 25,
+      "cone_state_bits": 16,
+      "exact_lifted_counterexample_trace_matches": true,
+      "exact_proof_results_and_bindings_match": true,
+      "full_ir_nodes": 478,
+      "full_over_cone_speedup": 8.546541801137144,
+      "full_state_bits": 2064,
+      "median_seconds": {
+        "cone": 0.11838580299991008,
+        "full": 1.0117892139999185
+      },
+      "module_instances": 66,
+      "mutant_failure_cycle": 3,
+      "mutant_results_sha256": "57e9dfaddb1e5af09a1e9dc65e587f378c6e64d24afebb957efda7af81ddd3ec",
+      "mutant_status": "counterexample",
+      "pass": true,
+      "proof_results_sha256": "b014472e290be82e2809ba6f006a2b41b02f652d89962d0806aca5d4c3117e4e",
+      "proof_status": "proven",
+      "samples_seconds": {
+        "cone": [
+          0.11838580299991008,
+          0.12000790199999756,
+          0.11507034999999632
+        ],
+        "full": [
+          1.0117892139999185,
+          1.0621143589999065,
+          1.0004263139999239
+        ]
+      },
+      "source_bytes": 728
+    },
+    {
+      "background_instances": 128,
+      "cone_ir_nodes": 25,
+      "cone_state_bits": 16,
+      "exact_lifted_counterexample_trace_matches": true,
+      "exact_proof_results_and_bindings_match": true,
+      "full_ir_nodes": 926,
+      "full_over_cone_speedup": 12.661798083694425,
+      "full_state_bits": 4112,
+      "median_seconds": {
+        "cone": 0.20233936800013907,
+        "full": 2.561980222000102
+      },
+      "module_instances": 130,
+      "mutant_failure_cycle": 3,
+      "mutant_results_sha256": "07b3583f00f26611a81223c29e70e29689113244dd23c07e402532af9468b26f",
+      "mutant_status": "counterexample",
+      "pass": true,
+      "proof_results_sha256": "b014472e290be82e2809ba6f006a2b41b02f652d89962d0806aca5d4c3117e4e",
+      "proof_status": "proven",
+      "samples_seconds": {
+        "cone": [
+          0.20182246300009865,
+          0.20411743199997545,
+          0.20233936800013907
+        ],
+        "full": [
+          2.6623135370000455,
+          2.561980222000102,
+          2.4419596870000078
+        ]
+      },
+      "source_bytes": 729
+    }
+  ],
+  "environment": {
+    "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+    "python": "3.13.5"
+  },
+  "limits": {
+    "resource_limit": 10000000,
+    "timeout_ms": 60000
+  },
+  "repeat": 3,
+  "schema_version": 1,
+  "scope": "Synthetic hierarchical RTL. Timings include frontend, lowering, cone construction and solving; exclude interpreter startup. Both modes use the new implementation; not a commercial-tool benchmark or production-SoC qualification.",
+  "status": "pass",
+  "suite": "source-hierarchy-and-closed-cones-v1"
+}
