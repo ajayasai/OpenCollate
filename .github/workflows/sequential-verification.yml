@@ -37,9 +37,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pytest -q tests/test_sequential.py tests/test_sequential_oracles.py | tee sequential-tests.log
+          pytest -q tests/test_sequential*.py | tee sequential-tests.log
       - name: Verify source-file proof and mutation corpus
         run: python benchmarks/sequential.py --repeat 3 --json-output sequential-results.json
+      - name: Verify full-model versus property-cone evidence
+        run: python benchmarks/hierarchy.py --tiers 0,16,64,128 --repeat 3 --json-output hierarchy-results.json
       - name: Retain validation evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -48,5 +50,6 @@ jobs:
           path: |
             sequential-tests.log
             sequential-results.json
+            hierarchy-results.json
           if-no-files-found: warn
           retention-days: 14
