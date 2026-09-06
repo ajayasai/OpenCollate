@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OpenCollate sequential-request",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "semantics": {
+      "const": "two-valued-synchronous"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      },
+      "minItems": 1,
+      "maxItems": 32
+    },
+    "top": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+      "maxLength": 256
+    },
+    "clock": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+      "maxLength": 256
+    },
+    "reset": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "signal": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+              "maxLength": 256
+            },
+            "active": {
+              "type": "integer",
+              "enum": [
+                0,
+                1
+              ]
+            },
+            "cycles": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            }
+          },
+          "required": [
+            "signal",
+            "active"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "assumptions": {
+      "type": "object",
+      "maxProperties": 256,
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+        "maxLength": 256
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 115792089237316195423570985008687907853269984665640564039457584007913129639935
+      }
+    },
+    "depth": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 128
+    },
+    "induction": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 16
+    },
+    "properties": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "sink": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+            "maxLength": 256
+          },
+          "source": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+            "maxLength": 256
+          },
+          "equals": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 115792089237316195423570985008687907853269984665640564039457584007913129639935
+          },
+          "latency": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16
+          },
+          "when": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "signal": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+                  "maxLength": 256
+                },
+                "equals": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 115792089237316195423570985008687907853269984665640564039457584007913129639935
+                },
+                "lag": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 16
+                }
+              },
+              "required": [
+                "signal",
+                "equals"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 0,
+            "maxItems": 64
+          },
+          "start_cycle": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 128
+          }
+        },
+        "required": [
+          "id",
+          "sink"
+        ],
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "required": [
+              "source"
+            ],
+            "not": {
+              "required": [
+                "equals"
+              ]
+            }
+          },
+          {
+            "required": [
+              "equals"
+            ],
+            "not": {
+              "required": [
+                "source"
+              ]
+            }
+          }
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 32
+    }
+  },
+  "required": [
+    "schema_version",
+    "semantics",
+    "files",
+    "top",
+    "clock",
+    "properties"
+  ],
+  "additionalProperties": false
+}
