@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from opencollate import __version__
+from opencollate.atomic_output import atomic_write_text
 from opencollate.boolean import (
     BoolAnd,
     BoolConst,
@@ -4252,8 +4253,8 @@ def write_contract(contract: DesignContract, path: str | Path) -> Path:
     """Write deterministic contract JSON and return its resolved path."""
 
     destination = Path(path).expanduser().resolve()
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(
+    atomic_write_text(
+        destination,
         json.dumps(
             contract.to_dict(),
             ensure_ascii=False,
@@ -4261,8 +4262,6 @@ def write_contract(contract: DesignContract, path: str | Path) -> Path:
             sort_keys=True,
         )
         + "\n",
-        encoding="utf-8",
-        newline="\n",
     )
     return destination
 

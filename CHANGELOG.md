@@ -26,6 +26,29 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
 
 ### Added
 
+- Source-bound synchronous RTL verification through `sequential check` and `sequential replay`,
+  with finite-width BMC, conservative k-induction, explicit reset/assumptions/history, non-vacuous
+  guard coverage, canonical counterexamples, independent integer replay, schemas and native oracles.
+  Bounded-only results cannot pass CI; unsupported clocks or HDL cannot become black-box proofs.
+- A source-file sequential mutation/scale benchmark and dedicated Icarus simulation validation.
+
+- Opt-in content-addressed observation caching with strict JSON round trips, byte/options/
+  implementation keys, conservative dependency bypass, corruption recovery, atomic writes,
+  private local storage, and bounded-entry/best-effort disk limits. Rules and waivers rerun.
+- External `guard` worker supervision with normal-completion handshakes, deadline cancellation,
+  POSIX resource limits, bounded output and machine-readable status; not a security sandbox.
+- Synthetic incremental full-check benchmarks and pinned unmodified SkyWater cell-interface
+  fixtures with independent inventory oracles and six file-level mutation regressions.
+
+### Fixed
+
+- Parser/checker SystemExit no longer escapes fail-closed plugin handling; None diagnostic
+  entries and overlong diagnostic iterators now become fatal plugin failures.
+- CLI output and contract publication no longer truncate a previous artifact before a new
+  artifact has been completely written and flushed.
+
+### Previously added in this development cycle
+
 - Opt-in deterministic parallel parsing through `--jobs N` for check, review, demo, and contract
   build. Built-ins are marked parallel-safe; third-party parsers remain hard serial barriers unless
   they explicitly declare `parallel_safe=True` in their versioned capability metadata.

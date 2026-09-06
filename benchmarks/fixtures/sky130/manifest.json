@@ -1,0 +1,32 @@
+{
+  "commit": "ac7fb61f06e6470b94e8afdf7c25268f62fbd7b1",
+  "files": [
+    {
+      "bytes": 1204,
+      "git_blob_sha": "6902d6e7ba933a02b731a1c18e8f6b880255161f",
+      "path": "cells/inv/sky130_fd_sc_hd__inv.blackbox.v",
+      "sha256": "007f3160cf5db97243c9aa6e13969c80dad643e68ef639928460654cc2f57721"
+    },
+    {
+      "bytes": 1979,
+      "git_blob_sha": "79703b337be3ffa34b27160f32ff4131a8938762",
+      "path": "cells/inv/sky130_fd_sc_hd__inv_1.lef",
+      "sha256": "271694f8d1223b72fd14af21c5666b28649c39083d60e9525b208a7fa3cef5ea"
+    },
+    {
+      "bytes": 1239,
+      "git_blob_sha": "3325f6f8f65b8ca8602ed28854d443a982747b6f",
+      "path": "cells/nand2/sky130_fd_sc_hd__nand2.blackbox.v",
+      "sha256": "41b22ec9ee224b497ee5e01897799623899cbdbdf12facff0bec2eab7227bd71"
+    },
+    {
+      "bytes": 2207,
+      "git_blob_sha": "c10a46e19b846d29da733406159999deea2b47ba",
+      "path": "cells/nand2/sky130_fd_sc_hd__nand2_1.lef",
+      "sha256": "f3b99f7946a7e667aa21041a989c0c7b46dfa25596f80b9cea56edfb60363e0e"
+    }
+  ],
+  "license": "Apache-2.0",
+  "repository": "google/skywater-pdk-libs-sky130_fd_sc_hd",
+  "schema_version": 1
+}

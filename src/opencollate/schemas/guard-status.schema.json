@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OpenCollate guard status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "exit_code",
+    "worker_returncode",
+    "elapsed_seconds",
+    "limits",
+    "memory_enforcement",
+    "output_enforcement"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "timeout",
+        "output-limit",
+        "worker-failed",
+        "invalid-output"
+      ]
+    },
+    "exit_code": {
+      "enum": [
+        0,
+        1,
+        2,
+        130
+      ]
+    },
+    "worker_returncode": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "elapsed_seconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "memory_enforcement": {
+      "enum": [
+        "posix-rlimit-as",
+        "not-requested"
+      ]
+    },
+    "output_enforcement": {
+      "enum": [
+        "posix-per-file-limit",
+        "parent-polling"
+      ]
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall_seconds",
+        "memory_mib",
+        "output_bytes"
+      ],
+      "properties": {
+        "wall_seconds": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 3600
+        },
+        "memory_mib": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": 64,
+              "maximum": 1048576
+            }
+          ]
+        },
+        "output_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 67108864
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "not": {
+              "const": "completed"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "const": 2
+          }
+        }
+      }
+    }
+  ]
+}

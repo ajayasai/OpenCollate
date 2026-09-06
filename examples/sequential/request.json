@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "semantics": "two-valued-synchronous",
+  "files": ["pipeline.sv"],
+  "top": "pipeline",
+  "clock": "clk",
+  "reset": {"signal": "rst_n", "active": 0, "cycles": 1},
+  "depth": 8,
+  "induction": 4,
+  "properties": [
+    {"id": "two-cycle-data", "source": "data_i", "sink": "data_o", "latency": 2,
+     "when": [{"signal": "enable", "equals": 1, "lag": 1},
+              {"signal": "enable", "equals": 1, "lag": 2}]},
+    {"id": "first-stage", "source": "data_i", "sink": "stage0", "latency": 1,
+     "when": [{"signal": "enable", "equals": 1, "lag": 1}]},
+    {"id": "reset-value", "sink": "data_o", "equals": 0, "start_cycle": 1,
+     "when": [{"signal": "rst_n", "equals": 0, "lag": 1}]}
+  ]
+}

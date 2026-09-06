@@ -393,7 +393,7 @@ def parse(
         if not isinstance(result, ViewObservation):
             raise TypeError(f"parser returned {type(result).__name__}, expected ViewObservation")
         return result
-    except Exception as error:
+    except (Exception, SystemExit) as error:
         return _plugin_failure_view(
             registration,
             source_paths,

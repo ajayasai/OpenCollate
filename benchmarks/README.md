@@ -127,3 +127,33 @@ inputs. A declined comparison's runtime is not meaningful speedup evidence. Meas
 OpenCollate backends on synthetic formulas, not licensed commercial products or industrial SoCs.
 Actual parser-to-engine 64-input RTL/Liberty control/mutant coverage is separately exercised by
 `tests/test_symbolic_integration.py`. See [the exact semantics and limits](../docs/symbolic-verification.md).
+
+## Incremental full-check and upstream cell-interface evidence
+
+```console
+python benchmarks/incremental.py --cells 128 --table-rows 256 --repeat 3 --json-output incremental.json
+python benchmarks/incremental.py --cells 512 --table-rows 512 --repeat 3 --json-output incremental-large.json
+python benchmarks/upstream_cells.py --json-output upstream-cells.json
+```
+
+The first runner measures full uncached, cold-cache and warm-cache paths, including
+hashing, decoding, reconciliation and rules; process startup is excluded. Each report
+must be identical. One source-file direction mutation must trigger OC4001 and match
+an uncached check while the other view is reused. Input dimensions and host timings
+are published; no speed ratio is enforced as a portable unit-test expectation.
+The synthetic timing-table contents are deliberately ignored by this structural tool.
+
+The second runner validates two unmodified upstream RTL/LEF cell-interface controls,
+then six mutations applied to temporary source files before parsing. The independent
+pin/direction/rail inventory oracle, source commit and file hashes are public. The
+corpus is small and does not establish full-chip, functional or foundry qualification.
+Neither benchmark runs or claims a win against a proprietary product. See
+[methodology and boundaries](../docs/incremental-and-guarded-checks.md).
+
+## Source-bound sequential verification
+
+`python benchmarks/sequential.py --repeat 3 --json-output sequential-results.json` exercises
+12 source-file cases: proven pipelines, independently replayed bugs, proof-depth boundaries,
+missing guard coverage and unsupported clocks. Scale tiers extend to 256-bit, 16-stage pipelines,
+not arbitrary production SoCs. Stable outcome digests are separate from measured elapsed samples.
+See [methodology and trust boundaries](../docs/source-bound-sequential.md).

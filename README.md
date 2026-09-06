@@ -130,6 +130,22 @@ The 74-rule 0.3.0 catalog covers:
 See the [rule catalog](docs/rule-catalog.md). Inconclusive evidence produces a completeness or
 not-applicable diagnostic; absence of a mismatch is not proof of equivalence.
 
+## Source-bound clock-cycle verification (development)
+
+The current checkout additionally provides `sequential check` and `sequential replay` for a
+strict single-clock RTL subset. It reads source RTL rather than trusting manually translated
+formulas, preserves nonblocking updates/reset/enable semantics, and distinguishes inductively
+proven properties from finite-depth clean checks. Counterexamples are independently replayed,
+and receipts bind source content, assumptions and translation. Unsupported HDL is rejected.
+
+```console
+python -m pip install -e ".[formal]"
+opencollate sequential check examples/sequential/request.json --output receipt.json
+```
+
+See [exact semantics, source subset, proof boundaries and test evidence](docs/source-bound-sequential.md).
+This is not full SystemVerilog, SVA, multi-clock verification or tapeout signoff.
+
 ## Commands
 
 ```text
@@ -203,6 +219,23 @@ opencollate capabilities --json  # exact built-in/plugin ownership and failures
 See the [extension API](docs/extension-api.md) for packaging, runtime registration, compatibility,
 configuration forwarding, deterministic conflict handling, and the plugin trust boundary. Set
 `OPENCOLLATE_DISABLE_PLUGINS=1` when a hermetic run must ignore installed entry points.
+
+## Incremental and supervised checks (development)
+
+Reuse unchanged parser observations without reusing a previous verdict:
+
+```console
+opencollate check --cache-dir .opencollate-cache --cache-stats
+opencollate guard --wall-seconds 60 --status-output guard-status.json -- check --cache-dir .opencollate-cache --format json --output report.json
+```
+
+The cache keys file bytes, options and implementation/dependency identity. Rules,
+contracts and waiver dates are checked every time. Unknown preprocessing dependencies
+and external plugins are deliberately uncached. The external guard rejects crashes,
+hangs and abnormal zero exits rather than accepting incomplete analysis. Neither
+feature is an authentication mechanism or an OS security sandbox.
+See [incremental and guarded checks](docs/incremental-and-guarded-checks.md) for
+POSIX resource limits, Windows restrictions, cache trust, and reproducible benchmarks.
 
 ## Security and privacy
 

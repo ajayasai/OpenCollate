@@ -2,3 +2,11 @@ OpenCollate
 Copyright 2026 ajayasai
 
 This product is licensed under the Apache License, Version 2.0.
+
+The test fixtures in benchmarks/fixtures/sky130/cells are unmodified portions of
+the SkyWater high-density standard-cell library:
+Copyright 2020 The SkyWater PDK Authors
+Licensed under the Apache License, Version 2.0.
+Upstream: https://github.com/google/skywater-pdk-libs-sky130_fd_sc_hd
+Pinned source and file identities: benchmarks/fixtures/sky130/manifest.json
+These authors do not endorse or certify OpenCollate.

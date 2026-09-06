@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from opencollate.parsers.base import ViewParser
 
 PLUGIN_API_VERSION = 1
+MAX_CHECKER_DIAGNOSTICS = 10_000
 PARSER_ENTRY_POINT_GROUP = "opencollate.parsers"
 CHECKER_ENTRY_POINT_GROUP = "opencollate.checkers"
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
@@ -204,13 +205,18 @@ class CheckerPluginSpec:
             raise PluginContractError(
                 f"checker plugin {self.name!r} returned None instead of diagnostics"
             )
-        diagnostics = tuple(raw)
-        invalid = next((item for item in diagnostics if not isinstance(item, Diagnostic)), None)
-        if invalid is not None:
-            raise PluginContractError(
-                f"checker plugin {self.name!r} returned {type(invalid).__name__}, not a Diagnostic"
-            )
-        return diagnostics
+        diagnostics: list[Diagnostic] = []
+        for index, item in enumerate(raw):
+            if index >= MAX_CHECKER_DIAGNOSTICS:
+                raise PluginContractError(
+                    f"checker plugin {self.name!r} exceeded {MAX_CHECKER_DIAGNOSTICS} diagnostics"
+                )
+            if not isinstance(item, Diagnostic):
+                raise PluginContractError(
+                    f"checker plugin {self.name!r} returned {type(item).__name__}, not a Diagnostic"
+                )
+            diagnostics.append(item)
+        return tuple(diagnostics)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -356,7 +362,7 @@ def _discover_parsers() -> tuple[tuple[ParserPluginSpec, ...], tuple[PluginFailu
                 )
             names.add(str(spec.name))
             specs.append(spec)
-        except Exception as error:
+        except (Exception, SystemExit) as error:
             failures.append(
                 _failure(
                     PARSER_ENTRY_POINT_GROUP,
@@ -387,7 +393,7 @@ def _discover_checkers() -> tuple[tuple[CheckerPluginSpec, ...], tuple[PluginFai
                 )
             names.add(str(spec.name))
             specs.append(spec)
-        except Exception as error:
+        except (Exception, SystemExit) as error:
             failures.append(
                 _failure(
                     CHECKER_ENTRY_POINT_GROUP,
@@ -521,7 +527,7 @@ def run_checker_plugins(context: CheckerContext) -> tuple[Diagnostic, ...]:
     for spec in specs:
         try:
             diagnostics.extend(spec.run(context))
-        except Exception as error:
+        except (Exception, SystemExit) as error:
             diagnostics.append(
                 _checker_failure_diagnostic(
                     name=str(spec.name),

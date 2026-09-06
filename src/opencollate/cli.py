@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import sys
 import tempfile
 from collections.abc import Mapping
@@ -14,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from opencollate import __version__
+from opencollate.atomic_output import atomic_write_text
 from opencollate.baseline import (
     MAX_REPORT_JSON_BYTES,
     MAX_REPORT_JSON_NESTING,
@@ -22,6 +24,7 @@ from opencollate.baseline import (
     ReportDiff,
     diff_reports,
 )
+from opencollate.cache import ObservationCache
 from opencollate.catalog import get_rule, iter_rules
 from opencollate.config import ConfigError, ProjectConfig, SourceConfig, load_config, load_contract
 from opencollate.contracts import upgrade_contract
@@ -69,6 +72,10 @@ def _job_count(value: str) -> int:
 
 
 def _jobs_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--cache-dir", type=Path, help="reuse eligible parsed views in a private local cache"
+    )
+    parser.add_argument("--cache-stats", action="store_true", help="write cache counters to stderr")
     parser.add_argument(
         "--jobs",
         type=_job_count,
@@ -174,7 +181,17 @@ def build_parser() -> argparse.ArgumentParser:
     schema.add_argument(
         "kind",
         nargs="?",
-        choices=("report", "contract", "diff", "contract-diff", "formal-request", "formal-receipt"),
+        choices=(
+            "report",
+            "contract",
+            "diff",
+            "contract-diff",
+            "formal-request",
+            "formal-receipt",
+            "guard-status",
+            "sequential-request",
+            "sequential-receipt",
+        ),
         default="report",
     )
     schema.add_argument("-o", "--output")
@@ -202,6 +219,14 @@ def build_parser() -> argparse.ArgumentParser:
     contract_diff.add_argument("-o", "--output")
     contract_diff.set_defaults(handler=_command_contract_diff)
 
+    guard = subparsers.add_parser("guard", help="run a command under an external process watchdog")
+    guard.add_argument("--wall-seconds", type=float, default=60.0)
+    guard.add_argument("--memory-mib", type=int)
+    guard.add_argument("--output-limit-bytes", type=int, default=32 * 1024 * 1024)
+    guard.add_argument("--status-output", type=Path)
+    guard.add_argument("command_args", nargs=argparse.REMAINDER)
+    guard.set_defaults(handler=_command_guard)
+
     formal = subparsers.add_parser("formal", help="check explicit two-valued Boolean obligations")
     formal_commands = formal.add_subparsers(dest="formal_command", required=True)
     for command in ("check", "replay"):
@@ -214,6 +239,9 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_argument("--timeout-ms", type=int, default=5000)
         sub.add_argument("--resource-limit", type=int, default=1000000)
         sub.set_defaults(handler=_command_formal)
+    from opencollate.sequential import add_commands
+
+    add_commands(subparsers)
     return parser
 
 
@@ -580,17 +608,38 @@ def _load_observations(
     config: ProjectConfig,
     *,
     jobs: int = 1,
+    cache: ObservationCache | None = None,
 ) -> tuple[ViewObservation, ...]:
+    def parse(source: SourceConfig) -> ViewObservation:
+        return _parse_source(source) if cache is None else cache.parse(source, _parse_source)
+
     return ordered_parallel_map(
         config.sources,
-        _parse_source,
+        parse,
         jobs=jobs,
         parallel_safe=_source_parallel_safe,
     )
 
 
-def _run(config: ProjectConfig, *, jobs: int = 1) -> EngineResult:
-    return ComparisonEngine(config).run(_load_observations(config, jobs=jobs))
+def _run(
+    config: ProjectConfig,
+    *,
+    jobs: int = 1,
+    cache_dir: Path | None = None,
+    cache_stats: bool = False,
+) -> EngineResult:
+    if cache_stats and cache_dir is None:
+        raise CliError("--cache-stats requires --cache-dir")
+    cache = None if cache_dir is None else ObservationCache(cache_dir)
+    try:
+        return ComparisonEngine(config).run(_load_observations(config, jobs=jobs, cache=cache))
+    finally:
+        if cache is not None and cache_stats:
+            print(json.dumps({"cache": cache.stats()}, sort_keys=True), file=sys.stderr)
+
+
+def _run_arguments(config: ProjectConfig, args: argparse.Namespace) -> EngineResult:
+    return _run(config, jobs=args.jobs, cache_dir=args.cache_dir, cache_stats=args.cache_stats)
 
 
 def _render(result: EngineResult, format_name: str, *, verbose: bool = False) -> str:
@@ -615,8 +664,7 @@ def _emit(text: str, output: str | None = None) -> None:
 
 def _write_text_file(target: Path, text: str, *, description: str) -> None:
     try:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(text, encoding="utf-8", newline="\n")
+        atomic_write_text(target, text)
     except OSError as error:
         raise CliError(f"cannot write {description} {target}: {error}") from error
 
@@ -779,7 +827,7 @@ def _command_check(args: argparse.Namespace) -> int:
     config = load_config(_selected_config(args))
     if args.deny_warnings and not config.policy.deny_warnings:
         config = replace(config, policy=replace(config.policy, deny_warnings=True))
-    result = _run(config, jobs=args.jobs)
+    result = _run_arguments(config, args)
     _emit(_render(result, args.format, verbose=args.verbose), args.output)
     return result.exit_code
 
@@ -793,7 +841,7 @@ def _command_review(args: argparse.Namespace) -> int:
     config = load_config(_selected_config(args))
     if args.deny_warnings and not config.policy.deny_warnings:
         config = replace(config, policy=replace(config.policy, deny_warnings=True))
-    result = _run(config, jobs=args.jobs)
+    result = _run_arguments(config, args)
     current = result.to_dict()
     if args.write_report:
         _write_text_file(
@@ -844,7 +892,7 @@ def _command_demo(args: argparse.Namespace) -> int:
     except OSError as error:
         destination = Path(args.output_dir).expanduser().resolve() if args.output_dir else "demo"
         raise CliError(f"cannot write synthetic demo to {destination}: {error}") from error
-    result = _run(load_config(root / "opencollate.toml"), jobs=args.jobs)
+    result = _run_arguments(load_config(root / "opencollate.toml"), args)
     if args.format == "text":
         sys.stdout.write(f"Synthetic demo: {root}\n")
     _emit(_render(result, args.format))
@@ -951,6 +999,33 @@ def _capability_data() -> dict[str, Any]:
         z3_version = None
     return {
         "tool": {"name": "OpenCollate", "version": __version__},
+        "incremental_cache": {
+            "opt_in": True,
+            "format_version": 1,
+            "stores": "parser-observations-only",
+            "always_rechecks_rules": True,
+            "external_plugins_cached": False,
+            "preprocessed_rtl_cached": False,
+            "systemrdl_cached": False,
+        },
+        "guarded_execution": {
+            "external_watchdog": True,
+            "requires_normal_completion_record": True,
+            "memory_limit_available": os.name == "posix",
+            "process_group_cancellation": os.name == "posix",
+            "security_sandbox": False,
+        },
+        "sequential_verification": {
+            "command": "sequential check",
+            "status": "experimental",
+            "semantics": "two-valued-synchronous",
+            "source_bound": True,
+            "proof_method": "bounded-base-plus-k-induction",
+            "bounded_only_exit_code": 2,
+            "requires_guard_coverage": True,
+            "full_systemverilog": False,
+            "independent_unsat_certificate_checking": False,
+        },
         "symbolic_boolean": {
             "backend": "z3",
             "installed_version": z3_version,
@@ -989,6 +1064,7 @@ def _capability_data() -> dict[str, Any]:
         "outputs": [
             "html",
             "formal-receipt-json",
+            "sequential-receipt-json",
             "contract-diff-json",
             "text",
             "json",
@@ -1060,7 +1136,7 @@ def _command_schema(args: argparse.Namespace) -> int:
 
 def _command_contract_build(args: argparse.Namespace) -> int:
     config = load_config(_selected_config(args))
-    result = _run(config, jobs=args.jobs)
+    result = _run_arguments(config, args)
     if result.exit_code == 2:
         _emit(render_text(result))
         return 2
@@ -1101,6 +1177,40 @@ def _command_contract_diff(args: argparse.Namespace) -> int:
         raise CliError(str(error)) from error
     _emit(json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n", args.output)
     return int(result["exit_code"])
+
+
+def _command_guard(args: argparse.Namespace) -> int:
+    from opencollate.guard import GuardLimits, run_guarded
+    from opencollate.guard_status import prepare_status_output
+
+    command = args.command_args
+    if command and command[0] == "--":
+        command = command[1:]
+    try:
+        status_output = (
+            prepare_status_output(args.status_output, command)
+            if args.status_output is not None
+            else None
+        )
+        result = run_guarded(
+            command,
+            limits=GuardLimits(
+                wall_seconds=args.wall_seconds,
+                memory_mib=args.memory_mib,
+                output_bytes=args.output_limit_bytes,
+            ),
+        )
+        if status_output is not None:
+            atomic_write_text(
+                status_output,
+                json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n",
+                overwrite=False,
+            )
+    except (ValueError, OSError) as error:
+        raise CliError(str(error)) from error
+    sys.stdout.write(result.stdout)
+    sys.stderr.write(result.stderr)
+    return result.exit_code
 
 
 def _command_formal(args: argparse.Namespace) -> int:
