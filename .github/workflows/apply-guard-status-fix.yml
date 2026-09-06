@@ -1,0 +1,77 @@
+name: Validate watchdog status safety
+
+on:
+  push:
+    branches: [feat/source-bound-sequential-verification]
+
+permissions:
+  contents: write
+
+env:
+  PYTHONHASHSEED: "0"
+  OPENCOLLATE_DISABLE_PLUGINS: "1"
+
+concurrency:
+  group: guard-status-fix-publication
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Apply checksum-bound safety fix
+        run: python tools/apply_guard_status_fix.py
+      - name: Install checker and independent simulator
+        run: |
+          python -m pip install -e ".[dev]"
+          sudo apt-get update -qq
+          sudo apt-get install -y iverilog
+      - name: Static quality and security
+        run: |
+          ruff format --check src tests
+          ruff check src tests
+          mypy src/opencollate
+          python -m bandit -q -r src/opencollate
+          git diff --check
+      - name: Full tests with coverage and optimized Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/guard-status-evidence"
+          pytest -q --cov=opencollate --cov-branch --cov-report=term --cov-fail-under=85 | tee "$RUNNER_TEMP/guard-status-evidence/tests.log"
+          python -O -m pytest -q | tee "$RUNNER_TEMP/guard-status-evidence/optimized.log"
+          pytest -q tests/test_guard_status.py tests/test_guard.py | tee "$RUNNER_TEMP/guard-status-evidence/status-regressions.log"
+      - name: Verify source proofs and existing oracles
+        run: |
+          python benchmarks/sequential.py --repeat 2 --json-output "$RUNNER_TEMP/guard-status-evidence/sequential.json"
+          python benchmarks/upstream_cells.py --json-output "$RUNNER_TEMP/guard-status-evidence/upstream.json"
+          python benchmarks/mutations.py --enforce-perfect --json-output "$RUNNER_TEMP/guard-status-evidence/mutations.json"
+      - name: Build and validate package
+        run: |
+          python -m build
+          python -m twine check dist/*
+      - name: Retain verification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: guard-status-safety-evidence
+          path: ${{ runner.temp }}/guard-status-evidence
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Publish only the validated code fix
+        run: |
+          test "$GITHUB_REF_NAME" = "feat/source-bound-sequential-verification"
+          rm -f tools/apply_guard_status_fix.py .github/workflows/apply-guard-status-fix.yml
+          git diff --check
+          git add -A
+          git config user.name "OpenCollate verified upgrade"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "fix: prevent guard status output from clobbering inputs and artifacts"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
