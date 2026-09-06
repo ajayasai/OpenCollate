@@ -1,0 +1,52 @@
+name: Certificate portability
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portability:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            python: '3.11'
+          - os: windows-latest
+            python: '3.12'
+          - os: windows-latest
+            python: '3.13'
+          - os: windows-latest
+            python: '3.14'
+          - os: ubuntu-latest
+            python: '3.13'
+          - os: macos-latest
+            python: '3.14'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e '.[dev]'
+      - name: Check real evidence and fault containment
+        run: python -m pytest -q tests/test_certificate_process.py tests/test_certificates.py tests/test_certificate_integration.py tests/test_certificate_benchmarks.py tests/test_proof_cnf.py tests/test_boolean_proof_kernel.py
+      - name: Retain reproducible cross-platform certificate evidence
+        run: python -m benchmarks.boolean_certificates --repeat 3 --json-output certificates.json --export-dir certificate-evidence
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: certificate-portability-${{ matrix.os }}-${{ matrix.python }}
+          path: |
+            certificates.json
+            certificate-evidence/
+          retention-days: 14
+          if-no-files-found: error

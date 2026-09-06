@@ -43,6 +43,25 @@ for full snapshot coverage, incomplete-analysis exit statuses, and offline repor
 synthetic benchmarks and real-file regression tests document tested capability, not superiority
 over all proprietary tools or signoff qualification.
 
+## Independently checkable Boolean certificates (development)
+
+An opt-in proof-producing backend now requires a solver-free checker to validate every UNSAT
+inference, alongside a satisfying assumptions witness, before accepting combinational equivalence.
+Recipients can verify portable formula certificates without installing either SAT/SMT solver extra.
+
+```console
+python -m pip install -e ".[certificates]"
+opencollate formal certify examples/formal/certified-obligations.json --output certificate.json
+opencollate formal verify-certificate examples/formal/certified-obligations.json certificate.json
+```
+
+Set `policy.boolean_backend = "certified"` to use the checked backend on supported RTL/Liberty
+Boolean functions. Unsupported declared functions and incomplete selected-backend analysis produce
+fatal `OC4302`, not a clean pass. The default truth-table behavior is unchanged. See
+[proof semantics, trust boundaries, limits, and reproducible evidence](docs/independent-boolean-certificates.md).
+The checker is independently tested, not mechanically verified; standalone certificates bind formulas,
+not RTL translation, and this feature does not add independent UNSAT certificates to sequential checks.
+
 ## Install
 
 OpenCollate requires Python 3.11 or newer.

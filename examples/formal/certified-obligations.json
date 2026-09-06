@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "semantics": "two-valued-combinational",
+  "obligations": [
+    {
+      "id": "demorgan",
+      "left": "A & B & C & D",
+      "right": "!(!A | !B | !C | !D)",
+      "assume": "1"
+    },
+    {
+      "id": "selected-mux",
+      "left": "(S & A) | (!S & B)",
+      "right": "A",
+      "assume": "S"
+    },
+    {
+      "id": "parity-permutation",
+      "left": "A ^ B ^ C ^ D ^ E ^ F",
+      "right": "F ^ E ^ D ^ C ^ B ^ A",
+      "assume": "1"
+    }
+  ]
+}

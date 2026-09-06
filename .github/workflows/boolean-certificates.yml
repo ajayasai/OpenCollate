@@ -1,0 +1,64 @@
+name: Independent Boolean certificates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out OpenCollate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check out independent DRAT-trim implementation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: marijnheule/drat-trim
+          ref: 2e3b2dc0ecf938addbd779d42877b6ed69d9a985
+          path: .external-drat-trim
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install and test certificate support
+        run: |
+          python -m pip install -e ".[dev]"
+          pytest -q tests/test_boolean_proof_kernel.py tests/test_proof_cnf.py tests/test_certificates.py tests/test_certificate_integration.py tests/test_certificate_benchmarks.py
+          python -m benchmarks.boolean_certificates --repeat 5 --json-output certificates.json --export-dir certificate-evidence
+      - name: Check every exported UNSAT proof with independent native code
+        run: |
+          make -C .external-drat-trim drat-trim
+          count=0
+          for cnf in certificate-evidence/*.cnf; do
+            .external-drat-trim/drat-trim "$cnf" "${cnf%.cnf}.rup" -f -t 30 > "${cnf%.cnf}.drat-trim.log" 2>&1
+            grep -q 's VERIFIED' "${cnf%.cnf}.drat-trim.log"
+            count=$((count + 1))
+          done
+          test "$count" -eq 7
+      - name: Verify installed wheel without either solver extra
+        run: |
+          python -m build
+          python -m venv /tmp/certificate-verifier
+          /tmp/certificate-verifier/bin/python -m pip install dist/*.whl
+          /tmp/certificate-verifier/bin/python -c "import importlib.util; assert importlib.util.find_spec('pysat') is None; assert importlib.util.find_spec('z3') is None"
+          /tmp/certificate-verifier/bin/opencollate formal verify-certificate certificate-evidence/parity-permutation.request.json certificate-evidence/parity-permutation.certificate.json --output installed-wheel-verification.json
+      - name: Retain raw evidence and independent checker logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: independent-boolean-certificates
+          path: |
+            certificates.json
+            certificate-evidence/
+            installed-wheel-verification.json
+          retention-days: 14
+          if-no-files-found: error

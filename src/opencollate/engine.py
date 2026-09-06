@@ -1347,7 +1347,16 @@ class ComparisonEngine:
                 aliases_by_view[member.view][port.native_name] = canonical_port
                 aliases_by_view[member.view][decoded_identifier(port.native_name)] = canonical_port
                 native_ports_by_view[member.view].add(port.native_name)
-            for native_output, expression in member.observation.functions.items():
+            declared_functions = dict(member.observation.functions)
+            if self.config.policy.boolean_backend != "truth_table":
+                # Liberty preserves explicit, unsupported function text on the
+                # port but intentionally omits it from the known function map.
+                # A selected formal backend must not turn that omission into a pass.
+                for port in member.observation.ports:
+                    raw = port.attributes.get("function")
+                    if isinstance(raw, str) and raw.strip():
+                        declared_functions.setdefault(port.native_name, raw)
+            for native_output, expression in declared_functions.items():
                 try:
                     canonical_output = resolver.port(
                         component.canonical_name, member.view, native_output
@@ -1365,7 +1374,8 @@ class ComparisonEngine:
 
         diagnostics: list[Diagnostic] = []
         for output, values in sorted(functions.items()):
-            if len({_semantic_view_kind(item.view) for item in values}) < 2:
+            cross_view = len({_semantic_view_kind(item.view) for item in values}) >= 2
+            if not cross_view and self.config.policy.boolean_backend == "truth_table":
                 continue
             ordered = self._ordered_values(values)
             parsed: list[tuple[_ValueEvidence, BoolExpr]] = []
@@ -1386,6 +1396,9 @@ class ComparisonEngine:
                             "OC4302",
                             f"{display} Boolean function in {_view_label(item.view)} "
                             f"cannot be checked: {error}.",
+                            severity=Severity.FATAL
+                            if self.config.policy.boolean_backend != "truth_table"
+                            else None,
                             object=entity,
                             property_name="boolean_function",
                             evidence=(item.diagnostic_evidence(),),
@@ -1423,14 +1436,40 @@ class ComparisonEngine:
                         ),
                     )
                 )
-            if parse_failed or len(parsed) < 2:
+            if parse_failed or not cross_view or len(parsed) < 2:
                 continue
             _reference_item, reference_expression = parsed[0]
             mismatch = False
             indeterminate_reason: str | None = None
             counterexample: Mapping[str, bool] | None = None
             for _item, expression in parsed[1:]:
-                if self.config.policy.boolean_backend == "z3":
+                if self.config.policy.boolean_backend == "certified":
+                    from opencollate.boolean import EquivalenceResult
+                    from opencollate.boolean_proof_kernel import ProofLimits
+                    from opencollate.certificates import certify_boolean
+
+                    certified = certify_boolean(
+                        reference_expression,
+                        expression,
+                        limits=ProofLimits(
+                            max_variables=self.config.policy.max_symbolic_inputs,
+                            timeout_ms=self.config.policy.symbolic_timeout_ms,
+                            conflict_limit=self.config.policy.symbolic_resource_limit,
+                        ),
+                    )
+                    state = certified["status"]
+                    result = EquivalenceResult(
+                        equivalent=True
+                        if state == "equivalent"
+                        else False
+                        if state == "different"
+                        else None,
+                        variables=tuple(certified["variables"]),
+                        checked_assignments=1 if certified["counterexample"] is not None else 0,
+                        counterexample=certified["counterexample"],
+                        reason=certified["reason"],
+                    )
+                elif self.config.policy.boolean_backend == "z3":
                     from opencollate.symbolic import SymbolicLimits, check_symbolic_equivalence
 
                     symbolic = check_symbolic_equivalence(
@@ -1472,7 +1511,7 @@ class ComparisonEngine:
                         f"{display} Boolean functions cannot be checked exactly: "
                         f"{indeterminate_reason}.",
                         severity=Severity.FATAL
-                        if self.config.policy.boolean_backend == "z3"
+                        if self.config.policy.boolean_backend != "truth_table"
                         else None,
                         object=entity,
                         property_name="boolean_function",

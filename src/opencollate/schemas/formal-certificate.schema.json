@@ -1,0 +1,411 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opencollate.dev/schemas/formal-certificate.schema.json",
+  "title": "OpenCollate independent Boolean certificate",
+  "description": "Structural schema only. Logical acceptance requires reconstruction and solver-free proof/witness verification. Hashes are not authentication.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "semantics",
+    "encoding",
+    "request_sha256",
+    "certificate_sha256",
+    "status",
+    "exit_code",
+    "results"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "semantics": {
+      "const": "two-valued-combinational"
+    },
+    "encoding": {
+      "const": "opencollate-tseitin-rup-v1"
+    },
+    "request_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "certificate_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail",
+        "inconclusive"
+      ]
+    },
+    "exit_code": {
+      "type": "integer",
+      "enum": [
+        0,
+        1,
+        2
+      ]
+    },
+    "results": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "status",
+          "variables",
+          "obligation_sha256",
+          "cnf_sha256",
+          "guard_witness",
+          "counterexample",
+          "proof",
+          "reason"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "status": {
+            "enum": [
+              "equivalent",
+              "different",
+              "vacuous",
+              "inconclusive"
+            ]
+          },
+          "variables": {
+            "type": "array",
+            "maxItems": 4096,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 65536
+            }
+          },
+          "obligation_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cnf_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "guard_witness": {
+            "anyOf": [
+              {
+                "type": "object",
+                "maxProperties": 4096,
+                "propertyNames": {
+                  "minLength": 1,
+                  "maxLength": 65536
+                },
+                "additionalProperties": {
+                  "type": "boolean"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "counterexample": {
+            "anyOf": [
+              {
+                "type": "object",
+                "maxProperties": 4096,
+                "propertyNames": {
+                  "minLength": 1,
+                  "maxLength": 65536
+                },
+                "additionalProperties": {
+                  "type": "boolean"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proof": {
+            "anyOf": [
+              {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 262144,
+                "items": {
+                  "type": "array",
+                  "maxItems": 1048576,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "integer",
+                    "minimum": -1048576,
+                    "maximum": 1048576,
+                    "not": {
+                      "const": 0
+                    }
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "equivalent"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "obligation_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "cnf_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "guard_witness": {
+                  "type": "object",
+                  "maxProperties": 4096,
+                  "propertyNames": {
+                    "minLength": 1,
+                    "maxLength": 65536
+                  },
+                  "additionalProperties": {
+                    "type": "boolean"
+                  }
+                },
+                "proof": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 262144,
+                  "items": {
+                    "type": "array",
+                    "maxItems": 1048576,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "integer",
+                      "minimum": -1048576,
+                      "maximum": 1048576,
+                      "not": {
+                        "const": 0
+                      }
+                    }
+                  }
+                },
+                "counterexample": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "different"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "obligation_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "cnf_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "guard_witness": {
+                  "type": "object",
+                  "maxProperties": 4096,
+                  "propertyNames": {
+                    "minLength": 1,
+                    "maxLength": 65536
+                  },
+                  "additionalProperties": {
+                    "type": "boolean"
+                  }
+                },
+                "counterexample": {
+                  "type": "object",
+                  "maxProperties": 4096,
+                  "propertyNames": {
+                    "minLength": 1,
+                    "maxLength": 65536
+                  },
+                  "additionalProperties": {
+                    "type": "boolean"
+                  }
+                },
+                "proof": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "vacuous"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "obligation_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "cnf_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "guard_witness": {
+                  "type": "null"
+                },
+                "counterexample": {
+                  "type": "null"
+                },
+                "proof": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 262144,
+                  "items": {
+                    "type": "array",
+                    "maxItems": 1048576,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "integer",
+                      "minimum": -1048576,
+                      "maximum": 1048576,
+                      "not": {
+                        "const": 0
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "inconclusive"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                "cnf_sha256": {
+                  "type": "null"
+                },
+                "guard_witness": {
+                  "type": "null"
+                },
+                "counterexample": {
+                  "type": "null"
+                },
+                "proof": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "pass"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "const": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "fail"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "const": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "inconclusive"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "const": 2
+          }
+        }
+      }
+    }
+  ]
+}

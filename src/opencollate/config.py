@@ -101,8 +101,9 @@ class PolicySettings:
         if not isinstance(self.boolean_backend, str) or self.boolean_backend not in {
             "truth_table",
             "z3",
+            "certified",
         }:
-            raise ConfigError("policy.boolean_backend must be truth_table or z3")
+            raise ConfigError("policy.boolean_backend must be truth_table, z3, or certified")
         for name, maximum in (
             ("max_symbolic_inputs", 4096),
             ("symbolic_timeout_ms", 300_000),

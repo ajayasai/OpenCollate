@@ -158,6 +158,17 @@ missing guard coverage and unsupported clocks. Scale tiers extend to 256-bit, 16
 not arbitrary production SoCs. Stable outcome digests are separate from measured elapsed samples.
 See [methodology and trust boundaries](../docs/source-bound-sequential.md).
 
+## Independent Boolean certificate corpus
+
+Run `python -m benchmarks.boolean_certificates --repeat 5 --json-output certificates.json
+--export-dir certificate-evidence` (on one command line). Fifteen expected outcome cases cover
+12/64/128/512-input equivalent and faulty formulas, guards, parity, unsupported syntax and work
+exhaustion; eight recomputed-checksum forgeries must be rejected. Output retains raw generation
+and solver-free verification timings, input and implementation digests, certificate sizes and
+producer version. The export contains seven DIMACS/RUP pairs for independent DRAT-trim checking.
+See [exact semantics and trust boundaries](../docs/independent-boolean-certificates.md). Neither
+local timing nor this finite synthetic corpus establishes commercial superiority or production scale.
+
 
 ## Independently checked source certificates (development)
 
