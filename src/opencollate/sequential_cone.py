@@ -54,8 +54,7 @@ def property_cone(c: Circuit, spec: dict[str, Any], prop: dict[str, Any]) -> Cir
             stack.extend(node.args)
     remap = {old: new for new, old in enumerate(sorted(nodes))}
     compact = [
-        replace(c.nodes[i], args=tuple(remap[a] for a in c.nodes[i].args))
-        for i in sorted(nodes)
+        replace(c.nodes[i], args=tuple(remap[a] for a in c.nodes[i].args)) for i in sorted(nodes)
     ]
     cone = Circuit(
         top=c.top,
@@ -76,9 +75,7 @@ def property_cone(c: Circuit, spec: dict[str, Any], prop: dict[str, Any]) -> Cir
     return cone
 
 
-def expand_trace(
-    full: Circuit, cone: Circuit, trace: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
+def expand_trace(full: Circuit, cone: Circuit, trace: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Lift a cone witness to a complete full-circuit witness by integer execution.
 
     Removed initial state and primary inputs are independent of the property;
@@ -99,8 +96,7 @@ def expand_trace(
         if not isinstance(values, dict) or set(values) != expected:
             raise SequentialError("incomplete cone trace frame")
         if any(
-            type(v) is not int or not 0 <= v < (1 << cone.signals[n][0])
-            for n, v in values.items()
+            type(v) is not int or not 0 <= v < (1 << cone.signals[n][0]) for n, v in values.items()
         ):
             raise SequentialError("invalid cone trace value")
         if t == 0:

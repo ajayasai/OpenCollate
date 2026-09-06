@@ -42,12 +42,11 @@ jobs:
         run: |
           python benchmarks/sequential.py --repeat 3 --json-output sequential-results.json
           python benchmarks/sequential_cone.py --repeat 3 --json-output cone-results.json
-      - name: Retain exact source and formatting diagnostics
+      - name: Retain exact validated source
         if: always()
         run: |
           git rev-parse HEAD > validated-source-commit.txt
           git archive --format=tar.gz -o source-snapshot.tar.gz HEAD
-          ruff format --diff src/opencollate/sequential_cone.py tests/test_sequential_cone.py benchmarks/sequential_cone.py > cone-format.patch || true
       - name: Retain validation evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -57,7 +56,6 @@ jobs:
             sequential-tests.log
             sequential-results.json
             cone-results.json
-            cone-format.patch
             validated-source-commit.txt
             source-snapshot.tar.gz
           if-no-files-found: warn

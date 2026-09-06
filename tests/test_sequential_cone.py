@@ -32,8 +32,13 @@ def model(width: int = 2) -> Circuit:
 def setup() -> tuple[dict, dict]:
     return (
         {"assumptions": {"fixed": 1}, "reset": {"signal": "rst", "active": 1, "cycles": 1}},
-        {"id": "transfer", "source": "d", "sink": "out", "latency": 2,
-         "when": [{"signal": "enable", "equals": 1, "lag": 2}]},
+        {
+            "id": "transfer",
+            "source": "d",
+            "sink": "out",
+            "latency": 2,
+            "when": [{"signal": "enable", "equals": 1, "lag": 2}],
+        },
     )
 
 
@@ -75,8 +80,9 @@ def test_guard_only_state_dependency_is_retained() -> None:
 
 def test_constant_property_without_reset_or_guards() -> None:
     c = model()
-    cone = property_cone(c, {"assumptions": {}, "reset": None},
-                         {"sink": "side", "equals": 0, "when": []})
+    cone = property_cone(
+        c, {"assumptions": {}, "reset": None}, {"sink": "side", "equals": 0, "when": []}
+    )
     assert set(cone.next_state) == {"side"}
     assert not cone.inputs and not cone.combinational
 
@@ -85,7 +91,9 @@ def test_exhaustive_projection_commutes_with_transition() -> None:
     c = model()
     spec, prop = setup()
     cone = property_cone(c, spec, prop)
-    for q, stage, side, d, gate in itertools.product(range(4), range(4), range(4), range(4), range(2)):
+    for q, stage, side, d, gate in itertools.product(
+        range(4), range(4), range(4), range(4), range(2)
+    ):
         states = {"q": q, "stage": stage, "side": side}
         inputs = {"d": d, "gate": gate, "rst": 1, "fixed": 1, "spare": side % 2}
         full_frame, full_next = simulate_frame(c, states, inputs)
@@ -119,7 +127,10 @@ def test_expansion_computes_removed_later_state_and_downstream_logic() -> None:
         assert large["values"]["spare"] == 0
 
 
-@pytest.mark.parametrize("mutation", ["empty", "cycle", "boolcycle", "missing", "extra", "bool", "range", "state", "comb"])
+@pytest.mark.parametrize(
+    "mutation",
+    ["empty", "cycle", "boolcycle", "missing", "extra", "bool", "range", "state", "comb"],
+)
 def test_expansion_rejects_corruption(mutation: str) -> None:
     full = model()
     cone = property_cone(full, *setup())
@@ -163,22 +174,35 @@ def test_unfinalized_full_circuit_is_rejected() -> None:
 
 def rtl_case(width: int, variant: str, islands: int = 6) -> tuple[str, dict]:
     noise = "\n".join(
-        f"logic [{width-1}:0] noise{i}; always_ff @(posedge clk) "
+        f"logic [{width - 1}:0] noise{i}; always_ff @(posedge clk) "
         f"if (rst) noise{i} <= '0; else noise{i} <= noise{i} + 1'b1;"
         for i in range(islands)
     )
     update = "q <= d;" if variant != "inversion" else "q <= ~d;"
     rtl = f"""module pipe(input logic clk, rst, en, fixed, spare,
-        input logic [{width-1}:0] d, output logic [{width-1}:0] q);
+        input logic [{width - 1}:0] d, output logic [{width - 1}:0] q);
         {noise}
         always_ff @(posedge clk) if (rst) q <= '0; else if (en) {update}
         endmodule"""
-    prop = {"id": "data", "source": "d", "sink": "q", "latency": 1,
-            "when": [{"signal": "en", "equals": 1, "lag": 1}]}
-    request = {"schema_version": 1, "semantics": "two-valued-synchronous",
-               "files": ["design.sv"], "top": "pipe", "clock": "clk", "depth": 5,
-               "induction": 3, "reset": {"signal": "rst", "active": 1},
-               "assumptions": {"fixed": 1}, "properties": [prop]}
+    prop = {
+        "id": "data",
+        "source": "d",
+        "sink": "q",
+        "latency": 1,
+        "when": [{"signal": "en", "equals": 1, "lag": 1}],
+    }
+    request = {
+        "schema_version": 1,
+        "semantics": "two-valued-synchronous",
+        "files": ["design.sv"],
+        "top": "pipe",
+        "clock": "clk",
+        "depth": 5,
+        "induction": 3,
+        "reset": {"signal": "rst", "active": 1},
+        "assumptions": {"fixed": 1},
+        "properties": [prop],
+    }
     if variant == "unguarded":
         prop["when"] = []
     elif variant == "uncovered":
@@ -196,8 +220,22 @@ def rtl_case(width: int, variant: str, islands: int = 6) -> tuple[str, dict]:
 
 
 @pytest.mark.parametrize("width", [1, 4, 16, 64, 256])
-@pytest.mark.parametrize("variant", ["correct", "inversion", "unguarded", "uncovered", "bounded", "initial", "guard-state", "feedback"])
-def test_source_derived_sliced_and_full_results_match(tmp_path: Path, width: int, variant: str) -> None:
+@pytest.mark.parametrize(
+    "variant",
+    [
+        "correct",
+        "inversion",
+        "unguarded",
+        "uncovered",
+        "bounded",
+        "initial",
+        "guard-state",
+        "feedback",
+    ],
+)
+def test_source_derived_sliced_and_full_results_match(
+    tmp_path: Path, width: int, variant: str
+) -> None:
     pytest.importorskip("z3")
     pytest.importorskip("pyslang")
     from opencollate.sequential_cone import verify_cone_property
@@ -246,3 +284,41 @@ def test_full_source_binding_detects_changed_unrelated_logic(tmp_path: Path) -> 
     path.write_text(rtl.replace("noise5 + 1'b1", "noise5 + 2'd2"))
     with pytest.raises(SequentialError, match="changed"):
         replay(request, receipt, root=tmp_path)
+
+
+@pytest.mark.parametrize("fail_at", [1, 2, 3, 4, 5, None])
+def test_wrapper_never_publishes_failed_replay_or_expired_witness(
+    monkeypatch: pytest.MonkeyPatch, fail_at: int | None
+) -> None:
+    from opencollate import sequential_smt
+    from opencollate.sequential_cone import verify_cone_property
+
+    full = model()
+    spec, prop = setup()
+    cone = property_cone(full, spec, prop)
+    claimed = {
+        "id": prop["id"],
+        "status": "counterexample",
+        "checked_through": 3,
+        "induction_depth": None,
+        "cover_cycle": 2,
+        "trace": sample_trace(cone),
+        "reason": None,
+    }
+    monkeypatch.setattr(sequential_smt, "verify_property", lambda *args: copy.deepcopy(claimed))
+    monkeypatch.setattr(sequential_smt, "replay_trace", lambda *args: fail_at is not None)
+
+    class Deadline:
+        calls = 0
+
+        def remaining(self) -> int:
+            self.calls += 1
+            if self.calls == fail_at:
+                raise SequentialError("test deadline exhausted")
+            return 1000
+
+    result = verify_cone_property(full, spec, prop, Deadline())
+    assert result["status"] == "inconclusive"
+    assert result["trace"] is None
+    expected = "deadline" if fail_at else "full-circuit replay"
+    assert expected in result["reason"]
