@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
@@ -44,3 +45,37 @@ def test_incremental_actual_file_and_full_rule_pipeline() -> None:
 def test_incremental_input_bounds(kwargs: dict[str, int]) -> None:
     with pytest.raises(ValueError):
         incremental.run_suite(**kwargs)
+
+
+@pytest.mark.parametrize("separator", ["/", "\\"])
+def test_upstream_root_aliases_have_identical_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, separator: str
+) -> None:
+    original = tmp_path / "RUNNER~1" / "case"
+    resolved = tmp_path / "runner admin" / "case"
+    monkeypatch.setattr(Path, "resolve", lambda self: resolved)
+    raw = str(original).replace("\\", "/").replace("/", separator)
+    canonical = str(resolved).replace("\\", "/").replace("/", separator)
+    payload = {
+        "source": canonical + separator + "cell.v",
+        "evidence": [raw + separator + "cell.lef", canonical, 3, None],
+        "similar_directory": canonical + "-other" + separator + "keep.v",
+        "expression": r"\escaped.name & A",
+    }
+    expected = {
+        "source": "$CASE/cell.v",
+        "evidence": ["$CASE/cell.lef", "$CASE", 3, None],
+        "similar_directory": payload["similar_directory"],
+        "expression": payload["expression"],
+    }
+    assert upstream_cells._normalize(payload, original) == expected
+
+
+def test_upstream_relative_frontend_paths_are_normalized(tmp_path: Path) -> None:
+    # Use a child of cwd so this also works when Windows TEMP is on another drive.
+    root = Path.cwd() / "temporary-oracle-case"
+    relative = os.path.relpath(root)
+    payload = {"location": {"path": relative + "/cell.v", "line": 39, "column": 12}}
+    assert upstream_cells._normalize(payload, root) == {
+        "location": {"path": "$CASE/cell.v", "line": 39, "column": 12}
+    }
