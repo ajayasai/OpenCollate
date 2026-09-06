@@ -1,0 +1,66 @@
+name: Independent proof certificates
+
+on:
+  push:
+    branches: [main, upgrade/independent-proof-certificates]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: proof-certificates-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONHASHSEED: "0"
+  OPENCOLLATE_DISABLE_PLUGINS: "1"
+
+jobs:
+  certificate-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install validation dependencies
+        run: python -m pip install -e ".[dev]" "python-sat==1.9.dev15"
+      - name: Record a reproducible offline validation environment
+        run: |
+          python -m pip freeze --exclude-editable > proof-requirements.txt
+          python -m pip download -r proof-requirements.txt --dest proof-wheelhouse
+      - name: Preserve the offline environment
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: proof-validation-environment
+          path: |
+            proof-requirements.txt
+            proof-wheelhouse/
+          retention-days: 7
+      - name: Run the complete regression suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          pytest -q --junitxml=proof-tests.xml | tee proof-tests.log
+      - name: Check formatting and types
+        run: |
+          ruff check .
+          ruff format --check .
+          mypy
+      - name: Preserve validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: proof-certificate-validation
+          path: |
+            proof-tests.xml
+            proof-tests.log
+          if-no-files-found: warn
+          retention-days: 14
