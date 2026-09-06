@@ -52,12 +52,15 @@ the 8-case combinational symbolic corpus and 4-case public conformance corpus
 also passed during source validation. The pinned upstream corpus contains only
 two cell-interface controls and six source-level mutations.
 
-The initial GitHub validation measured a 5.71x warm-check speedup against the
-same uncached OpenCollate path on synthetic 512-cell Liberty/LEF collateral
-(26,887,059 source bytes). Three-sample medians were 2.8705 seconds uncached,
-3.2703 seconds cold-cache and 0.5027 seconds warm-cache. Every report matched;
-a single-view mutation required one miss and one hit and matched fresh analysis.
-These are host-specific, in-process measurements, not commercial comparisons.
+The retained `incremental.json` artifact from the initial GitHub validation reports
+a 5.71x warm-check speedup against the same uncached OpenCollate path on synthetic
+512-cell Liberty/LEF collateral (26,891,279 source bytes). Three-sample medians were
+4.6265 seconds uncached, 5.2019 seconds cold-cache and 0.8108 seconds warm-cache.
+Every report matched; a single-view mutation required one miss and one hit and
+matched fresh analysis. These are host-specific, in-process measurements, not
+commercial comparisons. The original prose timing/byte figures were transcribed
+incorrectly; the retained raw artifact is authoritative and reproduced unchanged
+in [the checked-in result](../benchmarks/results/source-bound-cache-2026-09-06.json).
 
 Refer to the PR's final checks for the current cross-platform/security/browser
 results; this document records measured runs rather than promising future checks.
