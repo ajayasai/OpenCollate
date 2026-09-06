@@ -1181,11 +1181,17 @@ def _command_contract_diff(args: argparse.Namespace) -> int:
 
 def _command_guard(args: argparse.Namespace) -> int:
     from opencollate.guard import GuardLimits, run_guarded
+    from opencollate.guard_status import prepare_status_output
 
     command = args.command_args
     if command and command[0] == "--":
         command = command[1:]
     try:
+        status_output = (
+            prepare_status_output(args.status_output, command)
+            if args.status_output is not None
+            else None
+        )
         result = run_guarded(
             command,
             limits=GuardLimits(
@@ -1194,14 +1200,14 @@ def _command_guard(args: argparse.Namespace) -> int:
                 output_bytes=args.output_limit_bytes,
             ),
         )
+        if status_output is not None:
+            atomic_write_text(
+                status_output,
+                json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n",
+                overwrite=False,
+            )
     except (ValueError, OSError) as error:
         raise CliError(str(error)) from error
-    if args.status_output is not None:
-        _write_text_file(
-            args.status_output.expanduser().resolve(),
-            json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n",
-            description="guard status",
-        )
     sys.stdout.write(result.stdout)
     sys.stderr.write(result.stderr)
     return result.exit_code

@@ -113,6 +113,17 @@ abnormally terminated workers is not emitted as a valid machine report.
 The status JSON is schema-validated in tests and reports actual enforcement
 modes. A completed status alone does not mean a clean design: check `exit_code`.
 
+`--status-output` must name a **new, per-run file** outside the child's declared
+outputs and generated output/cache directories. Existing files and symlinks are
+rejected before the child starts, including aliases of configurations, requests,
+receipts, source files, includes, and plugin-private dependencies. Reusing a prior
+status filename is intentionally rejected; choose a fresh filename. Publication
+uses an atomic exclusive hard link, so a file appearing after preflight is also
+preserved and the guard exits 2. Filesystems lacking hard-link support fail closed.
+This protects status publication without parsing untrusted inputs outside the
+watchdog. It does not prevent trusted plugins or an explicitly configured child
+output from writing other files with the user's permissions.
+
 **This is reliability containment, not a security sandbox.** Installed Python
 plugins remain trusted code with the user's filesystem and network access. A
 malicious plugin can escape a process group, tamper with private worker state,
