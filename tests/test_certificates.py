@@ -388,6 +388,9 @@ class FakeSolver:
 def test_native_status_and_model_faults_fail_closed(
     monkeypatch: pytest.MonkeyPatch, solver: FakeSolver
 ) -> None:
+    # Exercise the native adapter with a deliberately fake solver on every OS;
+    # the real Windows boundary is separately tested in test_certificate_process.
+    monkeypatch.setattr(certificates, "_needs_process", lambda: False)
     monkeypatch.setattr(
         certificates, "import_module", lambda _: SimpleNamespace(Glucose3=lambda **_: solver)
     )

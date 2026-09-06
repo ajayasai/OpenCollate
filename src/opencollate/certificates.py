@@ -8,8 +8,9 @@ formulas, not the source RTL or a user's translation of that RTL.
 
 from __future__ import annotations
 
+import sys
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from importlib import import_module
 from threading import Timer
@@ -99,9 +100,37 @@ def _solve(
             "optional proof producer unavailable; install opencollate[certificates]"
         ) from error
     cnf = compiled.cnf(query)
+    if _needs_process():
+        from opencollate.certificate_process import solve_isolated
+
+        return solve_isolated(
+            cnf, compiled.encoder.inputs, compiled.encoder.variables, limits, deadline
+        )
+    return _solve_native(
+        cnf, compiled.encoder.inputs, compiled.encoder.variables, limits, deadline, module.Glucose3
+    )
+
+
+def _needs_process() -> bool:
+    # MSVC PySAT builds leave native FILE* proof output fully buffered. Never
+    # flush the host application's CRT or retain these streams in that process.
+    return sys.platform == "win32"
+
+
+def _solve_native(
+    cnf: list[tuple[int, ...]],
+    inputs: Mapping[str, int],
+    variables: int,
+    limits: ProofLimits,
+    deadline: float,
+    solver_type: Callable[..., Any],
+    *,
+    flush_proof: Callable[[], None] | None = None,
+) -> tuple[dict[str, bool] | None, list[list[int]] | None]:
+    """One native instance; Windows callers invoke this only in a fresh worker."""
     _remaining(limits, deadline)
     # A fresh solver per base formula avoids assumptions leaking into proofs.
-    with module.Glucose3(bootstrap_with=cnf, with_proof=True) as solver:
+    with solver_type(bootstrap_with=cnf, with_proof=True) as solver:
         remaining = _remaining(limits, deadline)
         timer = Timer(remaining.timeout_ms / 1000, solver.interrupt)
         timer.daemon = True
@@ -117,12 +146,14 @@ def _solve(
                 return answer
 
             if not solve([]):
-                return None, _proof_lines(solver.get_proof(), compiled.encoder.variables, limits)
+                if flush_proof is not None:
+                    flush_proof()
+                return None, _proof_lines(solver.get_proof(), variables, limits)
             # Canonical, complete SOURCE witness: False before True in name order.
             prefix: list[int] = []
             witness: dict[str, bool] = {}
-            for name in compiled.names:
-                variable = compiled.encoder.inputs[name]
+            for name in sorted(inputs):
+                variable = inputs[name]
                 value = not solve([*prefix, -variable])
                 witness[name] = value
                 prefix.append(variable if value else -variable)
@@ -131,9 +162,7 @@ def _solve(
             model = solver.get_model()
             if not isinstance(model, list):
                 raise ProofError("proof producer returned no SAT model")
-            if any(
-                type(x) is not int or not 1 <= abs(x) <= compiled.encoder.variables for x in model
-            ):
+            if any(type(x) is not int or not 1 <= abs(x) <= variables for x in model):
                 raise ProofError("proof producer returned invalid SAT literals")
             values = set(model)
             if any(-x in values for x in values) or len(values) != len(model):
@@ -146,6 +175,10 @@ def _solve(
         finally:
             timer.cancel()
             timer.join()  # Never interrupt a deleted solver from a late callback.
+            if flush_proof is not None:
+                # A SAT query's assumption refinements can also write proof data.
+                # Flush while the Python-owned file descriptor is still open.
+                flush_proof()
 
 
 def _verify_boolean(compiled: CompiledBoolean, row: Mapping[str, Any], limits: ProofLimits) -> None:
