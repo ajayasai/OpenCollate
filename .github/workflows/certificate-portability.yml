@@ -1,0 +1,55 @@
+name: Certificate portability
+on:
+  push:
+    branches: [feat/independent-proof-certificates]
+    paths: [.github/workflows/certificate-portability.yml]
+permissions:
+  contents: read
+jobs:
+  portability:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.14'
+      - run: python -m pip install '.[certificates]'
+      - name: Compare native producer evidence
+        shell: python
+        run: |
+          import json, platform, time
+          from importlib.metadata import version
+          from pysat import solvers
+          from opencollate.certificates import certify_boolean, _proof_lines
+          from opencollate.proof_cnf import compile_boolean
+          from opencollate.proof_kernel import verify_rup, ProofLimits
+          print(platform.platform(), version('python-sat'), flush=True)
+          for name in ('Glucose3', 'Glucose4', 'Gluecard3', 'MapleChrono', 'Maplesat'):
+              for early in (False, True):
+                  for left, right, guard in [('!(A&B)', '!A|!B', '1'), ('A^B^C','C^A^B','1'),('A','!A','1'),('A','A','S')]:
+                      c = compile_boolean(left, right, guard)
+                      try:
+                          with getattr(solvers,name)(bootstrap_with=None if early else c.cnf('difference'),with_proof=True) as s:
+                              if early: s.append_formula(c.cnf('difference'))
+                              s.conf_budget(100000)
+                              answer = s.solve_limited(expect_interrupt=True)
+                              raw = s.get_proof()
+                              model = s.get_model()
+                              verified = None
+                              if answer is False:
+                                  try:
+                                      verify_rup(c.cnf('difference'),_proof_lines(raw,c.encoder.variables,ProofLimits()),c.encoder.variables)
+                                      verified = True
+                                  except Exception as e: verified = str(e)
+                              print(json.dumps(dict(solver=name,early=early,left=left,answer=answer,raw=raw,model=model,verified=verified)),flush=True)
+                      except Exception as e: print(name,early,left,type(e).__name__,str(e),flush=True)
+          for _ in range(3):
+              for a,b,g in [('!(A&B)','!A|!B','1'),('A','!A','1'),('A','A','S')]:
+                  print('CERTIFICATE',json.dumps(certify_boolean(a,b,assume=g)),flush=True)
