@@ -188,6 +188,7 @@ def build_parser() -> argparse.ArgumentParser:
             "contract-diff",
             "formal-request",
             "formal-receipt",
+            "formal-certificate",
             "guard-status",
             "sequential-request",
             "sequential-receipt",
@@ -229,16 +230,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     formal = subparsers.add_parser("formal", help="check explicit two-valued Boolean obligations")
     formal_commands = formal.add_subparsers(dest="formal_command", required=True)
-    for command in ("check", "replay"):
+    for command in ("check", "replay", "certify", "verify-certificate"):
         sub = formal_commands.add_parser(command)
         sub.add_argument("request")
-        if command == "replay":
+        if command in {"replay", "verify-certificate"}:
             sub.add_argument("receipt")
         sub.add_argument("-o", "--output")
         sub.add_argument("--max-variables", type=int, default=512)
         sub.add_argument("--timeout-ms", type=int, default=5000)
         sub.add_argument("--resource-limit", type=int, default=1000000)
-        sub.set_defaults(handler=_command_formal)
+        if command in {"certify", "verify-certificate"}:
+            sub.add_argument("--max-proof-steps", type=int, default=32768)
+            sub.add_argument("--max-proof-work", type=int, default=20000000)
+            sub.set_defaults(handler=_command_certificate)
+        else:
+            sub.set_defaults(handler=_command_formal)
     from opencollate.sequential import add_commands
 
     add_commands(subparsers)
@@ -1026,6 +1032,17 @@ def _capability_data() -> dict[str, Any]:
             "full_systemverilog": False,
             "independent_unsat_certificate_checking": False,
         },
+        "boolean_certificates": {
+            "generator": "glucose3-via-python-sat",
+            "verifier": "solver-free-rup-kernel",
+            "semantics": "two-valued-combinational",
+            "optional_extra": "certificates",
+            "engine_backend": "certified",
+            "checks_nonvacuity": True,
+            "independent_unsat_certificate_checking": True,
+            "mechanically_verified_checker": False,
+            "standalone_source_bound": False,
+        },
         "symbolic_boolean": {
             "backend": "z3",
             "installed_version": z3_version,
@@ -1064,6 +1081,7 @@ def _capability_data() -> dict[str, Any]:
         "outputs": [
             "html",
             "formal-receipt-json",
+            "formal-certificate-json",
             "sequential-receipt-json",
             "contract-diff-json",
             "text",
@@ -1211,6 +1229,34 @@ def _command_guard(args: argparse.Namespace) -> int:
     sys.stdout.write(result.stdout)
     sys.stderr.write(result.stderr)
     return result.exit_code
+
+
+def _command_certificate(args: argparse.Namespace) -> int:
+    from opencollate.certificates import certify_obligations, verify_certificate
+    from opencollate.proof_kernel import ProofLimits
+
+    _reject_path_alias(args.request, "obligation request", args.output, "certificate output")
+    if args.formal_command == "verify-certificate":
+        _reject_path_alias(args.receipt, "prior certificate", args.output, "certificate output")
+    request = _read_json_report(args.request, label="obligation")
+    try:
+        limits = ProofLimits(
+            max_variables=args.max_variables,
+            timeout_ms=args.timeout_ms,
+            conflict_limit=args.resource_limit,
+            max_steps=args.max_proof_steps,
+            max_work=args.max_proof_work,
+        )
+        if args.formal_command == "verify-certificate":
+            result = verify_certificate(
+                request, _read_json_report(args.receipt, label="certificate"), limits=limits
+            )
+        else:
+            result = certify_obligations(request, limits=limits)
+    except (ValueError, TypeError, RecursionError) as error:
+        raise CliError(str(error)) from error
+    _emit(json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n", args.output)
+    return int(result["exit_code"])
 
 
 def _command_formal(args: argparse.Namespace) -> int:

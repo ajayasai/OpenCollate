@@ -6,6 +6,21 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
 
 ## [Unreleased]
 
+### Independently checkable Boolean evidence
+
+- Optional Glucose3 proof generation, deterministic Tseitin encoding, and a separate solver-free
+  RUP kernel. Equivalence also requires a Python-replayed satisfying assumptions witness.
+- `formal certify` / `formal verify-certificate`, strict certificate schema and request/CNF/content
+  binding. Rehashed forgeries cannot establish a pass; vacuity and exhausted budgets retain exit 2.
+- Opt-in `certified` engine backend for the supported RTL/Liberty Boolean IR; legacy truth tables
+  remain the default. Generation requires the new `certificates` extra; verification does not.
+- Fixed a false-pass path where unsupported, explicitly declared Liberty function text was dropped
+  from known function facts and could yield exit 0 despite selecting Z3. Both selected formal
+  backends now emit fatal OC4302 for that incomplete function analysis.
+- Exhaustive tiny-CNF and property-based oracles, native-producer fault injection, solver-free
+  installed-wheel checks, 15 synthetic outcome cases, eight forged-certificate controls and a
+  revision-pinned external DRAT-trim cross-check. No full-SystemVerilog or signoff claim is made.
+
 ### Symbolic verification and review
 
 - Optional bounded Z3 reasoning for the supported two-valued Boolean IR, including explicit

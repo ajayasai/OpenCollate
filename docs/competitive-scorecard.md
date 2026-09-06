@@ -5,8 +5,8 @@ checker**. That is narrower than claiming to replace every commercial SoC assemb
 verification, register-generation, or signoff product.
 
 This page makes the comparison falsifiable. It records public vendor claims, the evidence
-OpenCollate publishes, and the boundaries that must remain visible. It was last reviewed on
-2026-08-31.
+OpenCollate publishes, and the boundaries that must remain visible. Vendor comparison entries were last reviewed on
+2026-08-31; the implementation milestone below was added on 2026-09-06.
 
 ## What "better" means here
 
@@ -45,11 +45,26 @@ Siemens [announced an agreement to acquire Defacto Technologies on July 21,
 2026](https://news.siemens.com/en-us/siemens-to-acquire-defacto-technologies/). That validates the
 commercial importance of the workflow; it does not constitute a benchmark result.
 
+## Independently checkable evidence milestone (development, 2026-09-06)
+
+The new Boolean certificate backend checks a refutation and a satisfying assumptions witness,
+rather than relying only on a solver's verdict or rerunning that solver. Recipients can verify
+portable formula certificates without SAT/SMT dependencies. Unsupported declared Liberty
+functions no longer disappear into an apparent clean check when a formal backend is selected.
+
+The public evidence includes exhaustive tiny-CNF oracles, actual RTL/Liberty integration,
+malicious model/proof tests, a 15-case synthetic corpus and eight rehashed-forgery controls.
+A separate workflow checks exported proofs with revision-pinned DRAT-trim. Consult the workflow's
+actual status for a given commit. See [certificate scope and trust](independent-boolean-certificates.md).
+This is a demonstrated property of OpenCollate, **not a claim that every proprietary competitor
+lacks independently checked proofs**, and not a licensed head-to-head performance result.
+
 ## Claims OpenCollate does not make
 
-OpenCollate does not currently claim formal exhaustiveness, temporal or conditional connectivity,
+OpenCollate does not claim unrestricted formal exhaustiveness, full temporal/conditional connectivity,
 full SystemVerilog/UPF/SDC interpretation, design generation, million-register scale, functional
-safety certification, or tapeout signoff. Cadence, Siemens, Synopsys, Defacto, Arteris, and
+safety certification, or tapeout signoff. Its bounded Boolean proofs and strict source-bound
+single-clock sequential subset have the documented narrower semantics, not full commercial-app scope. Cadence, Siemens, Synopsys, Defacto, Arteris, and
 Agnisys publicly offer capabilities outside this project's scope.
 
 A result is stronger than a marketing comparison only when both products are run on the same

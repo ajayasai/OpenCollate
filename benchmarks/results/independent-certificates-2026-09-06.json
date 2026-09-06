@@ -1,0 +1,473 @@
+{
+  "cases": [
+    {
+      "certificate_bytes": 978,
+      "certificate_sha256": "adbc1d6484425cd0b79557ca9a1fe2d60887f574364bf53ad7211b1607a13183",
+      "deterministic": true,
+      "expected": "equivalent",
+      "generation_median_seconds": 0.0017887429999063897,
+      "generation_seconds": [
+        0.017623960000037187,
+        0.0017887429999063897,
+        0.001811029000009512,
+        0.0017034269999385288,
+        0.001611159000049156
+      ],
+      "name": "demorgan-12-control",
+      "observed": "equivalent",
+      "proof_steps": 2,
+      "request_sha256": "d08a3fe1549245a8c1179bf40c7124f9babe5137c8cec8e775eff18d80416e82",
+      "source_variables": 12,
+      "status": "pass",
+      "verification_median_seconds": 0.000889328999846839,
+      "verification_seconds": [
+        0.000889328999846839,
+        0.0009273110001686291,
+        0.0010012380000716803,
+        0.000772783000002164,
+        0.000765889999911451
+      ]
+    },
+    {
+      "certificate_bytes": 1157,
+      "certificate_sha256": "98aeb50a64df14921f14927e26ab4825ff9d78b58604f25bc8e070406030590b",
+      "deterministic": true,
+      "expected": "different",
+      "generation_median_seconds": 0.0017623090000142838,
+      "generation_seconds": [
+        0.0020735440000407834,
+        0.0017263580000417278,
+        0.0018382670000391954,
+        0.0017623090000142838,
+        0.0015020119999462622
+      ],
+      "name": "demorgan-12-mutant",
+      "observed": "different",
+      "proof_steps": null,
+      "request_sha256": "f99266932a76bd4aff39d5d642e8f3de020ea387c67d15afa000cd37fd44f087",
+      "source_variables": 12,
+      "status": "pass",
+      "verification_median_seconds": 0.0006266139998842846,
+      "verification_seconds": [
+        0.0005514500001027045,
+        0.0007769540000026609,
+        0.0006609219999518245,
+        0.0006266139998842846,
+        0.0005016659999910189
+      ]
+    },
+    {
+      "certificate_bytes": 2278,
+      "certificate_sha256": "16d3b451d39bbfca42728c163f17aa7602ca28b298f5a0b01d181b807c78855c",
+      "deterministic": true,
+      "expected": "equivalent",
+      "generation_median_seconds": 0.0042524200000571,
+      "generation_seconds": [
+        0.004250120000051538,
+        0.0042524200000571,
+        0.0040755790000730485,
+        0.004475423000030787,
+        0.004289861000188466
+      ],
+      "name": "demorgan-64-control",
+      "observed": "equivalent",
+      "proof_steps": 2,
+      "request_sha256": "44138e2ac0d1b6155d723a1eecaf2103ce77eba2f5c61a1335f46a0c83e05fb8",
+      "source_variables": 64,
+      "status": "pass",
+      "verification_median_seconds": 0.002712407999979405,
+      "verification_seconds": [
+        0.002712407999979405,
+        0.0023985339998944255,
+        0.0031488510001054237,
+        0.003122525999970094,
+        0.0026033120000192866
+      ]
+    },
+    {
+      "certificate_bytes": 3237,
+      "certificate_sha256": "5c6533e6aae097b76c10ba1c7d78eb1788adea49a09c4eff1f4504e9e6c9ae24",
+      "deterministic": true,
+      "expected": "different",
+      "generation_median_seconds": 0.004278911000028529,
+      "generation_seconds": [
+        0.004278911000028529,
+        0.004487079999989874,
+        0.00465481300011561,
+        0.003877108999859047,
+        0.0037820259999534755
+      ],
+      "name": "demorgan-64-mutant",
+      "observed": "different",
+      "proof_steps": null,
+      "request_sha256": "9bfbaab1181869003441b2bf95590045706bb187b96a64f3de8e0fe25b2c254b",
+      "source_variables": 64,
+      "status": "pass",
+      "verification_median_seconds": 0.0019952249999732885,
+      "verification_seconds": [
+        0.002203182999892306,
+        0.003160068999932264,
+        0.0019952249999732885,
+        0.0018448650000664202,
+        0.0017713080001158232
+      ]
+    },
+    {
+      "certificate_bytes": 3879,
+      "certificate_sha256": "2280d13f2c95d930c0a24da740e6a68c7459d5797377bc679e22c5c2505e9d70",
+      "deterministic": true,
+      "expected": "equivalent",
+      "generation_median_seconds": 0.007062593000000561,
+      "generation_seconds": [
+        0.007062593000000561,
+        0.006843732999868735,
+        0.007563062000144782,
+        0.006721684000012829,
+        0.007614981999950032
+      ],
+      "name": "demorgan-128-control",
+      "observed": "equivalent",
+      "proof_steps": 2,
+      "request_sha256": "2e113c575e402a98ff462a4d3f238b248e9961cd9e43c85cced76527426caf9e",
+      "source_variables": 128,
+      "status": "pass",
+      "verification_median_seconds": 0.004664351999963401,
+      "verification_seconds": [
+        0.004643545999897469,
+        0.004856351999933395,
+        0.004664351999963401,
+        0.0041706219999468885,
+        0.004828515999861338
+      ]
+    },
+    {
+      "certificate_bytes": 5797,
+      "certificate_sha256": "e3e7c281209d7eee56a1a30a9a91e2982be79e4caf01ba57e6af8f11e533af5a",
+      "deterministic": true,
+      "expected": "different",
+      "generation_median_seconds": 0.00795053799993184,
+      "generation_seconds": [
+        0.007999395000069853,
+        0.007975514999998268,
+        0.007285660999968968,
+        0.00795053799993184,
+        0.007468620000054216
+      ],
+      "name": "demorgan-128-mutant",
+      "observed": "different",
+      "proof_steps": null,
+      "request_sha256": "3fbdb7d7e2a31d2f4b334ed9ac863094198acb60071ff19280e45f868f379aab",
+      "source_variables": 128,
+      "status": "pass",
+      "verification_median_seconds": 0.0033612810000249738,
+      "verification_seconds": [
+        0.003473414999916713,
+        0.0033212010000625014,
+        0.0032647000000451953,
+        0.003418895999857341,
+        0.0033612810000249738
+      ]
+    },
+    {
+      "certificate_bytes": 13479,
+      "certificate_sha256": "fc1345f780898fdeb6857781eda2d07ace0f852a612325e15233b6bc1b99bff4",
+      "deterministic": true,
+      "expected": "equivalent",
+      "generation_median_seconds": 0.030941358999825752,
+      "generation_seconds": [
+        0.030941358999825752,
+        0.03055573500000719,
+        0.031838496000091254,
+        0.032188192999910825,
+        0.030168475999971633
+      ],
+      "name": "demorgan-512-control",
+      "observed": "equivalent",
+      "proof_steps": 2,
+      "request_sha256": "bf44d45504ee598bd249cd7b0dcf87ba8d1192dc56d51ad192c61df7a4460d12",
+      "source_variables": 512,
+      "status": "pass",
+      "verification_median_seconds": 0.01671693499997673,
+      "verification_seconds": [
+        0.01737106399991717,
+        0.016267222999886144,
+        0.017574301999957243,
+        0.016598282000131803,
+        0.01671693499997673
+      ]
+    },
+    {
+      "certificate_bytes": 21157,
+      "certificate_sha256": "8b9752ac8e842d545a1b2a35cd1c3a464cf3f52f6cef81ccaa94daadaa09adb6",
+      "deterministic": true,
+      "expected": "different",
+      "generation_median_seconds": 0.03579216799994356,
+      "generation_seconds": [
+        0.03579216799994356,
+        0.03546241099979852,
+        0.03641919000006055,
+        0.03646228100001281,
+        0.034855379999953584
+      ],
+      "name": "demorgan-512-mutant",
+      "observed": "different",
+      "proof_steps": null,
+      "request_sha256": "3768fa34894cd698d138b1d32ceba5e9f502fb97faf163b9fcca78b84a437fc5",
+      "source_variables": 512,
+      "status": "pass",
+      "verification_median_seconds": 0.01325179500008744,
+      "verification_seconds": [
+        0.013028080999902159,
+        0.01396671099996638,
+        0.01325179500008744,
+        0.01366412900006253,
+        0.013001332000158072
+      ]
+    },
+    {
+      "certificate_bytes": 727,
+      "certificate_sha256": "6e6d0e100c551fb2ced08407a9d1449f742c4c1dbee9997ca2a54cdb7bc42b2d",
+      "deterministic": true,
+      "expected": "equivalent",
+      "generation_median_seconds": 0.0012639899998703186,
+      "generation_seconds": [
+        0.0018159119999836548,
+        0.0012639899998703186,
+        0.0013614060001145845,
+        0.0011363250000613334,
+        0.0012233439999818074
+      ],
+      "name": "selected-mux",
+      "observed": "equivalent",
+      "proof_steps": 2,
+      "request_sha256": "528a9a9312bf7a04ac95ee51fe9cd9cbb8ddcb46859a986f0021010816f048e2",
+      "source_variables": 3,
+      "status": "pass",
+      "verification_median_seconds": 0.0003340400000979571,
+      "verification_seconds": [
+        0.0003340400000979571,
+        0.0003114799999366369,
+        0.0003761909999866475,
+        0.000328561999822341,
+        0.00036362699984238134
+      ]
+    },
+    {
+      "certificate_bytes": 762,
+      "certificate_sha256": "c666d2745e83ae281693a2bbd708ed0fd6d158262e54d61a2cf1b36b916c1b8d",
+      "deterministic": true,
+      "expected": "different",
+      "generation_median_seconds": 0.001298938999980237,
+      "generation_seconds": [
+        0.001298938999980237,
+        0.0010804109999753564,
+        0.0013339160000214179,
+        0.001381412000000637,
+        0.001081905000091865
+      ],
+      "name": "inactive-mux",
+      "observed": "different",
+      "proof_steps": null,
+      "request_sha256": "6c58cec0316d8d43bc81107fb53c4a3215f5d2d4c0ab9fdb0ea13aea7ac29bf3",
+      "source_variables": 3,
+      "status": "pass",
+      "verification_median_seconds": 0.0003151250000428263,
+      "verification_seconds": [
+        0.0003739210001185711,
+        0.000270939999836628,
+        0.00027333899993209343,
+        0.0003151250000428263,
+        0.00033928499988178373
+      ]
+    },
+    {
+      "certificate_bytes": 704,
+      "certificate_sha256": "51a8c751073d8c9c080ea18cf17beb1a2535be49446b04d889ef5870b86f542c",
+      "deterministic": true,
+      "expected": "vacuous",
+      "generation_median_seconds": 0.0007650860000012472,
+      "generation_seconds": [
+        0.0007650860000012472,
+        0.000833832999887818,
+        0.0004768759999933536,
+        0.0004977060000328493,
+        0.001295078999874022
+      ],
+      "name": "contradictory-mode",
+      "observed": "vacuous",
+      "proof_steps": 1,
+      "request_sha256": "d992e9afabce3402001de9f89339fea7a65aabf27d07e1a4bd3951344c2abe12",
+      "source_variables": 2,
+      "status": "pass",
+      "verification_median_seconds": 0.0001903590000438271,
+      "verification_seconds": [
+        0.00017865599988908798,
+        0.0001903590000438271,
+        0.0001599939998868649,
+        0.0008133800001814961,
+        0.00043261799987703853
+      ]
+    },
+    {
+      "certificate_bytes": 682,
+      "certificate_sha256": "c7e7da405fb345cbc4226ee71cd3ce0e044e6a62dfd2d3b1c322d07d6039c218",
+      "deterministic": true,
+      "expected": "different",
+      "generation_median_seconds": 0.0006747629997789772,
+      "generation_seconds": [
+        0.000816106000002037,
+        0.000743646000046283,
+        0.0006747629997789772,
+        0.0005979580000712303,
+        0.0006137930001841596
+      ],
+      "name": "constant-mismatch",
+      "observed": "different",
+      "proof_steps": null,
+      "request_sha256": "83df5cb1e74aa959dd6717f22a5bf90a2a042ff606dfce2bace57b6105f54cc1",
+      "source_variables": 0,
+      "status": "pass",
+      "verification_median_seconds": 0.00012439900001481874,
+      "verification_seconds": [
+        0.00013251399991531798,
+        0.00012439900001481874,
+        0.00015403099996547098,
+        0.00012249900009919656,
+        0.00011281299998699978
+      ]
+    },
+    {
+      "certificate_bytes": 1313,
+      "certificate_sha256": "b02398906416e2a97d3d3933971d0acc88c8aad182c642f5227dbbaab51adf05",
+      "deterministic": true,
+      "expected": "equivalent",
+      "generation_median_seconds": 0.003383391999932428,
+      "generation_seconds": [
+        0.0036433300001590396,
+        0.003383391999932428,
+        0.003305972999896767,
+        0.0035199019998799486,
+        0.003050058000098943
+      ],
+      "name": "parity-permutation",
+      "observed": "equivalent",
+      "proof_steps": 36,
+      "request_sha256": "5a8d5cda020044cc5be0cbd1201ed97aafa5fec32dd940a4864f6de6c8b5cd65",
+      "source_variables": 6,
+      "status": "pass",
+      "verification_median_seconds": 0.0017662160000782023,
+      "verification_seconds": [
+        0.0017975620000925119,
+        0.0019497640000736283,
+        0.0016602919999968435,
+        0.0017251619999569812,
+        0.0017662160000782023
+      ]
+    },
+    {
+      "certificate_bytes": 575,
+      "certificate_sha256": "c7357a5eb3dd41d48440878abe0cbc93ad85b5a2fa1cde3efcd046cc5ea93a85",
+      "deterministic": true,
+      "expected": "inconclusive",
+      "generation_median_seconds": 3.79559999146295e-05,
+      "generation_seconds": [
+        0.00012465200006772648,
+        4.594999995788385e-05,
+        3.79559999146295e-05,
+        3.580700013117166e-05,
+        3.0211999956009095e-05
+      ],
+      "name": "unsupported-ternary",
+      "observed": "inconclusive",
+      "proof_steps": null,
+      "request_sha256": "3dc48a5197889c204a4717179ab1352e617f5edda8060b43ccd0195f914676c1",
+      "source_variables": 0,
+      "status": "pass",
+      "verification_median_seconds": 3.13680000090244e-05,
+      "verification_seconds": [
+        6.48999998702493e-05,
+        3.13680000090244e-05,
+        5.5765000070095994e-05,
+        2.5095999944824143e-05,
+        2.299900006619282e-05
+      ]
+    },
+    {
+      "certificate_bytes": 638,
+      "certificate_sha256": "0514897dfc7a10ca568b23f9d201f83d0c3003c0f9ccf9fa551c8f2c2daf689e",
+      "deterministic": true,
+      "expected": "inconclusive",
+      "generation_median_seconds": 0.0010168589999466349,
+      "generation_seconds": [
+        0.001004534000003332,
+        0.0010168589999466349,
+        0.0013173549998555245,
+        0.0009360330000163231,
+        0.0010871279998809769
+      ],
+      "name": "verification-budget",
+      "observed": "inconclusive",
+      "proof_steps": null,
+      "request_sha256": "60faa48c356aa9f03a6f9b1d57d3b7653d792556b9b152e1ac4a8a80403584bc",
+      "source_variables": 2,
+      "status": "pass",
+      "verification_median_seconds": 4.19860000420158e-05,
+      "verification_seconds": [
+        4.133500010539137e-05,
+        0.00013110600002619321,
+        4.19860000420158e-05,
+        4.000099988843431e-05,
+        8.360499987247749e-05
+      ]
+    }
+  ],
+  "environment": {
+    "machine": "x86_64",
+    "producer": "Glucose3",
+    "python": "3.13.5",
+    "python-sat": "1.9.dev15",
+    "system": "Linux"
+  },
+  "implementation_sha256": "b9a3f526c54d4f6ae880a4c2057b91ae0995f4f079946ab5904b058704d67346",
+  "manifest_sha256": "5f57b6abd2a0b8a3839f76c5135628b63f0fce74caad8ea508d27714f1d8c9ca",
+  "poison_controls": [
+    {
+      "name": "rehashed-false-unsat",
+      "rejected": true
+    },
+    {
+      "name": "missing-proof",
+      "rejected": true
+    },
+    {
+      "name": "wrong-cnf-binding",
+      "rejected": true
+    },
+    {
+      "name": "false-guard-witness",
+      "rejected": true
+    },
+    {
+      "name": "integer-witness",
+      "rejected": true
+    },
+    {
+      "name": "extra-variable",
+      "rejected": true
+    },
+    {
+      "name": "trailing-proof-data",
+      "rejected": true
+    },
+    {
+      "name": "changed-request",
+      "rejected": true
+    }
+  ],
+  "repeat": 5,
+  "result_sha256": "7d1eb4c80b4a599dd9deb961246e793de7938cd6c19be78b5b1408ed38459afa",
+  "schema_version": 1,
+  "scope": "synthetic two-valued combinational formulas; no commercial or production-SoC comparison",
+  "status": "pass",
+  "suite": "opencollate-independent-boolean-certificates"
+}
