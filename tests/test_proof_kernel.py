@@ -147,12 +147,14 @@ def test_random_solver_proofs_against_exhaustive_truth_tables() -> None:
         )
         with Solver(name="g3", bootstrap_with=clauses, with_proof=True) as solver:
             assert solver.solve() == truth
+            # Flush even SAT traces before closing/reusing their descriptor.
+            raw_proof = read_producer_proof(solver)
             if truth:
                 sat += 1
                 with pytest.raises(ProofError):
                     verify_rup(clauses, n, [[]])
             else:
                 unsat += 1
-                proof = _proof_rows(read_producer_proof(solver), n, Meter())
+                proof = _proof_rows(raw_proof, n, Meter())
                 assert verify_rup(clauses, n, proof)["steps"] >= 1
     assert sat > 20 and unsat > 20

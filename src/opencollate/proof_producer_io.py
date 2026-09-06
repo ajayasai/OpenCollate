@@ -33,8 +33,17 @@ def _flush_windows_streams() -> None:
         raise ProofError("cannot flush the Windows proof producer's C runtime") from error
 
 
-def read_producer_proof(solver: Any) -> Any:
-    """Read opaque, still-untrusted evidence after native output is available."""
+def flush_producer_output() -> None:
+    """Drain native output while the producer's descriptor is still open.
+
+    This must also run for SAT, interrupted and failed proof-enabled calls.
+    Otherwise abandoned C buffers can write into a reused file descriptor.
+    """
     if sys.platform == "win32":
         _flush_windows_streams()
+
+
+def read_producer_proof(solver: Any) -> Any:
+    """Read opaque, still-untrusted evidence after native output is available."""
+    flush_producer_output()
     return solver.get_proof()

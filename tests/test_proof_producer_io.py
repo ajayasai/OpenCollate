@@ -67,3 +67,54 @@ def test_missing_native_runtime_fails_before_reading(
     monkeypatch.setattr(ctypes, "CDLL", load)
     with pytest.raises(ProofError, match="cannot flush"):
         module.read_producer_proof(object())
+
+
+@pytest.mark.parametrize("outcome", [True, False, None, "exception"])
+def test_every_proof_enabled_solve_flushes_before_close(
+    monkeypatch: pytest.MonkeyPatch, outcome: Any
+) -> None:
+    from opencollate import sequential_certificate as certificate
+    from opencollate.proof_kernel import Meter
+
+    events = []
+
+    class Solver:
+        def __init__(self, **kwargs: Any) -> None:
+            pass
+
+        def __enter__(self) -> Solver:
+            return self
+
+        def __exit__(self, *args: Any) -> None:
+            events.append("close")
+
+        def solve_limited(self, **kwargs: Any) -> Any:
+            events.append("solve")
+            if outcome == "exception":
+                raise RuntimeError("native error")
+            return outcome
+
+        def interrupt(self) -> None:
+            pass
+
+        def get_model(self) -> list[int]:
+            return [1]
+
+        def get_proof(self) -> list[str]:
+            return ["0"]
+
+    monkeypatch.setattr(
+        certificate.importlib, "import_module", lambda name: SimpleNamespace(Solver=Solver)
+    )
+    monkeypatch.setattr(certificate, "flush_producer_output", lambda: events.append("flush"))
+    monkeypatch.setattr(module, "flush_producer_output", lambda: events.append("read-flush"))
+    if outcome is True:
+        assert certificate._solve({"variables": 1, "clauses": [[1]]}, Meter(), proof=True)[0]
+    elif outcome is False:
+        assert not certificate._solve(
+            {"variables": 1, "clauses": [[1], [-1]]}, Meter(), proof=True
+        )[0]
+    else:
+        with pytest.raises((ProofError, RuntimeError)):
+            certificate._solve({"variables": 1, "clauses": [[1]]}, Meter(), proof=True)
+    assert events.index("solve") < events.index("flush") < events.index("close")
