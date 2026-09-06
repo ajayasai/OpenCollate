@@ -16,6 +16,7 @@ from typing import Any
 
 from opencollate.atomic_output import atomic_write_text
 from opencollate.proof_kernel import Limits, Meter, ProofError, verify_rup
+from opencollate.proof_producer_io import read_producer_proof
 from opencollate.sequential_cnf import ENCODING, Unroller, base_problem, digest, step_problem
 from opencollate.sequential_ir import Circuit, simulate_frame
 from opencollate.sequential_rtl import load_circuit
@@ -111,7 +112,7 @@ def _solve(
             return True, model
         if not proof:
             return False, []
-        rows = _proof_rows(solver.get_proof(), problem["variables"], meter)
+        rows = _proof_rows(read_producer_proof(solver), problem["variables"], meter)
         verify_rup(problem["clauses"], problem["variables"], rows, meter=meter)
         return False, rows
 

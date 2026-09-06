@@ -127,6 +127,7 @@ def test_watched_propagation_matches_naive_after_repeated_assignment_resets() ->
 def test_random_solver_proofs_against_exhaustive_truth_tables() -> None:
     from pysat.solvers import Solver
 
+    from opencollate.proof_producer_io import read_producer_proof
     from opencollate.sequential_certificate import _proof_rows
 
     rng = random.Random(31127)
@@ -152,6 +153,6 @@ def test_random_solver_proofs_against_exhaustive_truth_tables() -> None:
                     verify_rup(clauses, n, [[]])
             else:
                 unsat += 1
-                proof = _proof_rows(solver.get_proof(), n, Meter())
+                proof = _proof_rows(read_producer_proof(solver), n, Meter())
                 assert verify_rup(clauses, n, proof)["steps"] >= 1
     assert sat > 20 and unsat > 20
