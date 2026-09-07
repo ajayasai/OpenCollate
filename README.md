@@ -160,8 +160,29 @@ The receiver re-reads current RTL, rebuilds separate bit-blasted base/induction 
 checks every RUP proof addition, and replays reachable guard witnesses. Solver-returned `UNSAT`
 and recomputed hashes are not accepted as proof. Ordinary Z3 receipts remain unchanged; use
 these commands explicitly. The trusted frontend, encoding and Python kernel are not formally
-verified, and the same flat, single-clock, two-valued RTL subset still applies.
+verified, and the documented single-clock, two-valued RTL subset still applies.
 See [proof certificates, exact trust boundary and reproducible tests](docs/proof-certificates.md).
+
+## Hierarchical controller verification (development)
+
+Sequential checks and independently checked certificates now share an elaborated module/generate
+frontend, including ordinary `case`, packed integral enums, and conservatively checked
+`always_comb` blocks. Blocking reads use the current procedural value; clocked nonblocking reads
+use old state. Possible latches, read-before-write blocks and wildcard/unique/priority cases fail
+explicitly. The complete instantiated model is validated before per-property solver reduction.
+
+```console
+opencollate sequential check examples/controller/request.json --output controller.json
+opencollate sequential certify examples/controller/request.json --output certificate.json
+opencollate sequential verify-certificate examples/controller/request.json certificate.json
+opencollate sequential check examples/hierarchy/request.json --no-cone --output full.json
+```
+
+The certificate receiver regenerates full-model CNF and checks RUP evidence without a solver;
+property-cone reduction is used by the Z3 check/replay path, not silently assumed by the receiver.
+See [controller semantics](docs/controller-verification.md) and
+[hierarchy and exact reduction](docs/hierarchical-sequential.md). This remains a bounded supported
+hardware subset, not general SystemVerilog simulation equivalence or a signoff replacement.
 
 ## Commands
 

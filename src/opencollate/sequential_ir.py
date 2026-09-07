@@ -6,7 +6,9 @@ SMT lowering; counterexamples must replay every combinational and state update.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import asdict, dataclass, field
+from heapq import heapify, heappop, heappush
 from typing import Any
 
 
@@ -37,6 +39,8 @@ class Circuit:
     sources: list[dict[str, Any]] = field(default_factory=list)
     comb_order: list[str] = field(default_factory=list)
     frontend: str = ""
+    hierarchy: list[dict[str, Any]] = field(default_factory=list)
+    clock_aliases: list[str] = field(default_factory=list)
     _intern: dict[Node, int] = field(default_factory=dict, repr=False)
 
     def add(
@@ -78,6 +82,8 @@ class Circuit:
             "locations": self.locations,
             "sources": self.sources,
             "frontend": self.frontend,
+            "hierarchy": self.hierarchy,
+            "clock_aliases": self.clock_aliases,
         }
 
     def finalize(self) -> None:
@@ -89,6 +95,7 @@ class Circuit:
         if sum(self.signals[s][0] for s in self.next_state) > 16384:
             raise SequentialError("state exceeds 16384 bits")
         dependencies: dict[str, set[str]] = {}
+        comb_names = set(self.combinational)
         for name, root in self.combinational.items():
             todo, seen, refs = [root], set(), set()
             while todo:
@@ -100,17 +107,25 @@ class Circuit:
                 if node.op == "ref":
                     refs.add(str(node.value))
                 todo.extend(node.args)
-            dependencies[name] = refs & set(self.combinational)
-        # Kahn ordering; a cycle is unsupported, never an unconstrained wire.
-        while dependencies:
-            ready = sorted(name for name, deps in dependencies.items() if not deps)
-            if not ready:
-                raise SequentialError("combinational cycle detected")
-            self.comb_order.extend(ready)
-            for name in ready:
-                del dependencies[name]
-            for deps in dependencies.values():
-                deps.difference_update(ready)
+            dependencies[name] = refs & comb_names
+        # Incremental Kahn ordering: no repeated scan of every remaining edge.
+        self.comb_order.clear()
+        dependents: dict[str, list[str]] = defaultdict(list)
+        degree = {name: len(deps) for name, deps in dependencies.items()}
+        for name, deps in dependencies.items():
+            for dep in deps:
+                dependents[dep].append(name)
+        ready = [name for name, n in degree.items() if n == 0]
+        heapify(ready)
+        while ready:
+            name = heappop(ready)
+            self.comb_order.append(name)
+            for follower in dependents[name]:
+                degree[follower] -= 1
+                if not degree[follower]:
+                    heappush(ready, follower)
+        if len(self.comb_order) != len(dependencies):
+            raise SequentialError("combinational cycle detected")
 
 
 def signed_value(value: int, width: int) -> int:

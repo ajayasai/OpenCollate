@@ -76,18 +76,20 @@ failure must match. The trace includes source locations and can be independently
 
 ## Supported HDL and deliberate rejection
 
-The selected top must be a **flat, single-clock module**. Parameter defaults, scalar or simple
+The selected top may contain a **single-clock module hierarchy**. Parameter defaults/overrides, scalar or simple
 packed 1..256-bit values, signed/unsigned arithmetic, comparisons, shifts, reductions, ternaries,
 concatenations, constant bit/part selects, continuous assignments and positive-edge
 `always`/`always_ff` blocks with nonblocking whole-signal assignments and ordinary `if/else` are
-supported. Declared packed vectors must use descending `[width-1:0]` indices. Synchronous resets,
+supported. Packed integral enums, ordinary case, and definitely-assigned `always_comb` blocks
+are also supported; see [controller semantics](controller-verification.md). Declared packed vectors must use descending `[width-1:0]` indices. Synchronous resets,
 enables, pipelines, counters, wrapping arithmetic and assignment priority are modeled.
 
 Unsupported constructs cause an explicit refusal of the analysis, not a black-box proof:
-hierarchy/generate blocks (flatten first), multiple or gated clocks, asynchronous resets,
+multiple or gated clocks, asynchronous resets,
 X/Z literals, inout/ref ports, special net resolution/strengths, declaration initializers,
-initial/final blocks, procedural blocking/combinational/latch blocks, loops/case, dynamic selects,
-partial left-hand-side assignments, function calls, division/modulus, real/array/struct data,
+initial/final blocks, procedural blocking clocked/latch blocks, procedural loops, wildcard or
+unique/priority cases, dynamic selects,
+partial clocked left-hand-side assignments, function calls, division/modulus, real/array/struct data,
 preprocessor directives/macros, and arbitrary delays. All backticks are conservatively rejected
 before preprocessing, including backticks in comments. Undriven observed signals, multiple drivers
 and combinational cycles are rejected. This is not a full SystemVerilog or SVA frontend.
@@ -117,8 +119,8 @@ command deliberately for the properties and models it supports.
 ## Bounds and reproducible evidence
 
 Inputs are limited to 32 source files, 1 MiB/file, 4 MiB total; request/receipt JSON to 8 MiB and
-64 nesting levels. Paths remain inside the request directory. Models are bounded to 4096 top
-members, 16384 state bits, 32768 IR nodes and bounded lowering work/depth. Up to 32 properties,
+64 nesting levels. Paths remain inside the request directory. Models are bounded to 1024 instances, 4096 scopes, 32 scope-depth steps,
+16384 elaborated members, 16384 state bits, 32768 IR nodes and bounded lowering work/depth. Up to 32 properties,
 128 BMC steps, induction depth 16 and history length 16 are supported. The shared solving deadline
 defaults to 10 seconds, with 8192 queries and a per-query Z3 resource limit of 1000000. Runtime
 limits are cooperative; the external `guard` command is needed for a process-level wall deadline.
@@ -143,3 +145,6 @@ Primary method references: N. Bjørner et al., Programming Z3, section 5.4
 (https://theory.stanford.edu/~nikolaj/programmingz3.html); slang AST/user documentation
 (https://sv-lang.com/user-manual.html). Public finite tests are validation evidence, not proof
 that the implementation itself is free of bugs.
+
+For module/generate hierarchy, static output slices, clock aliases, and exact property-cone
+reduction, read [hierarchical sequential verification](hierarchical-sequential.md).

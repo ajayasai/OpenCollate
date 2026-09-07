@@ -6,6 +6,18 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
 
 ## [Unreleased]
 
+### Hierarchical controller proofs
+
+- Integrate elaborated hierarchy and exact property-cone checking with the independent
+  full-model RUP certificate receiver, preserving both CLI paths and all failure boundaries.
+- Add definitely-assigned `always_comb`, ordinary first-match case in combinational and clocked
+  logic, and packed integral enums/aliases. Reject possible latches, reads before definite
+  assignment, wildcard/qualified cases, unsupported local scopes and blocking clocked updates.
+- Add source-level controller proof/mutation/rejection fixtures, signed/unsigned exhaustive
+  independent Icarus checks, full-trace simulator replay and solver-free certificate tests.
+- Correct the previously unrun hierarchy simulator harness to select explicitly tagged frames
+  without interpreting simulator termination messages as signal values.
+
 ### Independently checkable sequential certificates
 
 - `sequential certify` and `sequential verify-certificate` generate and check source-bound
@@ -37,6 +49,13 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
 
 
 ### Added
+
+- Source-bound module/generate/instance-array hierarchy with parameter-aware signal identities,
+  native port conversions, disjoint output assembly, explicit clock aliases, and no black boxes.
+- Exact per-property structural cone reduction with full-model counterexample reconstruction,
+  per-property model statistics, and an unreduced `--no-cone` differential/replay path.
+- Hierarchical source examples, reduction benchmarks, randomized projection tests, and optional
+  independent Icarus tests. Receipts from earlier sequential implementations require rebuilding.
 
 - Source-bound synchronous RTL verification through `sequential check` and `sequential replay`,
   with finite-width BMC, conservative k-induction, explicit reset/assumptions/history, non-vacuous

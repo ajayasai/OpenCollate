@@ -58,7 +58,10 @@
               "type": "string"
             },
             "algorithm": {
-              "const": "source-bound-k-induction-v1"
+              "enum": [
+                "source-bound-k-induction-v1",
+                "source-bound-k-induction-v2"
+              ]
             }
           },
           "required": [
@@ -98,6 +101,9 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 100000000
+            },
+            "cone_reduction": {
+              "type": "boolean"
             }
           },
           "required": [
@@ -141,7 +147,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z0-9_$]*$",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_$]*(?:\\[-?(?:0|[1-9][0-9]*)\\])*(?:\\.[A-Za-z_][A-Za-z0-9_$]*(?:\\[-?(?:0|[1-9][0-9]*)\\])*)*$",
                 "maxLength": 256
               },
               "minItems": 0
@@ -181,6 +187,96 @@
                   "source",
                   "line",
                   "column"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "hierarchy": {
+              "type": "array",
+              "maxItems": 1024,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "module": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "object",
+                    "properties": {
+                      "source": {
+                        "type": "string"
+                      },
+                      "line": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "column": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "line",
+                      "column"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "path",
+                  "module",
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "clock_aliases": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_$]*(?:\\[-?(?:0|[1-9][0-9]*)\\])*(?:\\.[A-Za-z_][A-Za-z0-9_$]*(?:\\[-?(?:0|[1-9][0-9]*)\\])*)*$",
+                "maxLength": 256
+              }
+            },
+            "proof_cones": {
+              "type": "object",
+              "maxProperties": 32,
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "state_bits": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 16384
+                  },
+                  "states": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_$]*(?:\\[-?(?:0|[1-9][0-9]*)\\])*(?:\\.[A-Za-z_][A-Za-z0-9_$]*(?:\\[-?(?:0|[1-9][0-9]*)\\])*)*$",
+                      "maxLength": 256
+                    },
+                    "minItems": 0
+                  },
+                  "combinational_signals": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "ir_nodes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 32768
+                  }
+                },
+                "required": [
+                  "state_bits",
+                  "states",
+                  "combinational_signals",
+                  "ir_nodes"
                 ],
                 "additionalProperties": false
               }

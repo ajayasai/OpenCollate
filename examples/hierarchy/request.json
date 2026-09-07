@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "semantics": "two-valued-synchronous",
+  "files": ["design.sv"],
+  "top": "top",
+  "clock": "clk",
+  "reset": {"signal": "rst", "active": 1},
+  "depth": 6,
+  "induction": 4,
+  "properties": [
+    {
+      "id": "byte-transfer",
+      "source": "d",
+      "sink": "q",
+      "latency": 1,
+      "when": [{"signal": "en", "equals": 1, "lag": 1}]
+    },
+    {
+      "id": "lane-3-transfer",
+      "source": "lanes[3].ff.d",
+      "sink": "lanes[3].ff.q",
+      "latency": 1,
+      "when": [{"signal": "lanes[3].ff.en", "equals": 1, "lag": 1}]
+    }
+  ]
+}

@@ -172,3 +172,16 @@ and guard-witness replay; an arbitrary exception does not satisfy a negative exp
 All timings, dependency versions, certificate sizes and input digests are retained. This corpus
 is regular synthetic RTL, not a proprietary-tool comparison or general state-machine scaling
 result. See [proof certificates](../docs/proof-certificates.md) for semantics and trust boundaries.
+
+## Hierarchy and controller integration
+
+```console
+python -m benchmarks.hierarchy --distractors 128 --repeat 3 --json-output hierarchy.json
+python -m benchmarks.controllers --repeat 3 --json-output controllers.json
+```
+
+The hierarchy benchmark compares full and reduced Z3 checking on deliberately localized properties.
+The controller corpus has three positive and nine negative/incomplete source cases. It checks
+reduced/full outcomes and traces, full-model certificates, and exact rejection reasons; it never
+counts an arbitrary crash as a correct rejection. Timings are host-specific and exclude interpreter
+startup. No proprietary tool or production qualification is represented by these synthetic cases.

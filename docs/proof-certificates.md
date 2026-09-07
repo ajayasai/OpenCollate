@@ -163,3 +163,13 @@ Method/API references: [PySAT solver API](https://pysathq.github.io/docs/html/ap
 (RUP versus stronger RAT checking), and [Programming Z3](https://theory.stanford.edu/~nikolaj/programmingz3.html)
 (section 5.4, bounded checking and induction). The bit blaster and RUP kernel here are independent
 Python implementations of established methods, not a claimed new proof algorithm.
+
+## Hierarchy and controllers
+
+The receiver and producer now accept the documented elaborated hierarchy and controller subset
+through the shared typed frontend. `always_comb`, ordinary first-match `case` and integral enums
+are translated before CNF construction. The receiver always regenerates full-model obligations
+and verifies full-state guard witnesses; Z3 cone reduction is not part of this certificate format.
+Neither `verify-certificate` nor its controller/hierarchy imports needs a SAT/SMT solver.
+Certificates from the earlier flat frontend must be regenerated because the bound IR includes
+hierarchy and clock aliases. See [controller semantics](controller-verification.md).

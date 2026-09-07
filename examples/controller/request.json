@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "semantics": "two-valued-synchronous",
+  "files": [
+    "controller.sv"
+  ],
+  "top": "top",
+  "clock": "clk",
+  "depth": 6,
+  "induction": 3,
+  "reset": {
+    "signal": "rst",
+    "active": 1,
+    "cycles": 1
+  },
+  "properties": [
+    {
+      "id": "load",
+      "sink": "q",
+      "source": "d",
+      "latency": 1,
+      "when": [
+        {
+          "signal": "op",
+          "equals": 0,
+          "lag": 1
+        }
+      ]
+    }
+  ]
+}
