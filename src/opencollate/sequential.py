@@ -13,12 +13,13 @@ from pathlib import Path
 from typing import Any
 
 from opencollate.atomic_output import atomic_write_text
+from opencollate.sequential_cone import cone_summary, expand_trace, property_cone
 from opencollate.sequential_ir import SequentialError
 from opencollate.sequential_rtl import load_circuit
 from opencollate.sequential_smt import Budget, verify_property
 from opencollate.sequential_spec import SEMANTICS, integer, normalize, read_json, validate_signals
 
-ALGORITHM = "source-bound-k-induction-v1"
+ALGORITHM = "source-bound-k-induction-v2"
 
 
 def digest(value: Any) -> str:
@@ -40,11 +41,18 @@ def implementation_digest() -> str:
 
 
 def run_request(
-    request: dict[str, Any], *, root: Path, timeout_ms: int = 10000, resource_limit: int = 1000000
+    request: dict[str, Any],
+    *,
+    root: Path,
+    timeout_ms: int = 10000,
+    resource_limit: int = 1000000,
+    cone_reduction: bool = True,
 ) -> dict[str, Any]:
     spec = normalize(request)
     integer(timeout_ms, 1, 120000, "timeout_ms")
     integer(resource_limit, 1, 100000000, "resource_limit")
+    if type(cone_reduction) is not bool:
+        raise SequentialError("cone_reduction must be a boolean")
     # Binding depends on exact source bytes, assumptions and lowering, not just formula text.
     c = load_circuit(spec["files"], root=root, top=spec["top"], clock=spec["clock"])
     validate_signals(c, spec)
@@ -57,12 +65,17 @@ def run_request(
         "algorithm": ALGORITHM,
     }
     results: list[dict[str, Any]] = []
+    cones: dict[str, Any] = {}
     backend = None
     try:
         b = Budget(timeout_ms, resource_limit)
         backend = b.z3.get_version_string()
         for prop in spec["properties"]:
-            results.append(verify_property(c, spec, prop, b))
+            b.remaining()
+            selected = property_cone(c, prop) if cone_reduction else c
+            cones[prop["id"]] = cone_summary(selected)
+            result = verify_property(selected, spec, prop, b)
+            results.append(expand_trace(c, spec, prop, result, b))
     except Exception as exc:
         # Includes native/backend import failures. User interrupts still propagate.
         for prop in spec["properties"][len(results) :]:
@@ -87,15 +100,22 @@ def run_request(
         "binding": binding,
         "status": ("proven", "counterexample", "inconclusive")[code],
         "exit_code": code,
-        "limits": {"timeout_ms": timeout_ms, "resource_limit": resource_limit},
+        "limits": {
+            "timeout_ms": timeout_ms,
+            "resource_limit": resource_limit,
+            "cone_reduction": cone_reduction,
+        },
         "backend": {"name": "z3", "version": backend},
         "model": {
-            "signals": len(c.signals) - 1,
+            "signals": len(c.signals) - len(c.clock_aliases),
             "state_bits": sum(c.signals[n][0] for n in c.next_state),
             "states": sorted(c.next_state),
             "inputs": sorted(c.inputs),
             "ir_nodes": len(c.nodes),
             "locations": c.locations,
+            "hierarchy": c.hierarchy,
+            "clock_aliases": c.clock_aliases,
+            "proof_cones": cones,
         },
         "results": results,
     }
@@ -110,6 +130,7 @@ def replay(
     root: Path,
     timeout_ms: int = 10000,
     resource_limit: int = 1000000,
+    cone_reduction: bool = True,
 ) -> dict[str, Any]:
     required = {
         "schema_version",
@@ -134,7 +155,13 @@ def replay(
         {k: v for k, v in receipt.items() if k != "receipt_sha256"}
     ):
         raise SequentialError("sequential receipt content digest mismatch")
-    fresh = run_request(request, root=root, timeout_ms=timeout_ms, resource_limit=resource_limit)
+    fresh = run_request(
+        request,
+        root=root,
+        timeout_ms=timeout_ms,
+        resource_limit=resource_limit,
+        cone_reduction=cone_reduction,
+    )
     if digest(fresh["binding"]) != digest(receipt["binding"]):
         raise SequentialError(
             "source, request, frontend, IR, or implementation changed since verification"
@@ -152,6 +179,8 @@ def replay(
         or receipt["status"] != fresh["status"]
         or digest(stable(receipt["results"])) != digest(stable(fresh["results"]))
         or digest(receipt["model"]) != digest(fresh["model"])
+        or not isinstance(receipt["limits"], dict)
+        or receipt["limits"].get("cone_reduction") is not cone_reduction
     ):
         raise SequentialError("saved result disagrees with source-based reverification")
     return fresh
@@ -169,6 +198,11 @@ def add_commands(subparsers: Any) -> None:
             sub.add_argument("receipt", type=Path)
         sub.add_argument("--timeout-ms", type=int, default=10000)
         sub.add_argument("--resource-limit", type=int, default=1000000)
+        sub.add_argument(
+            "--no-cone",
+            action="store_true",
+            help="verify the unreduced model for differential validation",
+        )
         sub.add_argument("-o", "--output", type=Path)
         sub.set_defaults(handler=command_handler)
     from opencollate.sequential_certificate import add_commands as add_certificates
@@ -196,6 +230,7 @@ def command_handler(args: argparse.Namespace) -> int:
             "root": request_path.parent,
             "timeout_ms": args.timeout_ms,
             "resource_limit": args.resource_limit,
+            "cone_reduction": not args.no_cone,
         }
         result = (
             replay(request, read_json(args.receipt), **options)

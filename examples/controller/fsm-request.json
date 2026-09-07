@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "semantics": "two-valued-synchronous",
+  "files": [
+    "fsm.sv"
+  ],
+  "top": "top",
+  "clock": "clk",
+  "depth": 6,
+  "induction": 3,
+  "reset": {
+    "signal": "rst",
+    "active": 1,
+    "cycles": 1
+  },
+  "properties": [
+    {
+      "id": "idle",
+      "sink": "busy",
+      "equals": 0,
+      "when": [
+        {
+          "signal": "state",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "id": "work",
+      "sink": "busy",
+      "equals": 1,
+      "when": [
+        {
+          "signal": "state",
+          "equals": 1
+        }
+      ]
+    }
+  ]
+}

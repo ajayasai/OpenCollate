@@ -15,6 +15,12 @@ from typing import Any
 from opencollate.sequential_ir import Circuit, SequentialError
 
 IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_$]*\Z", re.ASCII)
+# Top-relative elaborated names, including constant generate/instance indices.
+SIGNAL_PATH_PATTERN = (
+    r"[A-Za-z_][A-Za-z0-9_$]*(?:\[-?(?:0|[1-9][0-9]*)\])*"
+    r"(?:\.[A-Za-z_][A-Za-z0-9_$]*(?:\[-?(?:0|[1-9][0-9]*)\])*)*"
+)
+SIGNAL_PATH = re.compile(SIGNAL_PATH_PATTERN + r"\Z", re.ASCII)
 BINARY = frozenset(
     {
         "Add",
@@ -64,11 +70,26 @@ def _integer(value: Any) -> int:
     return int(raw)
 
 
+def _constant(expression: Any) -> int:
+    # Implicit instance-array selectors can be literal AST nodes whose cached
+    # .constant has not been populated. Never reinterpret a dynamic expression.
+    if expression.constant is not None:
+        return _integer(expression.constant)
+    if expression.kind.name in {"IntegerLiteral", "UnbasedUnsizedIntegerLiteral"}:
+        return _integer(expression.value)
+    if expression.kind.name == "NamedValue" and expression.symbol.kind.name == "Parameter":
+        return _integer(expression.symbol.value)
+    raise SequentialError("dynamic bit/part selects are unsupported")
+
+
 class _Lowerer:
     def __init__(self, circuit: Circuit, source_manager: Any) -> None:
         self.c = circuit
         self.sm = source_manager
         self.work = 0
+        self.clock_aliases = {circuit.clock}
+        self.blocking_environment: dict[str, int] | None = None
+        self.blocking_writes: set[str] = set()
 
     def bounded(self, depth: int) -> None:
         self.work += 1
@@ -76,12 +97,15 @@ class _Lowerer:
             raise SequentialError("RTL expression/statement depth or work limit exceeded")
 
     def shape(self, dtype: Any, *, declaration: bool = False) -> tuple[int, bool]:
-        if not dtype.isSimpleBitVector or not 1 <= int(dtype.bitWidth) <= 256:
+        storage = dtype.canonicalType
+        if storage.isEnum:
+            storage = storage.baseType
+        if not storage.isSimpleBitVector or not 1 <= int(dtype.bitWidth) <= 256:
             raise SequentialError(
                 "only scalar or simple packed bit-vectors of 1..256 bits are supported"
             )
-        if declaration and dtype.isPackedArray:
-            r = dtype.getBitVectorRange()
+        if declaration and storage.isPackedArray:
+            r = storage.getBitVectorRange()
             if r.right != 0 or r.left != int(dtype.bitWidth) - 1:
                 raise SequentialError("packed ranges must be descending [width-1:0]")
         return int(dtype.bitWidth), bool(dtype.isSigned)
@@ -94,6 +118,44 @@ class _Lowerer:
             "column": int(self.sm.getColumnNumber(loc)),
         }
 
+    def symbol_name(self, symbol: Any) -> str:
+        """Use the elaborated instance, never a shared definition/local spelling."""
+        prefix = self.c.top + "."
+        path = str(symbol.hierarchicalPath)
+        name = path[len(prefix) :] if path.startswith(prefix) else ""
+        if (
+            not IDENTIFIER.fullmatch(symbol.name)
+            or not SIGNAL_PATH.fullmatch(name)
+            or len(name) > 256
+        ):
+            raise SequentialError("signal must have a bounded, top-relative ASCII path")
+        return name
+
+    def reference(self, symbol: Any) -> int:
+        name = self.symbol_name(symbol)
+        if name in self.clock_aliases:
+            raise SequentialError(f"clock-as-data is unsupported: {name}")
+        if self.blocking_environment is not None and name in self.blocking_writes:
+            if name not in self.blocking_environment:
+                raise SequentialError(f"combinational read before definite assignment: {name}")
+            return self.blocking_environment[name]
+        return self.c.ref(name)
+
+    def port_output(self, expr: Any, source: str, depth: int = 0) -> int:
+        """Substitute the child's value in slang's typed output conversion."""
+        self.bounded(depth)
+        width, signed = self.shape(expr.type)
+        if expr.kind.name == "EmptyArgument":
+            if (width, signed) != self.c.signals[source]:
+                raise SequentialError("output port placeholder has inconsistent type")
+            if source in self.clock_aliases:
+                raise SequentialError(f"clock-as-data is unsupported: {source}")
+            return self.c.ref(source)
+        if expr.kind.name == "Conversion":
+            root = self.port_output(expr.operand, source, depth + 1)
+            return self.c.add("cast", width, signed, (root,))
+        raise SequentialError("unsupported elaborated output port conversion")
+
     def expression(self, e: Any, depth: int = 0) -> int:
         self.bounded(depth)
         width, signed = self.shape(e.type)
@@ -101,12 +163,12 @@ class _Lowerer:
         kind = e.kind.name
         if kind in {"IntegerLiteral", "UnbasedUnsizedIntegerLiteral"}:
             return self.c.add("const", width, signed, value=_integer(e.value) & ((1 << width) - 1))
-        if kind == "NamedValue":
+        if kind in {"NamedValue", "HierarchicalValue"}:
             if e.symbol.kind.name in {"Parameter", "EnumValue"}:
                 return self.c.add(
                     "const", width, signed, value=_integer(e.symbol.value) & ((1 << width) - 1)
                 )
-            return self.c.ref(e.symbol.name)
+            return self.reference(e.symbol)
         if kind == "Conversion":
             return self.c.add("cast", width, signed, (self.expression(e.operand, depth + 1),))
         if kind == "UnaryOp" and e.op.name in UNARY:
@@ -134,17 +196,11 @@ class _Lowerer:
         if kind in {"ElementSelect", "RangeSelect"}:
             src = self.expression(e.value, depth + 1)
             if kind == "ElementSelect":
-                if e.selector.constant is None:
-                    raise SequentialError("dynamic bit selects are unsupported")
-                lo = hi = _integer(e.selector.constant)
+                lo = hi = _constant(e.selector)
             else:
-                if (
-                    e.selectionKind.name != "Simple"
-                    or e.left.constant is None
-                    or e.right.constant is None
-                ):
+                if e.selectionKind.name != "Simple":
                     raise SequentialError("only constant descending part selects are supported")
-                hi, lo = _integer(e.left.constant), _integer(e.right.constant)
+                hi, lo = _constant(e.left), _constant(e.right)
             bounds = e.value.type.getBitVectorRange()
             if bounds.left < bounds.right:
                 raise SequentialError("ascending selection sources are unsupported")
@@ -157,12 +213,15 @@ class _Lowerer:
     def assignment(self, e: Any, *, sequential: bool) -> tuple[str, int]:
         if e.kind.name != "Assignment" or e.isCompound or e.timingControl is not None:
             raise SequentialError("only simple untimed whole-signal assignments are supported")
-        if bool(e.isNonBlocking) != sequential or e.left.kind.name != "NamedValue":
+        if bool(e.isNonBlocking) != sequential or e.left.kind.name not in {
+            "NamedValue",
+            "HierarchicalValue",
+        }:
             raise SequentialError(
                 "clocked assignments must be nonblocking and target a whole signal"
             )
-        name = str(e.left.symbol.name)
-        if name in self.c.inputs or name == self.c.clock or name not in self.c.signals:
+        name = self.symbol_name(e.left.symbol)
+        if name in self.c.inputs or name in self.clock_aliases or name not in self.c.signals:
             raise SequentialError(f"invalid driven signal: {name}")
         root = self.expression(e.right)
         if self.c.nodes[root].width != self.c.signals[name][0]:
@@ -171,45 +230,10 @@ class _Lowerer:
         return name, root
 
     def statement(self, stmt: Any, pending: dict[str, int], depth: int = 0) -> dict[str, int]:
+        from opencollate.sequential_procedural import Procedure
+
         self.bounded(depth)
-        kind = stmt.kind.name
-        if kind == "Empty":
-            return pending
-        if kind == "Block":
-            if stmt.blockKind.name != "Sequential":
-                raise SequentialError("parallel statement blocks are unsupported")
-            return self.statement(stmt.body, pending, depth + 1)
-        if kind == "List":
-            for item in stmt.list:
-                pending = self.statement(item, pending, depth + 1)
-            return pending
-        if kind == "ExpressionStatement":
-            name, root = self.assignment(stmt.expr, sequential=True)
-            return {**pending, name: root}
-        if kind == "Conditional":
-            if (
-                len(stmt.conditions) != 1
-                or stmt.conditions[0].pattern is not None
-                or stmt.check.name != "None_"
-            ):
-                raise SequentialError("only ordinary if/else guards are supported")
-            cond = self.expression(stmt.conditions[0].expr)
-            yes = self.statement(stmt.ifTrue, dict(pending), depth + 1)
-            no = (
-                self.statement(stmt.ifFalse, dict(pending), depth + 1)
-                if stmt.ifFalse is not None
-                else dict(pending)
-            )
-            out = dict(pending)
-            for name in sorted(set(yes) | set(no)):
-                a = yes.get(name)
-                b = no.get(name)
-                a = self.c.ref(name) if a is None else a
-                b = self.c.ref(name) if b is None else b
-                width, signed = self.c.signals[name]
-                out[name] = a if a == b else self.c.add("mux", width, signed, (cond, a, b))
-            return out
-        raise SequentialError(f"unsupported clocked statement: {kind}")
+        return Procedure(self, sequential=True).run(stmt, pending)
 
     def add_driver(self, name: str, root: int, *, sequential: bool) -> None:
         if name in self.c.combinational or name in self.c.next_state:
@@ -219,7 +243,7 @@ class _Lowerer:
 
 
 def load_circuit(files: list[str], *, root: Path, top: str, clock: str) -> Circuit:
-    """Load exact source bytes and lower the selected flat module, or fail."""
+    """Load exact source bytes and lower the selected elaborated hierarchy, or fail."""
     s = importlib.import_module("pyslang")
     circuit = Circuit(top, clock, frontend=str(s.__version__))
     manager = s.SourceManager()
@@ -258,73 +282,8 @@ def load_circuit(files: list[str], *, root: Path, top: str, clock: str) -> Circu
         )
     if len(design.topInstances) != 1 or design.topInstances[0].name != top:
         raise SequentialError("selected top must elaborate to exactly one module")
-    body = design.topInstances[0].body
-    lower = _Lowerer(circuit, manager)
-    members = list(body)
-    if len(members) > 4096:
-        raise SequentialError("top module exceeds 4096 members")
-    for m in members:
-        kind = m.kind.name
-        if kind in {"Variable", "Net"}:
-            if not IDENTIFIER.fullmatch(m.name):
-                raise SequentialError("escaped/non-ASCII signal names are unsupported")
-            circuit.signals[m.name] = lower.shape(m.type, declaration=True)
-            circuit.locations[m.name] = lower.location(m)
-            if m.initializer is not None:
-                raise SequentialError(
-                    "declaration initializers are unsupported; use explicit assignments/reset"
-                )
-            if kind == "Net" and (
-                m.netType.netKind.name != "Wire"
-                or m.delay is not None
-                or any(x is not None for x in m.driveStrength)
-            ):
-                raise SequentialError("only undelayed unstrengthened wire nets are supported")
-        elif kind not in {
-            "Port",
-            "Parameter",
-            "ContinuousAssign",
-            "ProceduralBlock",
-            "EmptyMember",
-        }:
-            raise SequentialError(f"unsupported module member: {kind}; flatten hierarchy first")
-    for port in body.portList:
-        if port.internalSymbol is None or port.name != port.internalSymbol.name:
-            raise SequentialError("complex port expressions are unsupported")
-        if port.direction.name == "In":
-            circuit.inputs.append(port.name)
-        elif port.direction.name == "Out":
-            circuit.outputs.append(port.name)
-        else:
-            raise SequentialError("inout/ref ports are unsupported")
-    if clock not in circuit.inputs or circuit.signals[clock][0] != 1:
-        raise SequentialError("clock must be a scalar input")
-    circuit.inputs.remove(clock)
-    for m in members:
-        if m.kind.name == "ContinuousAssign":
-            if m.delay is not None or any(x is not None for x in m.driveStrength):
-                raise SequentialError("continuous assignment delays/strengths are unsupported")
-            name, expr = lower.assignment(m.assignment, sequential=False)
-            lower.add_driver(name, expr, sequential=False)
-        if m.kind.name == "ProceduralBlock":
-            if m.procedureKind.name not in {"AlwaysFF", "Always"} or m.body.kind.name != "Timed":
-                raise SequentialError(
-                    "only positive-edge clocked always/always_ff blocks are supported"
-                )
-            event = m.body.timing
-            if (
-                event.kind.name != "SignalEvent"
-                or event.edge.name != "PosEdge"
-                or event.iffCondition is not None
-                or event.expr.kind.name != "NamedValue"
-                or event.expr.symbol.name != clock
-            ):
-                raise SequentialError(
-                    "multiple clocks, asynchronous resets, gated clocks, "
-                    "and event qualifiers are unsupported"
-                )
-            pending = lower.statement(m.body.stmt, {})
-            for name, expr in sorted(pending.items()):
-                lower.add_driver(name, expr, sequential=True)
+    from opencollate.sequential_hierarchy import lower_hierarchy
+
+    lower_hierarchy(design.topInstances[0], _Lowerer(circuit, manager))
     circuit.finalize()
     return circuit

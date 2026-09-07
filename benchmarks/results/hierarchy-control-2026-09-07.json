@@ -1,0 +1,51 @@
+{
+  "environment": {
+    "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+    "python": "3.13.5"
+  },
+  "full_model": {
+    "instances": 3,
+    "ir_nodes": 12,
+    "state_bits": 16
+  },
+  "inputs": {
+    "distractors": 0,
+    "repeat": 3,
+    "source_sha256": "730a6b010d05abe149bb188d4f88fa3088afa0dd85d9edbed48554591c9a754f"
+  },
+  "median_seconds": {
+    "cone": 0.016128482999874905,
+    "full": 0.016838588999917192
+  },
+  "property_cone": {
+    "combinational_signals": 6,
+    "ir_nodes": 12,
+    "state_bits": 16,
+    "states": [
+      "a.q",
+      "b.q"
+    ]
+  },
+  "schema_version": 1,
+  "scope": "synthetic source-file module hierarchy; full frontend/IR/solver timing excluding interpreter startup; no vendor or production-SoC comparison",
+  "seconds": {
+    "cone": [
+      0.016404418999854897,
+      0.015770525999869278,
+      0.016128482999874905
+    ],
+    "full": [
+      0.020716772000014316,
+      0.016268629000023793,
+      0.016838588999917192
+    ]
+  },
+  "speedup": 1.0440280713349046,
+  "status": "pass",
+  "suite": "opencollate-hierarchy-cone",
+  "verification": {
+    "clean_results_identical": true,
+    "mutant_first_failure": 3,
+    "mutant_results_and_full_traces_identical": true
+  }
+}

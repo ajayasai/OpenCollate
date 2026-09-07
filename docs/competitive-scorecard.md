@@ -48,7 +48,7 @@ commercial importance of the workflow; it does not constitute a benchmark result
 ## Claims OpenCollate does not make
 
 OpenCollate does not claim general formal exhaustiveness or unrestricted temporal/conditional
-connectivity. Development commands cover a strict source-bound, flat, single-clock two-valued
+connectivity. Development commands cover a strict source-bound, hierarchical, single-clock two-valued
 subset; [proof certificates](proof-certificates.md) add independently checked RUP evidence for
 that subset, not full SystemVerilog/UPF/SDC interpretation, design generation, million-register scale, functional
 safety certification, or tapeout signoff. Cadence, Siemens, Synopsys, Defacto, Arteris, and
@@ -86,3 +86,13 @@ This is an implemented auditability capability, not a claim that proprietary too
 export, that the Python kernel is mechanically verified, or that all formal/SoC flows are covered.
 The existing `check` and Z3 receipt paths are not silently upgraded to certified results. Consult
 the dedicated [scope and validation record](proof-certificates.md) before making comparisons.
+
+## Hierarchical controller integration — 2026-09-07
+
+The previously separate hierarchy/cone upgrade is integrated with the certificate-capable base.
+`always_comb`, plain first-match `case`, and packed integral enum controllers now use typed AST
+lowering, checked blocking environments and all-path assignment checks. The RUP receiver still
+rebuilds full-design obligations; it does not trust a saved reduced-model verdict. Explicit
+source mutants and independent Icarus traces test controller semantics and failure handling.
+This is additional supported syntax and auditable evidence, not a claim to beat proprietary
+formal engines or qualify production SoCs. See [controller validation](controller-verification.md).

@@ -1,0 +1,551 @@
+{
+  "cases": [
+    {
+      "certificate_bytes": [
+        2750,
+        2750,
+        2750
+      ],
+      "certificate_outcomes": [
+        "certificate-verified",
+        "certificate-verified",
+        "certificate-verified"
+      ],
+      "certificate_sha256": [
+        "0e1db2c862c31936863bd836dca01f694ddc86ce64ec670739bdc3a373646e01",
+        "0e1db2c862c31936863bd836dca01f694ddc86ce64ec670739bdc3a373646e01",
+        "0e1db2c862c31936863bd836dca01f694ddc86ce64ec670739bdc3a373646e01"
+      ],
+      "certificate_verification_seconds": [
+        0.024279897000042183,
+        0.02865741599998728,
+        0.03168849000007867
+      ],
+      "check_seconds": [
+        0.09830961900001967,
+        0.029966333000174927,
+        0.02800634599998375
+      ],
+      "expected": "proven",
+      "median_check_seconds": 0.029966333000174927,
+      "model": {
+        "proof_cones": {
+          "load": {
+            "combinational_signals": 5,
+            "ir_nodes": 40,
+            "state_bits": 8,
+            "states": [
+              "unit.q"
+            ]
+          }
+        },
+        "state_bits": 8
+      },
+      "name": "hierarchical-load",
+      "outcomes": [
+        "proven",
+        "proven",
+        "proven"
+      ],
+      "pass": true,
+      "reduced_full_outcomes_and_traces_match": [
+        true,
+        true,
+        true
+      ],
+      "rejection_reason": null,
+      "request_sha256": "699f84d60aa4c004f5068acb9003fc8aa9d605c0010353cde5312d291d586f28",
+      "source_sha256": "d52a3d89fc0b1394b44878d056993ee125a37929386750ec63caa84f174cdb1b"
+    },
+    {
+      "certificate_bytes": [
+        10055,
+        10055,
+        10055
+      ],
+      "certificate_outcomes": [
+        "certificate-verified",
+        "certificate-verified",
+        "certificate-verified"
+      ],
+      "certificate_sha256": [
+        "a54afc32a9748a1dc3855f04172b1d7f20ebe70b343454977cff7a1ca18613aa",
+        "a54afc32a9748a1dc3855f04172b1d7f20ebe70b343454977cff7a1ca18613aa",
+        "a54afc32a9748a1dc3855f04172b1d7f20ebe70b343454977cff7a1ca18613aa"
+      ],
+      "certificate_verification_seconds": [
+        0.20782796900016365,
+        0.1736633810000967,
+        0.1433665080000992
+      ],
+      "check_seconds": [
+        0.1261823130000721,
+        0.13175058999991052,
+        0.12000456099985968
+      ],
+      "expected": "proven",
+      "median_check_seconds": 0.1261823130000721,
+      "model": {
+        "proof_cones": {
+          "load": {
+            "combinational_signals": 6,
+            "ir_nodes": 41,
+            "state_bits": 8,
+            "states": [
+              "channels[0].bank.q"
+            ]
+          }
+        },
+        "state_bits": 128
+      },
+      "name": "sixteen-controller-bank",
+      "outcomes": [
+        "proven",
+        "proven",
+        "proven"
+      ],
+      "pass": true,
+      "reduced_full_outcomes_and_traces_match": [
+        true,
+        true,
+        true
+      ],
+      "rejection_reason": null,
+      "request_sha256": "699f84d60aa4c004f5068acb9003fc8aa9d605c0010353cde5312d291d586f28",
+      "source_sha256": "7f605a5057ee836b87db10b32d51705003265db39d6dcbf71d74309b9e778492"
+    },
+    {
+      "certificate_bytes": [
+        1610,
+        1610,
+        1610
+      ],
+      "certificate_outcomes": [
+        "certificate-verified",
+        "certificate-verified",
+        "certificate-verified"
+      ],
+      "certificate_sha256": [
+        "1793853dd555e087807d1460d19faad0f7418f682d643c23d2605e676e7125ee",
+        "1793853dd555e087807d1460d19faad0f7418f682d643c23d2605e676e7125ee",
+        "1793853dd555e087807d1460d19faad0f7418f682d643c23d2605e676e7125ee"
+      ],
+      "certificate_verification_seconds": [
+        0.006935379999958968,
+        0.0068755920001422055,
+        0.0072515370000019175
+      ],
+      "check_seconds": [
+        0.030641827000181365,
+        0.029137931000150274,
+        0.029759766999859494
+      ],
+      "expected": "proven",
+      "median_check_seconds": 0.029759766999859494,
+      "model": {
+        "proof_cones": {
+          "idle": {
+            "combinational_signals": 2,
+            "ir_nodes": 29,
+            "state_bits": 2,
+            "states": [
+              "state"
+            ]
+          },
+          "work": {
+            "combinational_signals": 2,
+            "ir_nodes": 29,
+            "state_bits": 2,
+            "states": [
+              "state"
+            ]
+          }
+        },
+        "state_bits": 2
+      },
+      "name": "enumerated-fsm",
+      "outcomes": [
+        "proven",
+        "proven",
+        "proven"
+      ],
+      "pass": true,
+      "reduced_full_outcomes_and_traces_match": [
+        true,
+        true,
+        true
+      ],
+      "rejection_reason": null,
+      "request_sha256": "0c74d97524898c625b956bb2656e6fe8c4e66c9bcf3236f51f06c92bf3add198",
+      "source_sha256": "792126d3ba41dfc2555d51c263b93c71629d3d83b4b6378822ec353d6f182c53"
+    },
+    {
+      "certificate_bytes": [],
+      "certificate_outcomes": [
+        "expected-rejection",
+        "expected-rejection",
+        "expected-rejection"
+      ],
+      "certificate_sha256": [],
+      "certificate_verification_seconds": [],
+      "check_seconds": [
+        0.016237560000035955,
+        0.018002159999923606,
+        0.017884496000078798
+      ],
+      "expected": "counterexample",
+      "median_check_seconds": 0.017884496000078798,
+      "model": {
+        "proof_cones": {
+          "load": {
+            "combinational_signals": 5,
+            "ir_nodes": 41,
+            "state_bits": 8,
+            "states": [
+              "unit.q"
+            ]
+          }
+        },
+        "state_bits": 8
+      },
+      "name": "inverted-load",
+      "outcomes": [
+        "counterexample",
+        "counterexample",
+        "counterexample"
+      ],
+      "pass": true,
+      "reduced_full_outcomes_and_traces_match": [
+        true,
+        true,
+        true
+      ],
+      "rejection_reason": "property load: base counterexample; no certificate issued",
+      "request_sha256": "699f84d60aa4c004f5068acb9003fc8aa9d605c0010353cde5312d291d586f28",
+      "source_sha256": "17b2a8fe15fce6f67c50a4110f6a6be57c09ff1adc6006f448935bda1af13d07"
+    },
+    {
+      "certificate_bytes": [],
+      "certificate_outcomes": [
+        "expected-rejection",
+        "expected-rejection",
+        "expected-rejection"
+      ],
+      "certificate_sha256": [],
+      "certificate_verification_seconds": [],
+      "check_seconds": [
+        0.028002297000057297,
+        0.026380487000096764,
+        0.0166888740000104
+      ],
+      "expected": "counterexample",
+      "median_check_seconds": 0.026380487000096764,
+      "model": {
+        "proof_cones": {
+          "load": {
+            "combinational_signals": 5,
+            "ir_nodes": 39,
+            "state_bits": 8,
+            "states": [
+              "unit.q"
+            ]
+          }
+        },
+        "state_bits": 8
+      },
+      "name": "wrong-mode",
+      "outcomes": [
+        "counterexample",
+        "counterexample",
+        "counterexample"
+      ],
+      "pass": true,
+      "reduced_full_outcomes_and_traces_match": [
+        true,
+        true,
+        true
+      ],
+      "rejection_reason": "property load: base counterexample; no certificate issued",
+      "request_sha256": "699f84d60aa4c004f5068acb9003fc8aa9d605c0010353cde5312d291d586f28",
+      "source_sha256": "cd94e099bdfa51822b33dd5f23002b6ba2268cdb9ef9c85b1153f47643841777"
+    },
+    {
+      "certificate_bytes": [],
+      "certificate_outcomes": [
+        "expected-rejection",
+        "expected-rejection",
+        "expected-rejection"
+      ],
+      "certificate_sha256": [],
+      "certificate_verification_seconds": [],
+      "check_seconds": [
+        0.01889462500002992,
+        0.018534964999844306,
+        0.020042165999939243
+      ],
+      "expected": "counterexample",
+      "median_check_seconds": 0.01889462500002992,
+      "model": {
+        "proof_cones": {
+          "load": {
+            "combinational_signals": 5,
+            "ir_nodes": 44,
+            "state_bits": 8,
+            "states": [
+              "unit.q"
+            ]
+          }
+        },
+        "state_bits": 8
+      },
+      "name": "first-match-priority",
+      "outcomes": [
+        "counterexample",
+        "counterexample",
+        "counterexample"
+      ],
+      "pass": true,
+      "reduced_full_outcomes_and_traces_match": [
+        true,
+        true,
+        true
+      ],
+      "rejection_reason": "property load: base counterexample; no certificate issued",
+      "request_sha256": "699f84d60aa4c004f5068acb9003fc8aa9d605c0010353cde5312d291d586f28",
+      "source_sha256": "6c6f21b577c0fe14226f06660b217c2ed1ab76e8a15075644f2b377efd92276a"
+    },
+    {
+      "certificate_bytes": [],
+      "certificate_outcomes": [
+        "expected-rejection",
+        "expected-rejection",
+        "expected-rejection"
+      ],
+      "certificate_sha256": [],
+      "certificate_verification_seconds": [],
+      "check_seconds": [
+        0.005015860999947108,
+        0.004722429999901578,
+        0.004994899999928748
+      ],
+      "expected": "unsupported",
+      "median_check_seconds": 0.004994899999928748,
+      "model": null,
+      "name": "possible-latch",
+      "outcomes": [
+        "unsupported",
+        "unsupported",
+        "unsupported"
+      ],
+      "pass": true,
+      "reduced_full_outcomes_and_traces_match": [
+        true,
+        true,
+        true
+      ],
+      "rejection_reason": "incomplete combinational assignment (possible latch): unit.n",
+      "request_sha256": "699f84d60aa4c004f5068acb9003fc8aa9d605c0010353cde5312d291d586f28",
+      "source_sha256": "6361f6e16bfa76ae95b3edbb9cef26b696f31417f4e36a1290266514ab55af30"
+    },
+    {
+      "certificate_bytes": [],
+      "certificate_outcomes": [
+        "expected-rejection",
+        "expected-rejection",
+        "expected-rejection"
+      ],
+      "certificate_sha256": [],
+      "certificate_verification_seconds": [],
+      "check_seconds": [
+        0.004292805999966731,
+        0.004174861999899804,
+        0.004258526000057827
+      ],
+      "expected": "unsupported",
+      "median_check_seconds": 0.004258526000057827,
+      "model": null,
+      "name": "read-before-write",
+      "outcomes": [
+        "unsupported",
+        "unsupported",
+        "unsupported"
+      ],
+      "pass": true,
+      "reduced_full_outcomes_and_traces_match": [
+        true,
+        true,
+        true
+      ],
+      "rejection_reason": "combinational read before definite assignment: unit.n",
+      "request_sha256": "699f84d60aa4c004f5068acb9003fc8aa9d605c0010353cde5312d291d586f28",
+      "source_sha256": "2e5417bc4bcd6bef411d05744d97aab81b00550cdecf570fd075847eeef72fbc"
+    },
+    {
+      "certificate_bytes": [],
+      "certificate_outcomes": [
+        "expected-rejection",
+        "expected-rejection",
+        "expected-rejection"
+      ],
+      "certificate_sha256": [],
+      "certificate_verification_seconds": [],
+      "check_seconds": [
+        0.003627835999850504,
+        0.003665332000082344,
+        0.0036659719999079243
+      ],
+      "expected": "unsupported",
+      "median_check_seconds": 0.003665332000082344,
+      "model": null,
+      "name": "wildcard-case",
+      "outcomes": [
+        "unsupported",
+        "unsupported",
+        "unsupported"
+      ],
+      "pass": true,
+      "reduced_full_outcomes_and_traces_match": [
+        true,
+        true,
+        true
+      ],
+      "rejection_reason": "only ordinary case is supported; no wildcard/unique/priority",
+      "request_sha256": "699f84d60aa4c004f5068acb9003fc8aa9d605c0010353cde5312d291d586f28",
+      "source_sha256": "d966886a3496c97aef282b70692831bccf5c7b1fc6e53aea9619c6a3b87b46c3"
+    },
+    {
+      "certificate_bytes": [],
+      "certificate_outcomes": [
+        "expected-rejection",
+        "expected-rejection",
+        "expected-rejection"
+      ],
+      "certificate_sha256": [],
+      "certificate_verification_seconds": [],
+      "check_seconds": [
+        0.004996613999992405,
+        0.004720937000001868,
+        0.004983454000011989
+      ],
+      "expected": "unsupported",
+      "median_check_seconds": 0.004983454000011989,
+      "model": null,
+      "name": "blocking-clocked-update",
+      "outcomes": [
+        "unsupported",
+        "unsupported",
+        "unsupported"
+      ],
+      "pass": true,
+      "reduced_full_outcomes_and_traces_match": [
+        true,
+        true,
+        true
+      ],
+      "rejection_reason": "procedural assignments must be untimed whole-signal nonblocking assignments",
+      "request_sha256": "699f84d60aa4c004f5068acb9003fc8aa9d605c0010353cde5312d291d586f28",
+      "source_sha256": "5f9708e96fa705318ccf939fdfe1d2fdea4ea1be5af3b626e8e5d666c9aeb58e"
+    },
+    {
+      "certificate_bytes": [],
+      "certificate_outcomes": [
+        "expected-rejection",
+        "expected-rejection",
+        "expected-rejection"
+      ],
+      "certificate_sha256": [],
+      "certificate_verification_seconds": [],
+      "check_seconds": [
+        0.021668481999995493,
+        0.01927745800003322,
+        0.023241529999950217
+      ],
+      "expected": "uncovered",
+      "median_check_seconds": 0.021668481999995493,
+      "model": {
+        "proof_cones": {
+          "load": {
+            "combinational_signals": 5,
+            "ir_nodes": 40,
+            "state_bits": 8,
+            "states": [
+              "unit.q"
+            ]
+          }
+        },
+        "state_bits": 8
+      },
+      "name": "guard-uncovered",
+      "outcomes": [
+        "uncovered",
+        "uncovered",
+        "uncovered"
+      ],
+      "pass": true,
+      "reduced_full_outcomes_and_traces_match": [
+        true,
+        true,
+        true
+      ],
+      "rejection_reason": "property load: guard is uncovered within the bound",
+      "request_sha256": "961ef7b2ede94f8d4172c082f9a7eca77bc09830e8692ca6cff374ecf076f714",
+      "source_sha256": "d52a3d89fc0b1394b44878d056993ee125a37929386750ec63caa84f174cdb1b"
+    },
+    {
+      "certificate_bytes": [],
+      "certificate_outcomes": [
+        "expected-rejection",
+        "expected-rejection",
+        "expected-rejection"
+      ],
+      "certificate_sha256": [],
+      "certificate_verification_seconds": [],
+      "check_seconds": [
+        0.025394262999952844,
+        0.025077206000105434,
+        0.024210228000129064
+      ],
+      "expected": "bounded",
+      "median_check_seconds": 0.025077206000105434,
+      "model": {
+        "proof_cones": {
+          "load": {
+            "combinational_signals": 5,
+            "ir_nodes": 40,
+            "state_bits": 8,
+            "states": [
+              "unit.q"
+            ]
+          }
+        },
+        "state_bits": 8
+      },
+      "name": "bounded-is-not-proof",
+      "outcomes": [
+        "bounded",
+        "bounded",
+        "bounded"
+      ],
+      "pass": true,
+      "reduced_full_outcomes_and_traces_match": [
+        true,
+        true,
+        true
+      ],
+      "rejection_reason": "property load: insufficient induction/base depth",
+      "request_sha256": "703b5218303772f594527d530bb0076d4a32089ca24fabd1b6709072d81428c3",
+      "source_sha256": "d52a3d89fc0b1394b44878d056993ee125a37929386750ec63caa84f174cdb1b"
+    }
+  ],
+  "dependencies": {
+    "pyslang": "11.0.0",
+    "python-sat": "1.9.dev15",
+    "z3-solver": "4.16.0.0"
+  },
+  "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+  "python": "3.13.5",
+  "repeat": 3,
+  "scope": "Synthetic source fixtures, not production RTL qualification or a proprietary-tool comparison. Timings exclude interpreter startup.",
+  "status": "pass",
+  "suite": "opencollate-hierarchical-controllers-v1"
+}
