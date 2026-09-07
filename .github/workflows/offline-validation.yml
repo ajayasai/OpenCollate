@@ -1,0 +1,50 @@
+name: Offline validation bundle
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/offline-validation.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Build source and dependency bundle
+        run: |
+          mkdir -p offline/wheels
+          python -m pip wheel '.[dev]' --wheel-dir offline/wheels
+          git archive --format=tar.gz --output=offline/source.tar.gz HEAD
+          git rev-parse HEAD > offline/source-commit.txt
+          python -m pip --version > offline/pip-version.txt
+          python --version > offline/python-version.txt
+          cd offline
+          sha256sum wheels/* source.tar.gz > SHA256SUMS
+      - name: Verify installation without a package index
+        run: |
+          python -m venv offline-env
+          offline-env/bin/python -m pip install --no-index --find-links offline/wheels 'opencollate[dev]'
+          offline-env/bin/python -m pip freeze > offline/installed-requirements.txt
+          offline-env/bin/python -m pytest -q --junitxml=offline/tests.xml
+      - name: Preserve offline bundle and validation
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: offline-linux-python313
+          path: offline/
+          if-no-files-found: error
+          retention-days: 7
