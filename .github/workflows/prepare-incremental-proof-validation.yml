@@ -1,0 +1,37 @@
+name: Prepare incremental proof validation
+on:
+  push:
+    branches: [improve/certified-incremental-proofs]
+    paths: [.github/workflows/prepare-incremental-proof-validation.yml]
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Archive exact starting sources and metadata
+        run: |
+          mkdir -p evidence/wheels
+          git archive --format=zip --output=evidence/main-source.zip 58e724148f5d29a98f641abeca51bcd4b2fd5ae7
+          git archive --format=zip --output=evidence/cone-source.zip 76ae8a145db74ee01e8497b715f12193f4ab05bd
+          git ls-tree -r 58e724148f5d29a98f641abeca51bcd4b2fd5ae7 > evidence/main-tree.txt
+          git rev-parse 58e724148f5d29a98f641abeca51bcd4b2fd5ae7^{tree} > evidence/main-tree-sha.txt
+          python --version > evidence/environment.txt
+          uname -a >> evidence/environment.txt
+      - name: Download bounded offline test toolchain
+        run: |
+          python -m pip download --dest evidence/wheels --only-binary=:all: 'pyslang>=11,<12' 'systemrdl-compiler>=1.32,<1.33' 'z3-solver>=4.13,<5' 'python-sat>=1.9.dev15,<2' 'hatchling>=1.27' 'pytest>=8.3' 'pytest-cov>=6' 'hypothesis>=6.120' 'jsonschema>=4.23' 'ruff>=0.9' 'mypy>=1.13' 'bandit>=1.8' 'build>=1.2' 'twine>=6'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: incremental-proof-offline-toolchain
+          path: evidence/
+          retention-days: 7
