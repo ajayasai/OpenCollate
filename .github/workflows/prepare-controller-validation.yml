@@ -1,0 +1,31 @@
+name: Prepare controller validation
+on:
+  push:
+    branches: [upgrade/hierarchical-controller-proofs]
+    paths: [.github/workflows/prepare-controller-validation.yml]
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+      - name: Retain exact base and missing local dependencies
+        run: |
+          mkdir -p validation
+          git archive 58e724148f5d29a98f641abeca51bcd4b2fd5ae7 | gzip > validation/base.tar.gz
+          python -m pip download 'python-sat>=1.9.dev15,<2' twine -d validation/wheels
+          sudo apt-get update -qq
+          cd validation
+          apt-get download iverilog
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: controller-validation-inputs
+          path: validation
+          retention-days: 1
