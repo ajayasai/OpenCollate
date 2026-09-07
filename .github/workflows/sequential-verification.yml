@@ -33,13 +33,20 @@ jobs:
           sudo apt-get install -y iverilog
           command -v iverilog
           command -v vvp
-      - name: Run native semantics and simulator oracles
+      - name: Run native semantics, simulator and cone oracles
         shell: bash
         run: |
           set -euo pipefail
-          pytest -q tests/test_sequential.py tests/test_sequential_oracles.py | tee sequential-tests.log
+          pytest -q tests/test_sequential.py tests/test_sequential_oracles.py tests/test_sequential_cone.py | tee sequential-tests.log
       - name: Verify source-file proof and mutation corpus
-        run: python benchmarks/sequential.py --repeat 3 --json-output sequential-results.json
+        run: |
+          python benchmarks/sequential.py --repeat 3 --json-output sequential-results.json
+          python benchmarks/sequential_cone.py --repeat 3 --json-output cone-results.json
+      - name: Retain exact validated source
+        if: always()
+        run: |
+          git rev-parse HEAD > validated-source-commit.txt
+          git archive --format=tar.gz -o source-snapshot.tar.gz HEAD
       - name: Retain validation evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -48,5 +55,8 @@ jobs:
           path: |
             sequential-tests.log
             sequential-results.json
+            cone-results.json
+            validated-source-commit.txt
+            source-snapshot.tar.gz
           if-no-files-found: warn
           retention-days: 14
