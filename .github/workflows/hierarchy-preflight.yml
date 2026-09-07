@@ -1,0 +1,148 @@
+name: Hierarchy preflight
+
+on:
+  push:
+    branches: [validation/hierarchy-8f6563f6]
+    paths: [.github/workflows/hierarchy-preflight.yml]
+
+permissions:
+  contents: write
+
+env:
+  PYTHONHASHSEED: '0'
+  OPENCOLLATE_DISABLE_PLUGINS: '1'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ab9a11d3c15fca57305d289dddd084945759ca45
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+      - name: Reconstruct the exact locally tested source tree
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          import base64,hashlib,json,lzma,os,subprocess,urllib.request
+          from pathlib import Path
+          root=Path('/tmp/hierarchy-preflight-evidence');root.mkdir()
+          chunks=[]
+          for sha in ['4ffb7e331be0d2d70d21d3d65016efd5c5b55c63','2ace803b7b0f1c7944eb7920c3bb133f0e63151f','3467e7febf81f4e13bffa9c8f65c7fd663a7b628']:
+              request=urllib.request.Request('https://api.github.com/repos/ajayasai/OpenCollate/git/blobs/'+sha,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
+              with urllib.request.urlopen(request,timeout=30) as response: row=json.load(response)
+              raw=base64.b64decode(row['content'])
+              if hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()!=sha: raise RuntimeError('transport blob mismatch')
+              chunks.append(raw)
+          compressed=b''.join(chunks)
+          if hashlib.sha256(compressed).hexdigest()!='18cb57a7a77024c26a33401a2a25c3bd831facd7ef0335794c443d06c599dc77': raise RuntimeError('compressed patch mismatch')
+          patch=lzma.decompress(compressed)
+          if len(patch)!=120792 or hashlib.sha256(patch).hexdigest()!='27f78b7bf80f6ad7b91acf70e8b9f2bb3c63a4f1aa5c5d4e6e084810b0fd7fa0': raise RuntimeError('patch mismatch')
+          path=root/'upgrade.patch';path.write_bytes(patch)
+          subprocess.check_call(['git','apply','--check',str(path)])
+          subprocess.check_call(['git','apply','--index',str(path)])
+          tree=subprocess.check_output(['git','write-tree'],text=True).strip()
+          if tree!='8f6563f642900afe14a30ca663b3dd43edb96a43': raise RuntimeError('source tree mismatch: '+tree)
+          print('Exact staged source tree:',tree)
+      - name: Install regression dependencies and independent simulator
+        run: |
+          python -m pip install -e '.[dev]'
+          python -m pip freeze --exclude-editable > /tmp/hierarchy-preflight-evidence/requirements.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y iverilog
+          command -v iverilog
+          command -v vvp
+      - name: Static checks and the complete test suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          ruff check .
+          ruff format --check .
+          mypy src/opencollate
+          python -m bandit -q -r src/opencollate
+          pytest -q --cov=opencollate --cov-report=xml:/tmp/hierarchy-preflight-evidence/coverage.xml --cov-report=term --junitxml=/tmp/hierarchy-preflight-evidence/full-tests.xml | tee /tmp/hierarchy-preflight-evidence/full-tests.log
+          pytest -q tests/test_sequential_hierarchy_oracles.py --junitxml=/tmp/hierarchy-preflight-evidence/icarus-tests.xml | tee /tmp/hierarchy-preflight-evidence/icarus-tests.log
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          root=ET.parse('/tmp/hierarchy-preflight-evidence/icarus-tests.xml')
+          cases=root.findall('.//testcase')
+          assert len(cases)==19 and all(not list(c) for c in cases)
+          PY
+      - name: Measure guarded hierarchy and export exact proof obligations
+        run: python -m benchmarks.hierarchy --repeat 3 --json-output /tmp/hierarchy-preflight-evidence/hierarchy-results.json --export-dir /tmp/hierarchy-preflight-evidence/hierarchy-evidence
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: marijnheule/drat-trim
+          ref: 2e3b2dc0ecf938addbd779d42877b6ed69d9a985
+          path: .external-drat-trim
+          persist-credentials: false
+      - name: Validate all exported refutations with separate native checker code
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C .external-drat-trim drat-trim
+          count=0
+          for cnf in /tmp/hierarchy-preflight-evidence/hierarchy-evidence/*/*.cnf; do
+            .external-drat-trim/drat-trim "$cnf" "${cnf%.cnf}.rup" -f -t 30 > "${cnf%.cnf}.drat-trim.log" 2>&1
+            grep -q 's VERIFIED' "${cnf%.cnf}.drat-trim.log"
+            count=$((count + 1))
+          done
+          test "$count" -eq 14
+          echo "Verified $count exported refutations" | tee /tmp/hierarchy-preflight-evidence/external-checker-summary.txt
+      - name: Build and verify from a solver-free installed wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m build
+          python -m twine check dist/*
+          opencollate sequential certify examples/hierarchy/request.json --output /tmp/hierarchy-preflight-evidence/installed-certificate.json
+          python -m venv /tmp/hierarchy-installed-receiver
+          /tmp/hierarchy-installed-receiver/bin/python -m pip install dist/*.whl
+          /tmp/hierarchy-installed-receiver/bin/python -I -c "import importlib.util; assert all(importlib.util.find_spec(p) is None for p in ('pysat','pysolvers','z3'))"
+          /tmp/hierarchy-installed-receiver/bin/opencollate sequential verify-certificate examples/hierarchy/request.json /tmp/hierarchy-preflight-evidence/installed-certificate.json --output /tmp/hierarchy-preflight-evidence/installed-verified.json
+          cp dist/* /tmp/hierarchy-preflight-evidence/
+      - name: Prepare immutable Git objects only; no branch updates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          import base64,json,os,subprocess,urllib.request
+          from pathlib import Path
+          base='ab9a11d3c15fca57305d289dddd084945759ca45'
+          expected='8f6563f642900afe14a30ca663b3dd43edb96a43'
+          def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
+          def post(endpoint,payload):
+              request=urllib.request.Request('https://api.github.com/repos/ajayasai/OpenCollate/git/'+endpoint,data=json.dumps(payload).encode(),headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},method='POST')
+              with urllib.request.urlopen(request,timeout=30) as response: return json.load(response)
+          subprocess.check_call(['git','diff','--quiet'])
+          if git('write-tree')!=expected: raise RuntimeError('tested tree changed')
+          entries=[]
+          for line in git('diff','--cached','--name-status','--no-renames',base).splitlines():
+              status,path=line.split('\t')
+              if status=='D':
+                  entries.append({'path':path,'mode':'100644','type':'blob','sha':None})
+                  continue
+              mode,sha,stage=git('ls-files','--stage','--',path).split('\t')[0].split()
+              raw=subprocess.check_output(['git','show',':'+path])
+              actual=post('blobs',{'content':base64.b64encode(raw).decode(),'encoding':'base64'})['sha']
+              if actual!=sha: raise RuntimeError('blob mismatch: '+path)
+              entries.append({'path':path,'mode':mode,'type':'blob','sha':actual})
+          tree=post('trees',{'base_tree':'3b9fb135fa389365e0a1a87add7b85cab0d610a8','tree':entries})['sha']
+          if tree!=expected: raise RuntimeError('published tree mismatch')
+          result={'tree_sha':tree,'parent_sha':base,'branch_updated':False,'source_patch_sha256':'27f78b7bf80f6ad7b91acf70e8b9f2bb3c63a4f1aa5c5d4e6e084810b0fd7fa0'}
+          root=Path('/tmp/hierarchy-preflight-evidence')
+          (root/'tree.json').write_text(json.dumps(result,indent=2)+'\n')
+          subprocess.check_call(['git','archive','--format=tar.gz','--output='+str(root/'source.tar.gz'),tree])
+          print(json.dumps(result))
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: hierarchy-preflight-evidence
+          path: /tmp/hierarchy-preflight-evidence/
+          retention-days: 7
+          if-no-files-found: error
