@@ -25,7 +25,7 @@ jobs:
           git archive 58e724148f5d29a98f641abeca51bcd4b2fd5ae7 | gzip > validation/base.tar.gz
           tar -tzf validation/base.tar.gz > validation/archive-files.txt
           test -s validation/archive-files.txt
-          python -m pip download 'python-sat>=1.9.dev15,<2' twine -d validation/wheels
+          python -m pip download 'python-sat>=1.9.dev15,<2' twine jsonschema -d validation/wheels
           sudo apt-get update -qq
           cd validation
           apt-get download iverilog
