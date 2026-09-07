@@ -1,0 +1,71 @@
+name: Hierarchical controller verification
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONHASHSEED: "0"
+  OPENCOLLATE_DISABLE_PLUGINS: "1"
+
+jobs:
+  hierarchy-oracles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install checker and independent simulator
+        run: |
+          python -m pip install -e ".[dev]"
+          sudo apt-get update -qq
+          sudo apt-get install -y iverilog
+          command -v iverilog
+          command -v vvp
+      - name: Validate hierarchy, cones, and independent simulator traces
+        shell: bash
+        run: |
+          set -euo pipefail
+          pytest -q tests/test_sequential_hierarchy.py tests/test_sequential_cone.py tests/test_hierarchy_oracles.py tests/test_sequential_procedural.py tests/test_controller_benchmark.py --junitxml=controller-tests.xml | tee hierarchy-tests.log
+      - name: Compare full and reduced source-file verification
+        run: python benchmarks/hierarchy.py --distractors 128 --repeat 3 --json-output hierarchy-results.json
+      - name: Check controller source mutations and full-model certificates
+        run: python -m benchmarks.controllers --repeat 3 --json-output controller-results.json
+      - name: Verify hierarchical certificates without solver dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          opencollate sequential certify examples/controller/request.json --output controller-proof.json
+          opencollate sequential certify examples/controller/fsm-request.json --output fsm-proof.json
+          python -m venv "$RUNNER_TEMP/controller-receiver"
+          "$RUNNER_TEMP/controller-receiver/bin/python" -m pip install .
+          "$RUNNER_TEMP/controller-receiver/bin/python" -I -c "import importlib.util; assert importlib.util.find_spec('pysat') is None; assert importlib.util.find_spec('z3') is None"
+          "$RUNNER_TEMP/controller-receiver/bin/opencollate" sequential verify-certificate examples/controller/request.json controller-proof.json --output controller-verified.json
+          "$RUNNER_TEMP/controller-receiver/bin/opencollate" sequential verify-certificate examples/controller/fsm-request.json fsm-proof.json --output fsm-verified.json
+      - name: Retain verification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hierarchy-verification-evidence
+          path: |
+            hierarchy-tests.log
+            hierarchy-results.json
+            controller-tests.xml
+            controller-results.json
+            controller-proof.json
+            controller-verified.json
+            fsm-proof.json
+            fsm-verified.json
+          if-no-files-found: warn
+          retention-days: 14
