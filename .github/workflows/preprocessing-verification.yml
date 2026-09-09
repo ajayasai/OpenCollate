@@ -34,7 +34,7 @@ jobs:
           command -v iverilog
           command -v vvp
       - name: Verify source bindings and native simulator behavior
-        run: pytest -q tests/test_sequential_sources.py --junitxml=preprocessing-tests.xml
+        run: pytest -q tests/test_sequential_sources.py tests/test_preprocessing_schema_bounds.py --junitxml=preprocessing-tests.xml
       - name: Run source-file positive and negative oracles
         run: python -m benchmarks.preprocessing --repeat 3 --json-output preprocessing-results.json
       - name: Build a producer certificate
