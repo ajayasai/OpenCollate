@@ -173,3 +173,10 @@ and verifies full-state guard witnesses; Z3 cone reduction is not part of this c
 Neither `verify-certificate` nor its controller/hierarchy imports needs a SAT/SMT solver.
 Certificates from the earlier flat frontend must be regenerated because the bound IR includes
 hierarchy and clock aliases. See [controller semantics](controller-verification.md).
+
+## Explicit multi-file build configurations
+
+All four sequential commands use the same [manifest-bound preprocessing](manifest-preprocessing.md)
+mode. A certificate binds declared header bytes and build defines as well as root RTL.
+Receiving a preprocessed-source certificate still requires no SAT/SMT solver. The receiver
+regenerates source-derived obligations rather than trusting an imported preprocessed file.

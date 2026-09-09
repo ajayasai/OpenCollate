@@ -1,0 +1,63 @@
+name: Manifest-bound preprocessing
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONHASHSEED: "0"
+  OPENCOLLATE_DISABLE_PLUGINS: "1"
+
+jobs:
+  source-and-receiver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.13"
+      - name: Install checker and independent simulator
+        run: |
+          python -m pip install -e ".[dev]"
+          sudo apt-get update -qq
+          sudo apt-get install -y iverilog
+          command -v iverilog
+          command -v vvp
+      - name: Verify source bindings and native simulator behavior
+        run: pytest -q tests/test_sequential_sources.py tests/test_preprocessing_schema_bounds.py --junitxml=preprocessing-tests.xml
+      - name: Run source-file positive and negative oracles
+        run: python -m benchmarks.preprocessing --repeat 3 --json-output preprocessing-results.json
+      - name: Build a producer certificate
+        run: |
+          python -m build
+          opencollate sequential certify examples/preprocessed/request.json --output manifest-proof.json
+      - name: Verify installed wheel with no solver dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/manifest-receiver"
+          "$RUNNER_TEMP/manifest-receiver/bin/python" -m pip install dist/*.whl
+          "$RUNNER_TEMP/manifest-receiver/bin/python" -I -c "import importlib.util; assert importlib.util.find_spec('z3') is None; assert importlib.util.find_spec('pysat') is None"
+          "$RUNNER_TEMP/manifest-receiver/bin/opencollate" sequential verify-certificate examples/preprocessed/request.json manifest-proof.json --output manifest-verified.json
+      - name: Preserve validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: manifest-preprocessing-evidence
+          path: |
+            preprocessing-tests.xml
+            preprocessing-results.json
+            manifest-proof.json
+            manifest-verified.json
+          if-no-files-found: warn
+          retention-days: 14

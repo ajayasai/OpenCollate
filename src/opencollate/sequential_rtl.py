@@ -87,6 +87,7 @@ class _Lowerer:
         self.c = circuit
         self.sm = source_manager
         self.work = 0
+        self.source_paths: dict[str, str] = {}
         self.clock_aliases = {circuit.clock}
         self.blocking_environment: dict[str, int] | None = None
         self.blocking_writes: set[str] = set()
@@ -112,8 +113,11 @@ class _Lowerer:
 
     def location(self, obj: Any) -> dict[str, Any]:
         loc = obj.location if hasattr(obj, "location") else obj.sourceRange.start
+        # Macro-origin locations must be expanded before querying a raw column.
+        loc = self.sm.getFullyExpandedLoc(loc)
+        path = str(self.sm.getFullPath(loc.buffer)).replace("\\", "/")
         return {
-            "source": str(self.sm.getFileName(loc)),
+            "source": self.source_paths.get(path, str(self.sm.getFileName(loc))),
             "line": int(self.sm.getLineNumber(loc)),
             "column": int(self.sm.getColumnNumber(loc)),
         }
@@ -242,7 +246,14 @@ class _Lowerer:
         target[name] = root
 
 
-def load_circuit(files: list[str], *, root: Path, top: str, clock: str) -> Circuit:
+def load_circuit(
+    files: list[str],
+    *,
+    root: Path,
+    top: str,
+    clock: str,
+    preprocess: dict[str, Any] | None = None,
+) -> Circuit:
     """Load exact source bytes and lower the selected elaborated hierarchy, or fail."""
     s = importlib.import_module("pyslang")
     circuit = Circuit(top, clock, frontend=str(s.__version__))
@@ -250,29 +261,37 @@ def load_circuit(files: list[str], *, root: Path, top: str, clock: str) -> Circu
     options = s.ast.CompilationOptions()
     options.topModules = {top}
     compilation = s.ast.Compilation(s.Bag([options]))
-    total = 0
-    resolved: set[Path] = set()
-    for filename in files:
-        path = (root / filename).resolve()
-        if not path.is_relative_to(root.resolve()) or path in resolved:
-            raise SequentialError(
-                "source paths must be distinct and remain inside the request directory"
-            )
-        resolved.add(path)
-        with path.open("rb") as stream:
-            data = stream.read(1048576 + 1)
-        total += len(data)
-        if len(data) > 1048576 or total > 4194304:
-            raise SequentialError("source byte limit exceeded (1 MiB/file, 4 MiB total)")
-        text = data.decode("utf-8")
-        if "`" in text:
-            raise SequentialError(
-                "preprocessor directives/macros are unsupported in sequential input"
-            )
-        circuit.sources.append(
-            {"path": filename, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
+    source_paths: dict[str, str] = {}
+    if preprocess is not None:
+        from opencollate.sequential_sources import add_preprocessed_sources
+
+        source_paths = add_preprocessed_sources(
+            s, circuit, manager, compilation, files, root, preprocess
         )
-        compilation.addSyntaxTree(s.syntax.SyntaxTree.fromText(text, manager, filename))
+    else:
+        total = 0
+        resolved: set[Path] = set()
+        for filename in files:
+            path = (root / filename).resolve()
+            if not path.is_relative_to(root.resolve()) or path in resolved:
+                raise SequentialError(
+                    "source paths must be distinct and remain inside the request directory"
+                )
+            resolved.add(path)
+            with path.open("rb") as stream:
+                data = stream.read(1048576 + 1)
+            total += len(data)
+            if len(data) > 1048576 or total > 4194304:
+                raise SequentialError("source byte limit exceeded (1 MiB/file, 4 MiB total)")
+            text = data.decode("utf-8")
+            if "`" in text:
+                raise SequentialError(
+                    "preprocessor directives/macros are unsupported in sequential input"
+                )
+            circuit.sources.append(
+                {"path": filename, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
+            )
+            compilation.addSyntaxTree(s.syntax.SyntaxTree.fromText(text, manager, filename))
     design = compilation.getRoot()
     errors = [d for d in compilation.getAllDiagnostics() if d.isError()]
     if errors:
@@ -284,6 +303,8 @@ def load_circuit(files: list[str], *, root: Path, top: str, clock: str) -> Circu
         raise SequentialError("selected top must elaborate to exactly one module")
     from opencollate.sequential_hierarchy import lower_hierarchy
 
-    lower_hierarchy(design.topInstances[0], _Lowerer(circuit, manager))
+    lower = _Lowerer(circuit, manager)
+    lower.source_paths = source_paths
+    lower_hierarchy(design.topInstances[0], lower)
     circuit.finalize()
     return circuit

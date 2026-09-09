@@ -1,0 +1,808 @@
+{
+  "cases": [
+    {
+      "expected": "proven",
+      "median_seconds": 0.02958387499984383,
+      "name": "one-bit",
+      "outcome_sha256": "e941de512f2e3f4a22c3904189cce00c868fa2cb8a5c0fbe194ec37396cb3e4d",
+      "outcomes": [
+        {
+          "binding": {
+            "algorithm": "source-bound-k-induction-v2",
+            "frontend": "11.0.0",
+            "implementation_sha256": "ef6ff13777e3b6344c200719716a03c819214f8e57825de3343c99a2dfd884d5",
+            "ir_sha256": "10a8746e630fc6d4d7a973dfbea16d13023f4203e14d32986ef3cd76f0276951",
+            "request_sha256": "2397d64516470d349d456fba3588b7455567a46e5338b3287838cf29e0348e06",
+            "sources": [
+              {
+                "bytes": 286,
+                "path": "rtl/register.sv",
+                "sha256": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293"
+              },
+              {
+                "bytes": 235,
+                "path": "rtl/top.sv",
+                "sha256": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+              },
+              {
+                "bytes": 158,
+                "path": "include/ops.svh",
+                "sha256": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2"
+              }
+            ]
+          },
+          "certificate": "certificate-verified",
+          "source_count": 3,
+          "status": "proven"
+        },
+        {
+          "binding": {
+            "algorithm": "source-bound-k-induction-v2",
+            "frontend": "11.0.0",
+            "implementation_sha256": "ef6ff13777e3b6344c200719716a03c819214f8e57825de3343c99a2dfd884d5",
+            "ir_sha256": "10a8746e630fc6d4d7a973dfbea16d13023f4203e14d32986ef3cd76f0276951",
+            "request_sha256": "2397d64516470d349d456fba3588b7455567a46e5338b3287838cf29e0348e06",
+            "sources": [
+              {
+                "bytes": 286,
+                "path": "rtl/register.sv",
+                "sha256": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293"
+              },
+              {
+                "bytes": 235,
+                "path": "rtl/top.sv",
+                "sha256": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+              },
+              {
+                "bytes": 158,
+                "path": "include/ops.svh",
+                "sha256": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2"
+              }
+            ]
+          },
+          "certificate": "certificate-verified",
+          "source_count": 3,
+          "status": "proven"
+        },
+        {
+          "binding": {
+            "algorithm": "source-bound-k-induction-v2",
+            "frontend": "11.0.0",
+            "implementation_sha256": "ef6ff13777e3b6344c200719716a03c819214f8e57825de3343c99a2dfd884d5",
+            "ir_sha256": "10a8746e630fc6d4d7a973dfbea16d13023f4203e14d32986ef3cd76f0276951",
+            "request_sha256": "2397d64516470d349d456fba3588b7455567a46e5338b3287838cf29e0348e06",
+            "sources": [
+              {
+                "bytes": 286,
+                "path": "rtl/register.sv",
+                "sha256": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293"
+              },
+              {
+                "bytes": 235,
+                "path": "rtl/top.sv",
+                "sha256": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+              },
+              {
+                "bytes": 158,
+                "path": "include/ops.svh",
+                "sha256": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2"
+              }
+            ]
+          },
+          "certificate": "certificate-verified",
+          "source_count": 3,
+          "status": "proven"
+        }
+      ],
+      "pass": true,
+      "seconds": [
+        0.12057710499993846,
+        0.02958387499984383,
+        0.024601098000175625
+      ],
+      "source_sha256": {
+        "include/ops.svh": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2",
+        "rtl/register.sv": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293",
+        "rtl/top.sv": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+      }
+    },
+    {
+      "expected": "proven",
+      "median_seconds": 0.021352874000058364,
+      "name": "byte",
+      "outcome_sha256": "107ef6fc3f2824a0f1b5f45a2430973f47ee71649b9cc1cbd53b40afd050c93a",
+      "outcomes": [
+        {
+          "binding": {
+            "algorithm": "source-bound-k-induction-v2",
+            "frontend": "11.0.0",
+            "implementation_sha256": "ef6ff13777e3b6344c200719716a03c819214f8e57825de3343c99a2dfd884d5",
+            "ir_sha256": "5fdaf2345fb8959037ef45c78991df08db9e6b8a0d6533adef56301b482063a6",
+            "request_sha256": "8c8c75975ad8573964eb6ee9ca9bfbe43ef32a17eea719e4f011272884166895",
+            "sources": [
+              {
+                "bytes": 286,
+                "path": "rtl/register.sv",
+                "sha256": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293"
+              },
+              {
+                "bytes": 235,
+                "path": "rtl/top.sv",
+                "sha256": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+              },
+              {
+                "bytes": 158,
+                "path": "include/ops.svh",
+                "sha256": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2"
+              }
+            ]
+          },
+          "certificate": "certificate-verified",
+          "source_count": 3,
+          "status": "proven"
+        },
+        {
+          "binding": {
+            "algorithm": "source-bound-k-induction-v2",
+            "frontend": "11.0.0",
+            "implementation_sha256": "ef6ff13777e3b6344c200719716a03c819214f8e57825de3343c99a2dfd884d5",
+            "ir_sha256": "5fdaf2345fb8959037ef45c78991df08db9e6b8a0d6533adef56301b482063a6",
+            "request_sha256": "8c8c75975ad8573964eb6ee9ca9bfbe43ef32a17eea719e4f011272884166895",
+            "sources": [
+              {
+                "bytes": 286,
+                "path": "rtl/register.sv",
+                "sha256": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293"
+              },
+              {
+                "bytes": 235,
+                "path": "rtl/top.sv",
+                "sha256": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+              },
+              {
+                "bytes": 158,
+                "path": "include/ops.svh",
+                "sha256": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2"
+              }
+            ]
+          },
+          "certificate": "certificate-verified",
+          "source_count": 3,
+          "status": "proven"
+        },
+        {
+          "binding": {
+            "algorithm": "source-bound-k-induction-v2",
+            "frontend": "11.0.0",
+            "implementation_sha256": "ef6ff13777e3b6344c200719716a03c819214f8e57825de3343c99a2dfd884d5",
+            "ir_sha256": "5fdaf2345fb8959037ef45c78991df08db9e6b8a0d6533adef56301b482063a6",
+            "request_sha256": "8c8c75975ad8573964eb6ee9ca9bfbe43ef32a17eea719e4f011272884166895",
+            "sources": [
+              {
+                "bytes": 286,
+                "path": "rtl/register.sv",
+                "sha256": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293"
+              },
+              {
+                "bytes": 235,
+                "path": "rtl/top.sv",
+                "sha256": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+              },
+              {
+                "bytes": 158,
+                "path": "include/ops.svh",
+                "sha256": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2"
+              }
+            ]
+          },
+          "certificate": "certificate-verified",
+          "source_count": 3,
+          "status": "proven"
+        }
+      ],
+      "pass": true,
+      "seconds": [
+        0.0212994720000097,
+        0.022094218999882287,
+        0.021352874000058364
+      ],
+      "source_sha256": {
+        "include/ops.svh": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2",
+        "rtl/register.sv": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293",
+        "rtl/top.sv": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+      }
+    },
+    {
+      "expected": "proven",
+      "median_seconds": 0.02322942899991176,
+      "name": "word64",
+      "outcome_sha256": "e556730722d86ccb8d7c7a69a6803c513a4650adf4ab39024d3a174f578b5e15",
+      "outcomes": [
+        {
+          "binding": {
+            "algorithm": "source-bound-k-induction-v2",
+            "frontend": "11.0.0",
+            "implementation_sha256": "ef6ff13777e3b6344c200719716a03c819214f8e57825de3343c99a2dfd884d5",
+            "ir_sha256": "11852f756e29b9e37dbbc37353d0e967533e79ce07280f6882aef45a1d94bbd8",
+            "request_sha256": "310933343097bfb0ecd13a1d7930bb9d48fd51a591855ac43c20d990bc06a508",
+            "sources": [
+              {
+                "bytes": 286,
+                "path": "rtl/register.sv",
+                "sha256": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293"
+              },
+              {
+                "bytes": 235,
+                "path": "rtl/top.sv",
+                "sha256": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+              },
+              {
+                "bytes": 158,
+                "path": "include/ops.svh",
+                "sha256": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2"
+              }
+            ]
+          },
+          "certificate": "certificate-verified",
+          "source_count": 3,
+          "status": "proven"
+        },
+        {
+          "binding": {
+            "algorithm": "source-bound-k-induction-v2",
+            "frontend": "11.0.0",
+            "implementation_sha256": "ef6ff13777e3b6344c200719716a03c819214f8e57825de3343c99a2dfd884d5",
+            "ir_sha256": "11852f756e29b9e37dbbc37353d0e967533e79ce07280f6882aef45a1d94bbd8",
+            "request_sha256": "310933343097bfb0ecd13a1d7930bb9d48fd51a591855ac43c20d990bc06a508",
+            "sources": [
+              {
+                "bytes": 286,
+                "path": "rtl/register.sv",
+                "sha256": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293"
+              },
+              {
+                "bytes": 235,
+                "path": "rtl/top.sv",
+                "sha256": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+              },
+              {
+                "bytes": 158,
+                "path": "include/ops.svh",
+                "sha256": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2"
+              }
+            ]
+          },
+          "certificate": "certificate-verified",
+          "source_count": 3,
+          "status": "proven"
+        },
+        {
+          "binding": {
+            "algorithm": "source-bound-k-induction-v2",
+            "frontend": "11.0.0",
+            "implementation_sha256": "ef6ff13777e3b6344c200719716a03c819214f8e57825de3343c99a2dfd884d5",
+            "ir_sha256": "11852f756e29b9e37dbbc37353d0e967533e79ce07280f6882aef45a1d94bbd8",
+            "request_sha256": "310933343097bfb0ecd13a1d7930bb9d48fd51a591855ac43c20d990bc06a508",
+            "sources": [
+              {
+                "bytes": 286,
+                "path": "rtl/register.sv",
+                "sha256": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293"
+              },
+              {
+                "bytes": 235,
+                "path": "rtl/top.sv",
+                "sha256": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+              },
+              {
+                "bytes": 158,
+                "path": "include/ops.svh",
+                "sha256": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2"
+              }
+            ]
+          },
+          "certificate": "certificate-verified",
+          "source_count": 3,
+          "status": "proven"
+        }
+      ],
+      "pass": true,
+      "seconds": [
+        0.02322942899991176,
+        0.023863510999944992,
+        0.02307044000008318
+      ],
+      "source_sha256": {
+        "include/ops.svh": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2",
+        "rtl/register.sv": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293",
+        "rtl/top.sv": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+      }
+    },
+    {
+      "expected": "proven",
+      "median_seconds": 0.034595024000054764,
+      "name": "word256",
+      "outcome_sha256": "906f017e2e8e1bbfafec7ed8f055d5e9a1f858ee5bc6d182bb76c22791a128ec",
+      "outcomes": [
+        {
+          "binding": {
+            "algorithm": "source-bound-k-induction-v2",
+            "frontend": "11.0.0",
+            "implementation_sha256": "ef6ff13777e3b6344c200719716a03c819214f8e57825de3343c99a2dfd884d5",
+            "ir_sha256": "e9a9ab6ddd4072a81430ce0c20f66c344ebe8d4fe5523fe440b73150b2fc53e4",
+            "request_sha256": "6fc5aed92db1077e08154acb7619307851cec27b0f7c22487370270adf3d2fc1",
+            "sources": [
+              {
+                "bytes": 286,
+                "path": "rtl/register.sv",
+                "sha256": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293"
+              },
+              {
+                "bytes": 235,
+                "path": "rtl/top.sv",
+                "sha256": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+              },
+              {
+                "bytes": 158,
+                "path": "include/ops.svh",
+                "sha256": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2"
+              }
+            ]
+          },
+          "certificate": "certificate-verified",
+          "source_count": 3,
+          "status": "proven"
+        },
+        {
+          "binding": {
+            "algorithm": "source-bound-k-induction-v2",
+            "frontend": "11.0.0",
+            "implementation_sha256": "ef6ff13777e3b6344c200719716a03c819214f8e57825de3343c99a2dfd884d5",
+            "ir_sha256": "e9a9ab6ddd4072a81430ce0c20f66c344ebe8d4fe5523fe440b73150b2fc53e4",
+            "request_sha256": "6fc5aed92db1077e08154acb7619307851cec27b0f7c22487370270adf3d2fc1",
+            "sources": [
+              {
+                "bytes": 286,
+                "path": "rtl/register.sv",
+                "sha256": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293"
+              },
+              {
+                "bytes": 235,
+                "path": "rtl/top.sv",
+                "sha256": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+              },
+              {
+                "bytes": 158,
+                "path": "include/ops.svh",
+                "sha256": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2"
+              }
+            ]
+          },
+          "certificate": "certificate-verified",
+          "source_count": 3,
+          "status": "proven"
+        },
+        {
+          "binding": {
+            "algorithm": "source-bound-k-induction-v2",
+            "frontend": "11.0.0",
+            "implementation_sha256": "ef6ff13777e3b6344c200719716a03c819214f8e57825de3343c99a2dfd884d5",
+            "ir_sha256": "e9a9ab6ddd4072a81430ce0c20f66c344ebe8d4fe5523fe440b73150b2fc53e4",
+            "request_sha256": "6fc5aed92db1077e08154acb7619307851cec27b0f7c22487370270adf3d2fc1",
+            "sources": [
+              {
+                "bytes": 286,
+                "path": "rtl/register.sv",
+                "sha256": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293"
+              },
+              {
+                "bytes": 235,
+                "path": "rtl/top.sv",
+                "sha256": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+              },
+              {
+                "bytes": 158,
+                "path": "include/ops.svh",
+                "sha256": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2"
+              }
+            ]
+          },
+          "certificate": "certificate-verified",
+          "source_count": 3,
+          "status": "proven"
+        }
+      ],
+      "pass": true,
+      "seconds": [
+        0.034595024000054764,
+        0.033020633999967686,
+        0.03898161200004324
+      ],
+      "source_sha256": {
+        "include/ops.svh": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2",
+        "rtl/register.sv": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293",
+        "rtl/top.sv": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+      }
+    },
+    {
+      "expected": "counterexample",
+      "median_seconds": 0.023809667000023182,
+      "name": "inverted-build",
+      "outcome_sha256": "80c8744c5c5ccfb8bc87d319cc5f960615f4ca1e79f44f1feeed8756eeb0684f",
+      "outcomes": [
+        {
+          "certificate": "rejected-counterexample",
+          "status": "counterexample",
+          "trace": [
+            {
+              "cycle": 0,
+              "values": {
+                "d": 0,
+                "q": 0,
+                "stage.d": 0,
+                "stage.q": 0
+              }
+            },
+            {
+              "cycle": 1,
+              "values": {
+                "d": 0,
+                "q": 255,
+                "stage.d": 0,
+                "stage.q": 255
+              }
+            }
+          ]
+        },
+        {
+          "certificate": "rejected-counterexample",
+          "status": "counterexample",
+          "trace": [
+            {
+              "cycle": 0,
+              "values": {
+                "d": 0,
+                "q": 0,
+                "stage.d": 0,
+                "stage.q": 0
+              }
+            },
+            {
+              "cycle": 1,
+              "values": {
+                "d": 0,
+                "q": 255,
+                "stage.d": 0,
+                "stage.q": 255
+              }
+            }
+          ]
+        },
+        {
+          "certificate": "rejected-counterexample",
+          "status": "counterexample",
+          "trace": [
+            {
+              "cycle": 0,
+              "values": {
+                "d": 0,
+                "q": 0,
+                "stage.d": 0,
+                "stage.q": 0
+              }
+            },
+            {
+              "cycle": 1,
+              "values": {
+                "d": 0,
+                "q": 255,
+                "stage.d": 0,
+                "stage.q": 255
+              }
+            }
+          ]
+        }
+      ],
+      "pass": true,
+      "seconds": [
+        0.024283589999868127,
+        0.023809667000023182,
+        0.015756471000031524
+      ],
+      "source_sha256": {
+        "include/ops.svh": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2",
+        "rtl/register.sv": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293",
+        "rtl/top.sv": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+      }
+    },
+    {
+      "expected": "counterexample",
+      "median_seconds": 0.015543233000016698,
+      "name": "mutated-header",
+      "outcome_sha256": "80c8744c5c5ccfb8bc87d319cc5f960615f4ca1e79f44f1feeed8756eeb0684f",
+      "outcomes": [
+        {
+          "certificate": "rejected-counterexample",
+          "status": "counterexample",
+          "trace": [
+            {
+              "cycle": 0,
+              "values": {
+                "d": 0,
+                "q": 0,
+                "stage.d": 0,
+                "stage.q": 0
+              }
+            },
+            {
+              "cycle": 1,
+              "values": {
+                "d": 0,
+                "q": 255,
+                "stage.d": 0,
+                "stage.q": 255
+              }
+            }
+          ]
+        },
+        {
+          "certificate": "rejected-counterexample",
+          "status": "counterexample",
+          "trace": [
+            {
+              "cycle": 0,
+              "values": {
+                "d": 0,
+                "q": 0,
+                "stage.d": 0,
+                "stage.q": 0
+              }
+            },
+            {
+              "cycle": 1,
+              "values": {
+                "d": 0,
+                "q": 255,
+                "stage.d": 0,
+                "stage.q": 255
+              }
+            }
+          ]
+        },
+        {
+          "certificate": "rejected-counterexample",
+          "status": "counterexample",
+          "trace": [
+            {
+              "cycle": 0,
+              "values": {
+                "d": 0,
+                "q": 0,
+                "stage.d": 0,
+                "stage.q": 0
+              }
+            },
+            {
+              "cycle": 1,
+              "values": {
+                "d": 0,
+                "q": 255,
+                "stage.d": 0,
+                "stage.q": 255
+              }
+            }
+          ]
+        }
+      ],
+      "pass": true,
+      "seconds": [
+        0.015543233000016698,
+        0.016378723000116224,
+        0.014496925000003102
+      ],
+      "source_sha256": {
+        "include/ops.svh": "60e022ed688e4033edef16ce4016d593271dc550f460b79fe9130e950c552f0a",
+        "rtl/register.sv": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293",
+        "rtl/top.sv": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+      }
+    },
+    {
+      "expected": "rejected",
+      "median_seconds": 0.0008895410001059645,
+      "name": "missing-header",
+      "outcome_sha256": "bbdae8c390d214454aceefed7d73dce1aeaf2825ab845d55f81e859e0d52f9a1",
+      "outcomes": [
+        {
+          "reason": "rtl/register.sv: include 'ops.svh' must resolve to exactly one declared header; found []",
+          "status": "rejected"
+        },
+        {
+          "reason": "rtl/register.sv: include 'ops.svh' must resolve to exactly one declared header; found []",
+          "status": "rejected"
+        },
+        {
+          "reason": "rtl/register.sv: include 'ops.svh' must resolve to exactly one declared header; found []",
+          "status": "rejected"
+        }
+      ],
+      "pass": true,
+      "seconds": [
+        0.0008895410001059645,
+        0.0009485890000178188,
+        0.0008168370000021241
+      ],
+      "source_sha256": {
+        "include/ops.svh": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2",
+        "rtl/register.sv": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293",
+        "rtl/top.sv": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+      }
+    },
+    {
+      "expected": "rejected",
+      "median_seconds": 0.0012050800000906747,
+      "name": "ambiguous-header",
+      "outcome_sha256": "537abe8ffa3d446cf280c9a30fd271cf1e2f55f2fff5cd8a2ebeb65c8710187a",
+      "outcomes": [
+        {
+          "reason": "rtl/register.sv: include 'ops.svh' must resolve to exactly one declared header; found ['include/ops.svh', 'rtl/ops.svh']",
+          "status": "rejected"
+        },
+        {
+          "reason": "rtl/register.sv: include 'ops.svh' must resolve to exactly one declared header; found ['include/ops.svh', 'rtl/ops.svh']",
+          "status": "rejected"
+        },
+        {
+          "reason": "rtl/register.sv: include 'ops.svh' must resolve to exactly one declared header; found ['include/ops.svh', 'rtl/ops.svh']",
+          "status": "rejected"
+        }
+      ],
+      "pass": true,
+      "seconds": [
+        0.0012111710000226594,
+        0.0011258740000812395,
+        0.0012050800000906747
+      ],
+      "source_sha256": {
+        "include/ops.svh": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2",
+        "rtl/ops.svh": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2",
+        "rtl/register.sv": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293",
+        "rtl/top.sv": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+      }
+    },
+    {
+      "expected": "rejected",
+      "median_seconds": 0.0009537819998968189,
+      "name": "computed-include",
+      "outcome_sha256": "7bdcf3286ef228cf75678d6f1c49032cd898101a2fe89607744f8bdde8fcd325",
+      "outcomes": [
+        {
+          "reason": "include requires a literal quoted header path; computed includes are unsupported",
+          "status": "rejected"
+        },
+        {
+          "reason": "include requires a literal quoted header path; computed includes are unsupported",
+          "status": "rejected"
+        },
+        {
+          "reason": "include requires a literal quoted header path; computed includes are unsupported",
+          "status": "rejected"
+        }
+      ],
+      "pass": true,
+      "seconds": [
+        0.0009673449999354489,
+        0.000896337000085623,
+        0.0009537819998968189
+      ],
+      "source_sha256": {
+        "include/ops.svh": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2",
+        "rtl/register.sv": "da9e8d2a0a8405feeddc8962a72701c27c453ed96a51572115c8883c5a49abfd",
+        "rtl/top.sv": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+      }
+    },
+    {
+      "expected": "rejected",
+      "median_seconds": 0.0009626309999930527,
+      "name": "inactive-undeclared-include",
+      "outcome_sha256": "26769a71c7393105b16ea490ea28220b2dce54bcf8aeafcde455025acae2d23e",
+      "outcomes": [
+        {
+          "reason": "rtl/register.sv: include 'unlisted.svh' must resolve to exactly one declared header; found []",
+          "status": "rejected"
+        },
+        {
+          "reason": "rtl/register.sv: include 'unlisted.svh' must resolve to exactly one declared header; found []",
+          "status": "rejected"
+        },
+        {
+          "reason": "rtl/register.sv: include 'unlisted.svh' must resolve to exactly one declared header; found []",
+          "status": "rejected"
+        }
+      ],
+      "pass": true,
+      "seconds": [
+        0.0009603270000297925,
+        0.0010146030001578765,
+        0.0009626309999930527
+      ],
+      "source_sha256": {
+        "include/ops.svh": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2",
+        "rtl/register.sv": "7e314add51c5cd688c4826b71b2ffc48b28f12bf6343455ebba0b156bf40c4b8",
+        "rtl/top.sv": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+      }
+    },
+    {
+      "expected": "rejected",
+      "median_seconds": 0.0010095540001202608,
+      "name": "source-location-spoof",
+      "outcome_sha256": "c8d02586e42f10db72db20fa12a33cf9f7a150f7a74cc2b76574e4f7c0398fc9",
+      "outcomes": [
+        {
+          "reason": "unsupported directive or undeclared macro: `line",
+          "status": "rejected"
+        },
+        {
+          "reason": "unsupported directive or undeclared macro: `line",
+          "status": "rejected"
+        },
+        {
+          "reason": "unsupported directive or undeclared macro: `line",
+          "status": "rejected"
+        }
+      ],
+      "pass": true,
+      "seconds": [
+        0.0010095540001202608,
+        0.000929195000026084,
+        0.0010727439998845512
+      ],
+      "source_sha256": {
+        "include/ops.svh": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2",
+        "rtl/register.sv": "b4f1d086a36c5f4d15012df337717d1afbb2113dffc969c47f0fd502a4d3a49a",
+        "rtl/top.sv": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+      }
+    },
+    {
+      "expected": "stale-rejected",
+      "median_seconds": 0.03667358300003798,
+      "name": "inactive-header-drift",
+      "outcome_sha256": "d3bfdc10738ee3c75ef74f28ad99f8866dd07ebff5ba3f383655ad2fa7909c7f",
+      "outcomes": [
+        {
+          "logical_result": "proven",
+          "status": "stale-rejected"
+        },
+        {
+          "logical_result": "proven",
+          "status": "stale-rejected"
+        },
+        {
+          "logical_result": "proven",
+          "status": "stale-rejected"
+        }
+      ],
+      "pass": true,
+      "seconds": [
+        0.03639276800004154,
+        0.03681013300001723,
+        0.03667358300003798
+      ],
+      "source_sha256": {
+        "include/ops.svh": "946700ef3d780efc4c95327207aaca332bbb529979e99d09f12fda05c2c065c2",
+        "rtl/register.sv": "7b76c46165b67bd6b9c78ae29b257419c853f651711f229af05aab96a40d9293",
+        "rtl/top.sv": "72179db2528eff39de0146a1ab9f02ab267cf0dc6aee6e90829e42b415770df5"
+      }
+    }
+  ],
+  "dependencies": {
+    "pyslang": "11.0.0",
+    "python-sat": "1.9.dev15",
+    "z3-solver": "4.16.0.0"
+  },
+  "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+  "python": "3.13.5",
+  "repeat": 3,
+  "scope": "Structured source-file regression corpus, not a commercial comparison, production SoC or all-build-configurations proof.",
+  "status": "pass",
+  "suite": "manifest-preprocessing-v1"
+}

@@ -90,8 +90,9 @@ X/Z literals, inout/ref ports, special net resolution/strengths, declaration ini
 initial/final blocks, procedural blocking clocked/latch blocks, procedural loops, wildcard or
 unique/priority cases, dynamic selects,
 partial clocked left-hand-side assignments, function calls, division/modulus, real/array/struct data,
-preprocessor directives/macros, and arbitrary delays. All backticks are conservatively rejected
-before preprocessing, including backticks in comments. Undriven observed signals, multiple drivers
+arbitrary delays, and unrestricted preprocessing. Without an explicit `preprocess` object,
+all backticks are conservatively rejected, including those in comments. The opt-in
+[manifest loader](manifest-preprocessing.md) supports declared literal headers and native macros. Undriven observed signals, multiple drivers
 and combinational cycles are rejected. This is not a full SystemVerilog or SVA frontend.
 
 ## Replay and trust

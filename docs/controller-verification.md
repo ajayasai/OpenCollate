@@ -52,7 +52,7 @@ assumption is silently introduced. Ordinary reset and default branches handle su
 Only module/generate-level signal declarations are supported. Procedural locals/named scopes,
 procedural loops, functions/tasks, partial procedural LHS assignments, compound assignments,
 nonblocking combinational assignments, blocking clocked assignments, latches, general event lists,
-preprocessing, interfaces/modports, multiple/gated clocks, asynchronous reset and four-state
+unrestricted preprocessing (see [manifest mode](manifest-preprocessing.md)), interfaces/modports, multiple/gated clocks, asynchronous reset and four-state
 semantics remain outside this feature. Each case is bounded to 256 groups and 1024 labels;
 existing expression depth, lowering work, source size and model limits also apply.
 

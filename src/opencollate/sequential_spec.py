@@ -8,6 +8,7 @@ from typing import Any
 
 from opencollate.sequential_ir import Circuit, SequentialError
 from opencollate.sequential_rtl import IDENTIFIER, SIGNAL_PATH
+from opencollate.sequential_sources import normalize_preprocess
 
 SEMANTICS = "two-valued-synchronous"
 
@@ -82,7 +83,7 @@ def normalize(value: Any) -> dict[str, Any]:
     r = obj(
         value,
         {"schema_version", "semantics", "files", "top", "clock", "properties"},
-        {"reset", "assumptions", "depth", "induction"},
+        {"reset", "assumptions", "depth", "induction", "preprocess"},
     )
     integer(r["schema_version"], 1, 1, "schema_version")
     if r["semantics"] != SEMANTICS:
@@ -170,7 +171,7 @@ def normalize(value: Any) -> dict[str, Any]:
             "start_cycle",
         )
         props.append(prop)
-    return {
+    result = {
         "schema_version": 1,
         "semantics": SEMANTICS,
         "files": list(files),
@@ -182,6 +183,10 @@ def normalize(value: Any) -> dict[str, Any]:
         "induction": integer(r.get("induction", 4), 0, 16, "induction"),
         "properties": sorted(props, key=lambda p: p["id"]),
     }
+
+    if "preprocess" in r:
+        result["preprocess"] = normalize_preprocess(r["preprocess"], files)
+    return result
 
 
 def validate_signals(c: Circuit, spec: dict[str, Any]) -> None:

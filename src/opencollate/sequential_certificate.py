@@ -20,6 +20,7 @@ from opencollate.proof_producer_io import flush_producer_output, read_producer_p
 from opencollate.sequential_cnf import ENCODING, Unroller, base_problem, digest, step_problem
 from opencollate.sequential_ir import Circuit, simulate_frame
 from opencollate.sequential_rtl import load_circuit
+from opencollate.sequential_sources import declared_files
 from opencollate.sequential_spec import (
     SEMANTICS,
     holds,
@@ -42,7 +43,13 @@ def _binding(c: Circuit, spec: dict[str, Any]) -> dict[str, Any]:
 
 def _load(request: dict[str, Any], root: Path) -> tuple[Circuit, dict[str, Any]]:
     spec = normalize(request)
-    circuit = load_circuit(spec["files"], root=root, top=spec["top"], clock=spec["clock"])
+    circuit = load_circuit(
+        spec["files"],
+        root=root,
+        top=spec["top"],
+        clock=spec["clock"],
+        preprocess=spec.get("preprocess"),
+    )
     validate_signals(circuit, spec)
     return circuit, spec
 
@@ -340,7 +347,10 @@ def command_handler(args: argparse.Namespace) -> int:
         request_path = args.request.resolve()
         request = read_json(request_path)
         spec = normalize(request)
-        protected = [request_path, *[(request_path.parent / f).resolve() for f in spec["files"]]]
+        protected = [
+            request_path,
+            *[(request_path.parent / f).resolve() for f in declared_files(spec)],
+        ]
         checking = args.sequential_command == "verify-certificate"
         if checking:
             protected.append(args.certificate.resolve())

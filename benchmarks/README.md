@@ -185,3 +185,12 @@ The controller corpus has three positive and nine negative/incomplete source cas
 reduced/full outcomes and traces, full-model certificates, and exact rejection reasons; it never
 counts an arbitrary crash as a correct rejection. Timings are host-specific and exclude interpreter
 startup. No proprietary tool or production qualification is represented by these synthetic cases.
+
+## Manifest-bound preprocessing
+
+`python -m benchmarks.preprocessing --repeat 3 --json-output preprocessing.json`
+runs four positive multi-file width variants, two actual source/build mutants, five
+specific dependency/syntax rejections, and an inactive-header stale-proof rejection.
+Positive cases require full-model certificate verification. The independent Icarus test
+in `tests/test_sequential_sources.py` checks 512 byte/configuration samples. These are
+finite synthetic validation cases, not a production-SoC or proprietary-tool comparison.
