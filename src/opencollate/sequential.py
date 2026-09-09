@@ -17,6 +17,7 @@ from opencollate.sequential_cone import cone_summary, expand_trace, property_con
 from opencollate.sequential_ir import SequentialError
 from opencollate.sequential_rtl import load_circuit
 from opencollate.sequential_smt import Budget, verify_property
+from opencollate.sequential_sources import declared_files
 from opencollate.sequential_spec import SEMANTICS, integer, normalize, read_json, validate_signals
 
 ALGORITHM = "source-bound-k-induction-v2"
@@ -54,7 +55,13 @@ def run_request(
     if type(cone_reduction) is not bool:
         raise SequentialError("cone_reduction must be a boolean")
     # Binding depends on exact source bytes, assumptions and lowering, not just formula text.
-    c = load_circuit(spec["files"], root=root, top=spec["top"], clock=spec["clock"])
+    c = load_circuit(
+        spec["files"],
+        root=root,
+        top=spec["top"],
+        clock=spec["clock"],
+        preprocess=spec.get("preprocess"),
+    )
     validate_signals(c, spec)
     binding = {
         "request_sha256": digest(spec),
@@ -216,7 +223,10 @@ def command_handler(args: argparse.Namespace) -> int:
         request = read_json(request_path)
         # Do not let publication overwrite a source, request, or input receipt.
         spec = normalize(request)
-        protected = [request_path, *[(request_path.parent / f).resolve() for f in spec["files"]]]
+        protected = [
+            request_path,
+            *[(request_path.parent / f).resolve() for f in declared_files(spec)],
+        ]
         if args.sequential_command == "replay":
             protected.append(args.receipt.resolve())
         if args.output:

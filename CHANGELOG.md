@@ -6,6 +6,17 @@ The format follows Keep a Changelog, and the project uses Semantic Versioning.
 
 ## [Unreleased]
 
+### Manifest-bound native preprocessing
+
+- Explicit multi-file sequential build configurations with bounded original-source
+  snapshots, literal declared headers, build defines and native macro/conditional expansion.
+- Same source loader for Z3 checks, receipt replay and solver-free RUP verification;
+  header/configuration changes invalidate old evidence. No ambient include-file shadowing.
+- Logical macro/header source provenance, input/output alias protection for all headers,
+  strict schema/capabilities, independent Icarus checks and 12 source-level benchmark cases.
+- The mode is opt-in and conservative: no computed includes, token pasting, user source-location
+  directives or unrestricted SystemVerilog preprocessing; no commercial superiority claim.
+
 ### Hierarchical controller proofs
 
 - Integrate elaborated hierarchy and exact property-cone checking with the independent

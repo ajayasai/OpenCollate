@@ -102,7 +102,7 @@ Optional Icarus tests simulate original hierarchical RTL; they are skipped when 
 is absent. A separate read-only workflow installs Icarus and runs those tests.
 
 Remaining boundaries include full SystemVerilog/SVA, procedural `case`/loops/`always_comb`,
-preprocessing, interfaces/modports, asynchronous reset, multi-clock verification, four-state
+unrestricted preprocessing (see [manifest mode](manifest-preprocessing.md)), interfaces/modports, asynchronous reset, multi-clock verification, four-state
 semantics, liveness, industrial qualification, and independently checked UNSAT certificates.
 Proven results still trust slang, translation, cone selection, Z3, and induction. Open tests
 and source hashes do not constitute safety certification or demonstrate universal superiority.

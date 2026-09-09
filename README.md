@@ -184,6 +184,23 @@ See [controller semantics](docs/controller-verification.md) and
 [hierarchy and exact reduction](docs/hierarchical-sequential.md). This remains a bounded supported
 hardware subset, not general SystemVerilog simulation equivalence or a signoff replacement.
 
+## Manifest-bound multi-file builds (development)
+
+Sequential checks and solver-free proof receivers now accept explicit headers,
+include directories and build defines through a request's `preprocess` object.
+Native slang handles supported macro expansion and conditional compilation; exact
+source snapshots prevent undeclared disk-file shadowing and stale header evidence.
+
+```console
+opencollate sequential check examples/preprocessed/request.json --output receipt.json
+opencollate sequential certify examples/preprocessed/request.json --output proof.json
+opencollate sequential verify-certificate examples/preprocessed/request.json proof.json
+```
+
+This is a single ordered compilation unit, not unrestricted preprocessing or a
+sandbox. Computed includes, token pasting and ambiguous declared includes are
+rejected. See [manifest semantics and safety boundaries](docs/manifest-preprocessing.md).
+
 ## Commands
 
 ```text

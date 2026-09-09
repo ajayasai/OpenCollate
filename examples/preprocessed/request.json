@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "semantics": "two-valued-synchronous",
+  "files": ["rtl/register.sv", "rtl/top.sv"],
+  "preprocess": {
+    "headers": ["include/ops.svh"],
+    "include_dirs": ["include"],
+    "defines": {"DATA_WIDTH": "8"}
+  },
+  "top": "top",
+  "clock": "clk",
+  "depth": 4,
+  "induction": 2,
+  "properties": [
+    {"id": "one-cycle-transfer", "source": "d", "sink": "q", "latency": 1}
+  ]
+}
