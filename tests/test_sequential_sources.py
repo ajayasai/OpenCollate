@@ -124,9 +124,9 @@ def test_snapshot_precedes_native_frontend_no_header_reread(
     request = project(tmp_path)
     saved = sources._tokens
 
-    def change_after_snapshot(s: Any, data: bytes) -> Any:
+    def change_after_snapshot(s: Any, data: bytes, *, remaining: int) -> Any:
         (tmp_path / "inc/defs.svh").write_text("`define VALUE(a) (~a)\n")
-        return saved(s, data)
+        return saved(s, data, remaining=remaining)
 
     monkeypatch.setattr(sources, "_tokens", change_after_snapshot)
     receipt = run_request(request, root=tmp_path)
@@ -503,3 +503,36 @@ def test_public_preprocessing_oracles() -> None:
     assert sum(row["expected"] == "proven" for row in result["cases"]) == 4
     with pytest.raises(ValueError):
         run_suite(repeat=0)
+
+
+def test_lexical_budget_is_shared_before_reading_each_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from opencollate import sequential_sources as sources
+
+    request = project(tmp_path)
+    # The first file fits, but roots and headers together exceed the cap.
+    import pyslang
+
+    first = (tmp_path / request["files"][0]).read_bytes()
+    count = len(sources._tokens(pyslang, first, remaining=200000))
+    monkeypatch.setattr(sources, "_MAX_TOKENS", count + 1)
+    original = sources._tokens
+    budgets: list[int] = []
+
+    def tracked(s: Any, data: bytes, *, remaining: int) -> list[tuple[str, str, int, int]]:
+        budgets.append(remaining)
+        return original(s, data, remaining=remaining)
+
+    monkeypatch.setattr(sources, "_tokens", tracked)
+    with pytest.raises(SequentialError, match="token limit"):
+        run_request(request, root=tmp_path)
+    assert budgets == [count + 1, 1]
+
+
+def test_many_literal_includes_keep_original_line_order(tmp_path: Path) -> None:
+    request = project(tmp_path)
+    source = tmp_path / request["files"][0]
+    original = source.read_text()
+    source.write_text('`include "defs.svh"\n' * 128 + original)
+    assert run_request(request, root=tmp_path)["status"] == "proven"

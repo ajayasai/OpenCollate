@@ -183,7 +183,7 @@ def _logical_end(data: bytes, offset: int) -> int:
             return end
 
 
-def _tokens(s: Any, data: bytes) -> list[tuple[str, str, int, int]]:
+def _tokens(s: Any, data: bytes, *, remaining: int) -> list[tuple[str, str, int, int]]:
     sm = s.SourceManager()
     allocator = s.BumpAllocator()
     diagnostics = s.Diagnostics()
@@ -194,7 +194,7 @@ def _tokens(s: Any, data: bytes) -> list[tuple[str, str, int, int]]:
         kind = token.kind.name
         if kind == "EndOfFile":
             break
-        if len(result) >= _MAX_TOKENS:
+        if len(result) >= remaining:
             raise SequentialError("preprocessing lexical token limit exceeded")
         text = token.rawText
         start = int(token.location.offset)
@@ -272,10 +272,13 @@ def _rewrite(
             raise SequentialError(f"unsupported directive or undeclared macro: {text}")
         elif directive in _ALLOWED and start < macro_end:
             raise SequentialError("compiler directives inside macro replacements are unsupported")
-    result = data
-    for a, b, value in reversed(edits):
-        result = result[:a] + value + result[b:]
-    return result
+    chunks: list[bytes] = []
+    cursor = 0
+    for a, b, value in edits:
+        chunks.extend((data[cursor:a], value))
+        cursor = b
+    chunks.append(data[cursor:])
+    return b"".join(chunks)
 
 
 def add_preprocessed_sources(
@@ -290,9 +293,12 @@ def add_preprocessed_sources(
     """Preload exact bounded snapshots and parse a single ordered compilation unit."""
     options = normalize_preprocess(options, files)
     data = _snapshot([*files, *options["headers"]], root)
-    tokens = {filename: _tokens(s, content) for filename, content in data.items()}
-    if sum(map(len, tokens.values())) > _MAX_TOKENS:
-        raise SequentialError("preprocessing total token limit exceeded")
+    tokens = {}
+    remaining = _MAX_TOKENS
+    for filename, content in data.items():
+        rows = _tokens(s, content, remaining=remaining)
+        tokens[filename] = rows
+        remaining -= len(rows)
     names = set(options["defines"]) | {"__LINE__"}
     for rows in tokens.values():
         for i, (kind, text, _a, _b) in enumerate(rows):
