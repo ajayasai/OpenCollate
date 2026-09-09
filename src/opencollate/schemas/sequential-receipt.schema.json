@@ -52,7 +52,7 @@
                 "additionalProperties": false
               },
               "minItems": 1,
-              "maxItems": 32
+              "maxItems": 160
             },
             "frontend": {
               "type": "string"
