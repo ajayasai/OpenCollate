@@ -1,0 +1,105 @@
+--- a/src/opencollate/sequential_sources.py
++++ b/src/opencollate/sequential_sources.py
+@@ -183,7 +183,7 @@
+             return end
+ 
+ 
+-def _tokens(s: Any, data: bytes) -> list[tuple[str, str, int, int]]:
++def _tokens(s: Any, data: bytes, *, remaining: int) -> list[tuple[str, str, int, int]]:
+     sm = s.SourceManager()
+     allocator = s.BumpAllocator()
+     diagnostics = s.Diagnostics()
+@@ -194,7 +194,7 @@
+         kind = token.kind.name
+         if kind == "EndOfFile":
+             break
+-        if len(result) >= _MAX_TOKENS:
++        if len(result) >= remaining:
+             raise SequentialError("preprocessing lexical token limit exceeded")
+         text = token.rawText
+         start = int(token.location.offset)
+@@ -272,10 +272,13 @@
+             raise SequentialError(f"unsupported directive or undeclared macro: {text}")
+         elif directive in _ALLOWED and start < macro_end:
+             raise SequentialError("compiler directives inside macro replacements are unsupported")
+-    result = data
+-    for a, b, value in reversed(edits):
+-        result = result[:a] + value + result[b:]
+-    return result
++    chunks: list[bytes] = []
++    cursor = 0
++    for a, b, value in edits:
++        chunks.extend((data[cursor:a], value))
++        cursor = b
++    chunks.append(data[cursor:])
++    return b"".join(chunks)
+ 
+ 
+ def add_preprocessed_sources(
+@@ -290,9 +293,12 @@
+     """Preload exact bounded snapshots and parse a single ordered compilation unit."""
+     options = normalize_preprocess(options, files)
+     data = _snapshot([*files, *options["headers"]], root)
+-    tokens = {filename: _tokens(s, content) for filename, content in data.items()}
+-    if sum(map(len, tokens.values())) > _MAX_TOKENS:
+-        raise SequentialError("preprocessing total token limit exceeded")
++    tokens = {}
++    remaining = _MAX_TOKENS
++    for filename, content in data.items():
++        rows = _tokens(s, content, remaining=remaining)
++        tokens[filename] = rows
++        remaining -= len(rows)
+     names = set(options["defines"]) | {"__LINE__"}
+     for rows in tokens.values():
+         for i, (kind, text, _a, _b) in enumerate(rows):
+--- a/tests/test_sequential_sources.py
++++ b/tests/test_sequential_sources.py
+@@ -124,9 +124,9 @@
+     request = project(tmp_path)
+     saved = sources._tokens
+ 
+-    def change_after_snapshot(s: Any, data: bytes) -> Any:
++    def change_after_snapshot(s: Any, data: bytes, *, remaining: int) -> Any:
+         (tmp_path / "inc/defs.svh").write_text("`define VALUE(a) (~a)\n")
+-        return saved(s, data)
++        return saved(s, data, remaining=remaining)
+ 
+     monkeypatch.setattr(sources, "_tokens", change_after_snapshot)
+     receipt = run_request(request, root=tmp_path)
+@@ -503,3 +503,36 @@
+     assert sum(row["expected"] == "proven" for row in result["cases"]) == 4
+     with pytest.raises(ValueError):
+         run_suite(repeat=0)
++
++
++def test_lexical_budget_is_shared_before_reading_each_file(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    from opencollate import sequential_sources as sources
++
++    request = project(tmp_path)
++    # The first file fits, but roots and headers together exceed the cap.
++    import pyslang
++
++    first = (tmp_path / request["files"][0]).read_bytes()
++    count = len(sources._tokens(pyslang, first, remaining=200000))
++    monkeypatch.setattr(sources, "_MAX_TOKENS", count + 1)
++    original = sources._tokens
++    budgets: list[int] = []
++
++    def tracked(s: Any, data: bytes, *, remaining: int) -> list[tuple[str, str, int, int]]:
++        budgets.append(remaining)
++        return original(s, data, remaining=remaining)
++
++    monkeypatch.setattr(sources, "_tokens", tracked)
++    with pytest.raises(SequentialError, match="token limit"):
++        run_request(request, root=tmp_path)
++    assert budgets == [count + 1, 1]
++
++
++def test_many_literal_includes_keep_original_line_order(tmp_path: Path) -> None:
++    request = project(tmp_path)
++    source = tmp_path / request["files"][0]
++    original = source.read_text()
++    source.write_text('`include "defs.svh"\n' * 128 + original)
++    assert run_request(request, root=tmp_path)["status"] == "proven"
