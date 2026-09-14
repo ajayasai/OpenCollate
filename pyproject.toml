@@ -46,11 +46,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-formal = ["z3-solver>=4.13,<5"]
+formal = ["z3-solver>=4.13,<6"]
 certificates = ["python-sat>=1.9.dev15,<2"]
 dev = [
   "python-sat>=1.9.dev15,<2",
-  "z3-solver>=4.13,<5",
+  "z3-solver>=4.13,<6",
   "bandit>=1.8",
   "build>=1.2",
   "coverage[toml]>=7.6",
