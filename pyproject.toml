@@ -41,7 +41,7 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
 ]
 dependencies = [
-  "pyslang>=11,<12",
+  "pyslang>=11,<13",
   "systemrdl-compiler>=1.32,<1.33",
 ]
 
